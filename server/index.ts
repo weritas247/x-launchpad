@@ -6,6 +6,7 @@ import * as pty from 'node-pty';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as os from 'os';
 import { execFileSync } from 'child_process';
+import * as gitService from './git-service';
 
 const app = express();
 const server = http.createServer(app);
@@ -458,20 +459,7 @@ wss.on('connection', (ws: WebSocket) => {
       const session = sessions.get(id);
       if (!session) return;
       try {
-        const raw = execFileSync('git', [
-          'log', '--format=%H%x00%P%x00%D%x00%an%x00%aI%x00%s', '--max-count=50', '--all',
-        ], { cwd: session.cwd, encoding: 'utf-8', timeout: 5000 }).trim();
-        const commits = raw.split('\n').filter(Boolean).map(line => {
-          const [hash, parentStr, refStr, author, date, ...msgParts] = line.split('\x00');
-          return {
-            hash,
-            parents: parentStr ? parentStr.split(' ') : [],
-            refs: refStr ? refStr.split(', ').map((r: string) => r.trim()).filter(Boolean) : [],
-            author,
-            date,
-            message: msgParts.join('\x00'),
-          };
-        });
+        const commits = gitService.getGitLog(session.cwd);
         ws.send(JSON.stringify({ type: 'git_graph_data', sessionId: id, commits }));
       } catch (e) {
         ws.send(JSON.stringify({ type: 'git_graph_data', sessionId: id, commits: [], error: String(e) }));
@@ -488,13 +476,7 @@ wss.on('connection', (ws: WebSocket) => {
         return;
       }
       try {
-        const raw = execFileSync('git', [
-          'diff-tree', '--no-commit-id', '--name-status', '-r', hash,
-        ], { cwd: session.cwd, encoding: 'utf-8', timeout: 5000 }).trim();
-        const files = raw.split('\n').filter(Boolean).map(line => {
-          const [status, ...pathParts] = line.split('\t');
-          return { status, path: pathParts.join('\t') };
-        });
+        const files = gitService.getFileList(session.cwd, hash);
         ws.send(JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files }));
       } catch (e) {
         ws.send(JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files: [], error: String(e) }));
@@ -506,18 +488,52 @@ wss.on('connection', (ws: WebSocket) => {
       const session = sessions.get(id);
       if (!session) return;
       try {
-        let branch = execFileSync('git', ['branch', '--show-current'], {
-          cwd: session.cwd, encoding: 'utf-8', timeout: 3000,
-        }).trim();
-        if (!branch) {
-          branch = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
-            cwd: session.cwd, encoding: 'utf-8', timeout: 3000,
-          }).trim();
-        }
+        const branch = gitService.getCurrentBranch(session.cwd);
         ws.send(JSON.stringify({ type: 'git_branch_data', sessionId: id, branch }));
       } catch {
         ws.send(JSON.stringify({ type: 'git_branch_data', sessionId: id, branch: null }));
       }
+
+    } else if (parsed.type === 'git_branch_list') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      try {
+        const branches = gitService.getBranchList(session.cwd);
+        ws.send(JSON.stringify({ type: 'git_branch_list_data', sessionId: id, branches }));
+      } catch (e) {
+        ws.send(JSON.stringify({ type: 'git_branch_list_data', sessionId: id, branches: [], error: String(e) }));
+      }
+
+    } else if (parsed.type === 'git_remote_url') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const url = gitService.getRemoteUrl(session.cwd);
+      ws.send(JSON.stringify({ type: 'git_remote_url_data', sessionId: id, url }));
+
+    } else if (parsed.type === 'git_checkout') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const branch = parsed.branch as string;
+      if (!branch || !/^[a-zA-Z0-9][a-zA-Z0-9/_.\-]*$/.test(branch)) {
+        ws.send(JSON.stringify({ type: 'git_checkout_ack', sessionId: id, error: 'Invalid branch name' }));
+        return;
+      }
+      // For remote branches like origin/feature, create a local tracking branch
+      let cmd: string;
+      if (branch.startsWith('origin/')) {
+        const localName = branch.slice(7);
+        cmd = `git checkout -b ${localName} --track ${branch}`;
+      } else {
+        cmd = `git checkout ${branch}`;
+      }
+      session.pty.write(cmd + '\r');
+      ws.send(JSON.stringify({ type: 'git_checkout_ack', sessionId: id, branch }));
     }
   });
 

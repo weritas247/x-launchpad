@@ -137,8 +137,13 @@
       <span class="gg-title-icon">⎇</span>
       <span class="gg-repo-name" id="gg-repo-name"></span>
       <span class="gg-branch-badge" id="gg-branch-badge"></span>
+      <div class="gg-branch-dropdown" id="gg-branch-dropdown">
+        <button class="gg-branch-trigger" id="gg-branch-trigger">⎇ <span id="gg-branch-trigger-label">branches</span> ▾</button>
+        <div class="gg-branch-menu" id="gg-branch-menu"></div>
+      </div>
       <span style="flex:1"></span>
-      <button class="settings-close" id="gg-close">✕</button>
+      <button class="gg-github-btn" id="gg-github-btn" style="display:none" title="Open on GitHub">GitHub ↗</button>
+      <button class="gg-close-btn" id="gg-close">✕</button>
     </div>
     <div class="gg-body" id="gg-body">
       <div class="gg-loading" id="gg-loading">
@@ -156,7 +161,18 @@
             <span class="gg-file-title" id="gg-file-title">Changed files</span>
             <button class="gg-file-close" id="gg-file-close">✕</button>
           </div>
+          <div class="gg-commit-body" id="gg-commit-body" style="display:none"></div>
           <div class="gg-file-list" id="gg-file-list"></div>
+        </div>
+      </div>
+    </div>
+    <!-- CONFIRM DIALOG -->
+    <div class="gg-confirm" id="gg-confirm" style="display:none">
+      <div class="gg-confirm-box">
+        <div class="gg-confirm-message" id="gg-confirm-message"></div>
+        <div class="gg-confirm-actions">
+          <button class="gg-confirm-ok" id="gg-confirm-ok">Switch Branch</button>
+          <button class="gg-confirm-cancel" id="gg-confirm-cancel">Cancel</button>
         </div>
       </div>
     </div>

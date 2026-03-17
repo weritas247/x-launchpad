@@ -8,7 +8,7 @@ import { newSession, closeSession, renameSession, syncSessionList, attachTermina
 import { loadSettings, applySettings, openSettings, closeSettings, initSettingsUI } from './settings.js';
 import { aiNotifyCheck, resetNotifyState, initNotifications } from './notifications.js';
 import { createFolder, initFolderDnD } from './folder.js';
-import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, requestBranch } from './git-graph.js';
+import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, requestBranch } from './git-graph.js';
 
 S.currentTheme = THEMES[0];
 
@@ -65,6 +65,12 @@ function handleMessage(msg) {
     handleGitFileListData(msg);
   } else if (msg.type === 'git_branch_data') {
     handleGitBranchData(msg);
+  } else if (msg.type === 'git_branch_list_data') {
+    handleGitBranchListData(msg);
+  } else if (msg.type === 'git_remote_url_data') {
+    handleGitRemoteUrlData(msg);
+  } else if (msg.type === 'git_checkout_ack') {
+    handleGitCheckoutAck(msg);
   }
 }
 

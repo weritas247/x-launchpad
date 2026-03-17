@@ -5,6 +5,10 @@ import { BRANCH_COLORS } from './constants.js';
 // ─── STATE ───────────────────────────────────────────
 let isOpen = false;
 let selectedHash = null;
+let cachedCommits = [];
+let githubBaseUrl = null;
+let pendingCheckoutBranch = null;
+let dropdownAbort = null;
 
 // ─── DOM REFS ────────────────────────────────────────
 const overlay   = document.getElementById('git-graph-overlay');
@@ -18,20 +22,41 @@ const commitBox = document.getElementById('gg-commits');
 const filePanel = document.getElementById('gg-file-panel');
 const fileList  = document.getElementById('gg-file-list');
 const fileTitle = document.getElementById('gg-file-title');
+const commitBody = document.getElementById('gg-commit-body');
 const sbBranch  = document.getElementById('sb-branch');
 const sbBrSep   = document.getElementById('sb-branch-sep');
 const sbBrName  = document.getElementById('sb-branch-name');
+
+// Branch dropdown
+const branchDropdown = document.getElementById('gg-branch-dropdown');
+const branchTrigger  = document.getElementById('gg-branch-trigger');
+const branchMenu     = document.getElementById('gg-branch-menu');
+
+// GitHub button
+const githubBtn = document.getElementById('gg-github-btn');
+
+// Confirm dialog
+const confirmEl      = document.getElementById('gg-confirm');
+const confirmMessage = document.getElementById('gg-confirm-message');
+const confirmOk      = document.getElementById('gg-confirm-ok');
+const confirmCancel  = document.getElementById('gg-confirm-cancel');
 
 // ─── OPEN / CLOSE ────────────────────────────────────
 export function openGitGraph() {
   if (!S.activeSessionId) return;
   isOpen = true;
   selectedHash = null;
+  cachedCommits = [];
+  githubBaseUrl = null;
   overlay.classList.add('open');
   loading.style.display = 'flex';
   errorEl.style.display = 'none';
   content.style.display = 'none';
   filePanel.style.display = 'none';
+  commitBody.style.display = 'none';
+  confirmEl.style.display = 'none';
+  githubBtn.style.display = 'none';
+  branchMenu.classList.remove('open');
 
   const meta = sessionMeta.get(S.activeSessionId);
   const cwd = meta?.cwd || '';
@@ -39,11 +64,24 @@ export function openGitGraph() {
   branchBdg.textContent = sbBrName.textContent || '...';
 
   wsSend({ type: 'git_graph', sessionId: S.activeSessionId });
+  wsSend({ type: 'git_branch_list', sessionId: S.activeSessionId });
+  wsSend({ type: 'git_remote_url', sessionId: S.activeSessionId });
+
+  // Close dropdown on outside click
+  if (dropdownAbort) dropdownAbort.abort();
+  dropdownAbort = new AbortController();
+  document.addEventListener('click', e => {
+    if (!branchDropdown.contains(e.target)) {
+      branchMenu.classList.remove('open');
+    }
+  }, { signal: dropdownAbort.signal });
 }
 
 export function closeGitGraph() {
   isOpen = false;
   overlay.classList.remove('open');
+  branchMenu.classList.remove('open');
+  if (dropdownAbort) { dropdownAbort.abort(); dropdownAbort = null; }
 }
 
 export function isGitGraphOpen() {
@@ -59,16 +97,29 @@ export function handleGitGraphData(msg) {
     content.style.display = 'none';
     return;
   }
+  cachedCommits = msg.commits;
   content.style.display = 'flex';
   renderGraph(msg.commits);
 }
 
 export function handleGitFileListData(msg) {
+  const commit = cachedCommits.find(c => c.hash === msg.hash);
+
+  filePanel.style.display = 'block';
+
+  if (commit?.body) {
+    commitBody.style.display = 'block';
+    commitBody.textContent = commit.body;
+  } else {
+    commitBody.style.display = 'none';
+  }
+
   if (!msg.files || msg.files.length === 0) {
-    filePanel.style.display = 'none';
+    fileTitle.textContent = commit?.body ? 'Commit message' : 'Details';
+    fileList.innerHTML = '<div class="gg-file-item" style="color:var(--text-ghost)">No changed files</div>';
     return;
   }
-  filePanel.style.display = 'block';
+
   fileTitle.textContent = `Changed files (${msg.files.length})`;
   fileList.innerHTML = msg.files.map(f =>
     `<div class="gg-file-item"><span class="gg-file-status gg-file-status-${escHtml(f.status)}">${escHtml(f.status)}</span><span class="gg-file-path">${escHtml(f.path)}</span></div>`
@@ -87,6 +138,77 @@ export function handleGitBranchData(msg) {
   }
 }
 
+export function handleGitBranchListData(msg) {
+  if (!msg.branches || msg.branches.length === 0) return;
+
+  const local = msg.branches.filter(b => !b.isRemote);
+  const remote = msg.branches.filter(b => b.isRemote);
+
+  let html = '';
+  if (local.length > 0) {
+    html += '<div class="gg-branch-menu-label">LOCAL</div>';
+    html += local.map(b =>
+      `<div class="gg-branch-item${b.isCurrent ? ' current' : ''}" data-branch="${escHtml(b.name)}">${escHtml(b.name)}</div>`
+    ).join('');
+  }
+  if (remote.length > 0) {
+    html += '<div class="gg-branch-menu-label">REMOTE</div>';
+    html += remote.map(b =>
+      `<div class="gg-branch-item gg-branch-item-remote" data-branch="${escHtml(b.name)}">${escHtml(b.name)}</div>`
+    ).join('');
+  }
+  branchMenu.innerHTML = html;
+}
+
+export function handleGitRemoteUrlData(msg) {
+  githubBaseUrl = parseGithubUrl(msg.url);
+  githubBtn.style.display = githubBaseUrl ? '' : 'none';
+}
+
+export function handleGitCheckoutAck(msg) {
+  confirmEl.style.display = 'none';
+  if (msg.error) return;
+  // Refresh graph and branch info after checkout
+  if (S.activeSessionId) {
+    requestBranch(S.activeSessionId);
+    setTimeout(() => {
+      if (isOpen && S.activeSessionId) {
+        wsSend({ type: 'git_graph', sessionId: S.activeSessionId });
+        wsSend({ type: 'git_branch_list', sessionId: S.activeSessionId });
+      }
+    }, 1500);
+  }
+}
+
+// ─── GITHUB URL PARSING ─────────────────────────────
+function parseGithubUrl(remoteUrl) {
+  if (!remoteUrl || !remoteUrl.includes('github.com')) return null;
+  // SSH: git@github.com:owner/repo.git
+  const sshMatch = remoteUrl.match(/github\.com[:/]([^/]+\/[^/\s]+?)(?:\.git)?$/);
+  if (sshMatch) return `https://github.com/${sshMatch[1]}`;
+  // HTTPS: https://github.com/owner/repo[.git]
+  const httpsMatch = remoteUrl.match(/github\.com\/([^/]+\/[^/\s]+?)(?:\.git)?$/);
+  if (httpsMatch) return `https://github.com/${httpsMatch[1]}`;
+  return null;
+}
+
+// ─── CONFIRM DIALOG ─────────────────────────────────
+function showCheckoutConfirm(branch) {
+  pendingCheckoutBranch = branch;
+  confirmMessage.innerHTML = `Switch to <strong style="color:var(--accent)">${escHtml(branch)}</strong>?<br><span style="font-size:11px;color:var(--text-dim)">Uncommitted changes may be lost.</span>`;
+  confirmEl.style.display = 'flex';
+}
+
+function hideCheckoutConfirm() {
+  pendingCheckoutBranch = null;
+  confirmEl.style.display = 'none';
+}
+
+function doCheckout() {
+  if (!pendingCheckoutBranch || !S.activeSessionId) return;
+  wsSend({ type: 'git_checkout', sessionId: S.activeSessionId, branch: pendingCheckoutBranch });
+}
+
 // ─── REQUEST BRANCH ──────────────────────────────────
 export function requestBranch(sessionId) {
   if (sessionId) wsSend({ type: 'git_branch', sessionId });
@@ -102,20 +224,29 @@ function relTime(iso) {
   return `${Math.floor(diff/604800)}w`;
 }
 
+// ─── STAT BADGE ──────────────────────────────────────
+function statBadge(add, del) {
+  if (!add && !del) return '';
+  const parts = [];
+  if (add) parts.push(`<span class="gg-stat-add">+${add}</span>`);
+  if (del) parts.push(`<span class="gg-stat-del">-${del}</span>`);
+  return parts.join(' ');
+}
+
 // ─── REF BADGE HTML ──────────────────────────────────
 function refBadge(ref) {
   const r = ref.trim();
   if (r.startsWith('HEAD -> ')) {
     const br = r.slice(8);
-    return `<span class="gg-ref gg-ref-head">${escHtml(br)}</span>`;
+    return `<span class="gg-ref gg-ref-head" data-checkout-branch="${escHtml(br)}">${escHtml(br)}</span>`;
   }
   if (r.startsWith('tag: ')) {
     return `<span class="gg-ref gg-ref-tag">${escHtml(r.slice(5))}</span>`;
   }
   if (r.includes('/')) {
-    return `<span class="gg-ref gg-ref-remote">${escHtml(r)}</span>`;
+    return `<span class="gg-ref gg-ref-remote" data-checkout-branch="${escHtml(r)}">${escHtml(r)}</span>`;
   }
-  return `<span class="gg-ref gg-ref-branch">${escHtml(r)}</span>`;
+  return `<span class="gg-ref gg-ref-branch" data-checkout-branch="${escHtml(r)}">${escHtml(r)}</span>`;
 }
 
 // ─── GRAPH LAYOUT ────────────────────────────────────
@@ -217,12 +348,15 @@ function renderGraph(commits) {
   svgEl.innerHTML = svg;
 
   // Commit rows
+  const hasGithub = !!githubBaseUrl;
   commitBox.innerHTML = commits.map((c, i) => {
     const refs = c.refs.length > 0 ? `<span class="gg-refs">${c.refs.map(refBadge).join('')}</span>` : '';
+    const hashClass = hasGithub ? 'gg-hash gg-hash-link' : 'gg-hash';
     return `<div class="gg-row" data-hash="${escHtml(c.hash)}" style="height:${ROW_H}px">` +
-      `<span class="gg-hash">${escHtml(c.hash.slice(0,7))}</span>` +
+      `<span class="${hashClass}" data-hash="${escHtml(c.hash)}">${escHtml(c.hash.slice(0,7))}</span>` +
       refs +
       `<span class="gg-msg">${escHtml(c.message)}</span>` +
+      `<span class="gg-stat">${statBadge(c.additions, c.deletions)}</span>` +
       `<span class="gg-author">${escHtml(c.author)}</span>` +
       `<span class="gg-time">${relTime(c.date)}</span>` +
       `</div>`;
@@ -234,6 +368,7 @@ function onCommitClick(hash) {
   if (selectedHash === hash) {
     selectedHash = null;
     filePanel.style.display = 'none';
+    commitBody.style.display = 'none';
     commitBox.querySelectorAll('.gg-row').forEach(r => r.classList.remove('selected'));
     return;
   }
@@ -241,6 +376,16 @@ function onCommitClick(hash) {
   commitBox.querySelectorAll('.gg-row').forEach(r => {
     r.classList.toggle('selected', r.dataset.hash === hash);
   });
+
+  // Show body immediately if available
+  const commit = cachedCommits.find(c => c.hash === hash);
+  if (commit?.body) {
+    commitBody.style.display = 'block';
+    commitBody.textContent = commit.body;
+  } else {
+    commitBody.style.display = 'none';
+  }
+
   fileList.innerHTML = '<div class="gg-file-item" style="color:var(--text-dim)">Loading...</div>';
   filePanel.style.display = 'block';
   wsSend({ type: 'git_file_list', sessionId: S.activeSessionId, hash });
@@ -249,9 +394,56 @@ function onCommitClick(hash) {
 // ─── EVENT LISTENERS ─────────────────────────────────
 document.getElementById('gg-close').addEventListener('click', closeGitGraph);
 overlay.addEventListener('click', e => { if (e.target === overlay) closeGitGraph(); });
-document.getElementById('gg-file-close').addEventListener('click', () => { filePanel.style.display = 'none'; });
+document.getElementById('gg-file-close').addEventListener('click', () => {
+  filePanel.style.display = 'none';
+  commitBody.style.display = 'none';
+});
+
 commitBox.addEventListener('click', e => {
+  // GitHub hash link click
+  const hashLink = e.target.closest('.gg-hash-link');
+  if (hashLink && githubBaseUrl) {
+    e.stopPropagation();
+    window.open(`${githubBaseUrl}/commit/${hashLink.dataset.hash}`, '_blank');
+    return;
+  }
+
+  // Branch/remote ref badge click → checkout
+  const refBadgeEl = e.target.closest('[data-checkout-branch]');
+  if (refBadgeEl) {
+    e.stopPropagation();
+    showCheckoutConfirm(refBadgeEl.dataset.checkoutBranch);
+    return;
+  }
+
+  // Normal row click → show files
   const row = e.target.closest('.gg-row');
   if (row) onCommitClick(row.dataset.hash);
 });
+
 sbBranch.addEventListener('click', () => openGitGraph());
+
+// Branch dropdown
+branchTrigger.addEventListener('click', e => {
+  e.stopPropagation();
+  branchMenu.classList.toggle('open');
+});
+
+branchMenu.addEventListener('click', e => {
+  const item = e.target.closest('.gg-branch-item');
+  if (!item) return;
+  branchMenu.classList.remove('open');
+  const branch = item.dataset.branch;
+  if (branch && !item.classList.contains('current')) {
+    showCheckoutConfirm(branch);
+  }
+});
+
+// GitHub button
+githubBtn.addEventListener('click', () => {
+  if (githubBaseUrl) window.open(githubBaseUrl, '_blank');
+});
+
+// Confirm dialog
+confirmOk.addEventListener('click', doCheckout);
+confirmCancel.addEventListener('click', hideCheckoutConfirm);

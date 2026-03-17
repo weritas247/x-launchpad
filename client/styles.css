@@ -393,8 +393,8 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .gg-spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .gg-error{display:flex;align-items:center;justify-content:center;flex:1;color:var(--danger);font-size:13px;letter-spacing:.06em;padding:40px}
-.gg-content{display:flex;flex-direction:column;flex:1;overflow:hidden}
-.gg-scroll{flex:1;overflow-y:auto;display:flex;position:relative}
+.gg-content{display:flex;flex-direction:row;flex:1;overflow:hidden}
+.gg-scroll{flex:1;min-width:0;overflow-y:auto;display:flex;position:relative}
 .gg-scroll::-webkit-scrollbar{width:4px}
 .gg-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 .gg-svg{flex-shrink:0;min-width:60px}
@@ -410,9 +410,12 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .gg-ref-remote{background:rgba(152,195,121,.1);color:#98c379;border-color:rgba(152,195,121,.3)}
 .gg-ref-tag{background:rgba(229,192,123,.1);color:#e5c07b;border-color:rgba(229,192,123,.3)}
 .gg-msg{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-main)}
+.gg-stat{flex-shrink:0;font-size:10px;display:flex;gap:4px;min-width:70px;justify-content:flex-end}
+.gg-stat-add{color:var(--ok)}
+.gg-stat-del{color:var(--danger)}
 .gg-author{flex-shrink:0;color:var(--text-dim);font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gg-time{flex-shrink:0;color:var(--text-ghost);font-size:11px;width:60px;text-align:right}
-.gg-file-panel{border-top:1px solid var(--border);max-height:200px;overflow-y:auto;flex-shrink:0;background:var(--bg-deep)}
+.gg-file-panel{border-left:1px solid var(--border);width:320px;flex-shrink:0;overflow-y:auto;background:var(--bg-deep)}
 .gg-file-panel::-webkit-scrollbar{width:4px}
 .gg-file-panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 .gg-file-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;font-size:11px;color:var(--text-dim);letter-spacing:.1em;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-deep);z-index:1}
@@ -425,6 +428,44 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .gg-file-status-D{color:var(--danger)}
 .gg-file-status-R{color:#61afef}
 .gg-file-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Branch dropdown */
+.gg-branch-dropdown{position:relative}
+.gg-branch-trigger{background:var(--bg-deep);color:var(--text-dim);border:1px solid var(--border);border-radius:4px;font-size:11px;padding:3px 8px;font-family:var(--font-mono);cursor:pointer;letter-spacing:.04em}
+.gg-branch-trigger:hover{color:var(--accent);border-color:var(--accent)}
+.gg-branch-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:220px;background:var(--bg-deep);border:1px solid var(--border-lit);border-radius:6px;max-height:280px;overflow-y:auto;z-index:10;display:none;box-shadow:0 8px 24px rgba(0,0,0,.6)}
+.gg-branch-menu.open{display:block}
+.gg-branch-menu::-webkit-scrollbar{width:4px}
+.gg-branch-menu::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.gg-branch-menu-label{padding:6px 12px;font-size:9px;color:var(--text-ghost);letter-spacing:.12em;font-weight:700}
+.gg-branch-item{padding:6px 12px;font-size:11px;cursor:pointer;color:var(--text-main);transition:background .1s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gg-branch-item:hover{background:var(--bg-hover)}
+.gg-branch-item.current{color:var(--accent)}
+.gg-branch-item.current::before{content:'● ';font-size:8px}
+.gg-branch-item-remote{color:var(--text-dim)}
+/* GitHub button */
+.gg-github-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-dim);font-size:11px;padding:3px 10px;cursor:pointer;font-family:var(--font-mono);letter-spacing:.04em}
+.gg-github-btn:hover{color:var(--accent);border-color:var(--accent)}
+/* Close button */
+.gg-close-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-dim);font-size:16px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);transition:all .12s}
+.gg-close-btn:hover{color:var(--danger);border-color:var(--danger);background:rgba(255,51,102,.1)}
+/* Commit hash link */
+.gg-hash-link{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.gg-hash-link:hover{color:var(--text-bright)}
+/* Clickable ref badges */
+.gg-ref-branch,.gg-ref-remote{cursor:pointer}
+.gg-ref-branch:hover,.gg-ref-remote:hover{filter:brightness(1.3)}
+/* Commit body */
+.gg-commit-body{padding:10px 14px;font-size:11px;color:var(--text-dim);white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono);line-height:1.6;border-bottom:1px solid var(--border)}
+/* Confirm dialog */
+.gg-confirm{position:absolute;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;z-index:5}
+.gg-confirm-box{background:var(--bg-panel);border:1px solid var(--border-lit);border-radius:8px;padding:24px 32px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.6)}
+.gg-confirm-message{font-size:13px;color:var(--text-main);margin-bottom:16px;line-height:1.6}
+.gg-confirm-actions{display:flex;gap:10px;justify-content:center}
+.gg-confirm-ok{background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:5px 16px;font-size:11px;cursor:pointer;font-family:var(--font-mono);font-weight:700;letter-spacing:.04em}
+.gg-confirm-ok:hover{background:var(--accent);color:var(--bg-deep)}
+.gg-confirm-cancel{background:none;color:var(--text-dim);border:1px solid var(--border);border-radius:4px;padding:5px 14px;font-size:11px;cursor:pointer;font-family:var(--font-mono)}
+.gg-confirm-cancel:hover{color:var(--text-main);border-color:var(--text-dim)}
+
 .sb-branch{transition:color .15s}
 .sb-branch:hover{color:var(--accent)}
 
