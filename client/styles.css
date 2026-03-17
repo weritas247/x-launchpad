@@ -382,7 +382,10 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 /* ═══ GIT GRAPH ═══ */
 #git-graph-overlay{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center}
 #git-graph-overlay.open{display:flex;animation:overlayIn .2s ease}
-#git-graph-modal{width:960px;max-width:96vw;height:640px;max-height:92vh;background:var(--bg-panel);border:1px solid var(--border-lit);border-radius:10px;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.8),0 0 40px var(--accent-dim);animation:modalIn .22s cubic-bezier(.16,1,.3,1);overflow:hidden}
+#git-graph-modal{width:960px;max-width:96vw;height:640px;max-height:92vh;min-width:480px;min-height:320px;background:var(--bg-panel);border:1px solid var(--border-lit);border-radius:10px;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.8),0 0 40px var(--accent-dim);animation:modalIn .22s cubic-bezier(.16,1,.3,1);overflow:hidden;position:relative}
+.gg-resize-handle{position:absolute;bottom:0;right:0;width:16px;height:16px;cursor:nwse-resize;z-index:2}
+.gg-resize-handle::after{content:'';position:absolute;bottom:3px;right:3px;width:8px;height:8px;border-right:2px solid var(--text-ghost);border-bottom:2px solid var(--text-ghost);opacity:.5}
+.gg-resize-handle:hover::after{opacity:1;border-color:var(--accent)}
 .gg-titlebar{padding:0 20px;height:48px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg-deep);position:relative}
 .gg-titlebar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent-dim),transparent)}
 .gg-title-icon{color:var(--accent);font-size:16px}

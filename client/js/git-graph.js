@@ -41,6 +41,31 @@ const confirmMessage = document.getElementById('gg-confirm-message');
 const confirmOk      = document.getElementById('gg-confirm-ok');
 const confirmCancel  = document.getElementById('gg-confirm-cancel');
 
+// Modal + resize
+const modal       = document.getElementById('git-graph-modal');
+const resizeHandle = document.getElementById('gg-resize-handle');
+
+const STORAGE_KEY = 'gg-modal-size';
+
+function restoreModalSize() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (saved?.w && saved?.h) {
+      modal.style.width = saved.w + 'px';
+      modal.style.height = saved.h + 'px';
+    }
+  } catch {}
+}
+
+function saveModalSize() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      w: modal.offsetWidth,
+      h: modal.offsetHeight,
+    }));
+  } catch {}
+}
+
 // ─── OPEN / CLOSE ────────────────────────────────────
 export function openGitGraph() {
   if (!S.activeSessionId) return;
@@ -48,6 +73,7 @@ export function openGitGraph() {
   selectedHash = null;
   cachedCommits = [];
   githubBaseUrl = null;
+  restoreModalSize();
   overlay.classList.add('open');
   loading.style.display = 'flex';
   errorEl.style.display = 'none';
@@ -447,3 +473,28 @@ githubBtn.addEventListener('click', () => {
 // Confirm dialog
 confirmOk.addEventListener('click', doCheckout);
 confirmCancel.addEventListener('click', hideCheckoutConfirm);
+
+// ─── RESIZE ──────────────────────────────────────────
+resizeHandle.addEventListener('mousedown', e => {
+  e.preventDefault();
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const startW = modal.offsetWidth;
+  const startH = modal.offsetHeight;
+
+  function onMove(ev) {
+    const w = Math.max(480, startW + (ev.clientX - startX));
+    const h = Math.max(320, startH + (ev.clientY - startY));
+    modal.style.width = w + 'px';
+    modal.style.height = h + 'px';
+  }
+
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    saveModalSize();
+  }
+
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+});
