@@ -177,7 +177,6 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .split-pane-title .spt-name{color:var(--fg);font-weight:500;flex-shrink:0}
 .split-pane-title .spt-path{color:var(--fg-dim);overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
 .term-pane.split-inactive .split-pane-title .spt-dot{background:var(--border-lit);box-shadow:none}
-#split-root .term-pane .xterm{position:absolute!important;top:24px!important;left:0!important;right:0!important;bottom:0!important;width:auto!important;height:auto!important}
 #split-root .term-pane .xterm{position:absolute!important;top:22px!important;left:0!important;right:0!important;bottom:0!important;width:auto!important;height:auto!important}
 .split-divider{position:absolute;z-index:10;display:flex;align-items:center;justify-content:center}
 .split-divider-v{cursor:col-resize;width:8px;top:0;bottom:0}
