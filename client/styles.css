@@ -345,7 +345,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .theme-card.active .theme-card-check{display:block}
 
 /* ═══ TOAST NOTIFICATIONS ═══ */
-#toast-container{position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+#toast-container{position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .toast{background:var(--bg-surface);border:1px solid var(--border-lit);border-left:3px solid var(--accent);border-radius:6px;padding:12px 36px 12px 14px;min-width:260px;max-width:340px;pointer-events:all;cursor:pointer;box-shadow:0 4px 24px rgba(0,0,0,.6),0 0 12px var(--accent-dim);animation:toast-in .25s cubic-bezier(.34,1.56,.64,1);position:relative}
 .toast:hover{border-color:var(--accent);box-shadow:0 4px 28px rgba(0,0,0,.7),0 0 18px var(--accent-dim)}
 .toast-title{font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin-bottom:4px}

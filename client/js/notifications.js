@@ -95,6 +95,7 @@ function fireOsNotification(title, body, sessionId) {
   };
 }
 
+const alertSound = new Audio('/alert.m4a');
 let toastContainer = null;
 function getToastContainer() {
   if (!toastContainer) {
@@ -123,6 +124,8 @@ export function showToast(title, body, sessionId) {
     t.remove();
   });
   c.appendChild(t);
+  alertSound.currentTime = 0;
+  alertSound.play().catch(() => {});
   setTimeout(() => t.classList.add('toast-hide'), 5500);
   setTimeout(() => { if (t.parentNode) t.remove(); }, 6200);
 }
