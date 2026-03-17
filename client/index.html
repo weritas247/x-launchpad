@@ -1891,12 +1891,9 @@ const AI_ICONS = {
 };
 
 function aiNotifyCheck(sessionId, chunk) {
-  // Skip if this is the active (focused) tab and the page is visible
-  if (document.visibilityState === 'visible' && sessionId === activeSessionId) return;
-
   const currentAi = sessionMeta.get(sessionId)?.ai || null;
 
-  // Accumulate output (keep last 4KB)
+  // Always accumulate output
   const prev = notifyBuffers.get(sessionId) || '';
   const next = (prev + chunk).slice(-4096);
   notifyBuffers.set(sessionId, next);
@@ -1909,14 +1906,12 @@ function aiNotifyCheck(sessionId, chunk) {
 
     let matched = null;
     for (const p of AI_PATTERNS) {
-      // If pattern is AI-specific, only fire when that AI is active
       if (p.ai !== 'any' && currentAi && p.ai !== currentAi) continue;
       if (p.re.test(buf)) { matched = p; break; }
     }
     if (!matched) return;
 
     const prevState = notifyState.get(sessionId);
-    // Avoid repeated same-type notifications
     if (prevState === matched.type) return;
     notifyState.set(sessionId, matched.type);
 
@@ -1928,7 +1923,24 @@ function aiNotifyCheck(sessionId, chunk) {
       : `${icon} Needs Input — ${sessName}`;
     const body = matched.msg;
 
-    sendNotification(title, body, sessionId);
+    // Toast: always show when session is not the active visible tab
+    const isActiveVisible = (sessionId === activeSessionId) && (document.visibilityState === 'visible');
+    if (!isActiveVisible) {
+      showToast(title, body, sessionId);
+    }
+
+    // OS notification: only when page is hidden or window not focused
+    if (document.visibilityState === 'hidden' || !document.hasFocus()) {
+      if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+          fireOsNotification(title, body, sessionId);
+        } else if (Notification.permission === 'default') {
+          Notification.requestPermission().then(p => {
+            if (p === 'granted') fireOsNotification(title, body, sessionId);
+          });
+        }
+      }
+    }
   }, NOTIFY_DEBOUNCE));
 }
 
@@ -1939,27 +1951,21 @@ function resetNotifyState(sessionId) {
   clearTimeout(notifyTimers.get(sessionId));
 }
 
-function sendNotification(title, body, sessionId) {
-  // Browser Notification API
-  if ('Notification' in window && Notification.permission === 'granted') {
-    const n = new Notification(title, {
-      body,
-      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="%2300ffe5" opacity=".15"/><polyline points="10,7 6,16 14,16 10,25 22,13 15,13 19,7" fill="%2300ffe5"/></svg>',
-      tag: `super-terminal-${sessionId}`,
-      silent: false,
-    });
-    n.onclick = () => {
-      window.focus();
-      if (terminalMap.has(sessionId)) {
-        activateSession(sessionId);
-        wsSend({ type:'session_attach', sessionId });
-      }
-      n.close();
-    };
-  }
-
-  // In-app toast (always shown regardless of permission)
-  showToast(title, body, sessionId);
+function fireOsNotification(title, body, sessionId) {
+  const n = new Notification(title, {
+    body,
+    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="%2300ffe5" opacity=".15"/><polyline points="10,7 6,16 14,16 10,25 22,13 15,13 19,7" fill="%2300ffe5"/></svg>',
+    tag: `super-terminal-${sessionId}`,
+    silent: false,
+  });
+  n.onclick = () => {
+    window.focus();
+    if (terminalMap.has(sessionId)) {
+      activateSession(sessionId);
+      wsSend({ type:'session_attach', sessionId });
+    }
+    n.close();
+  };
 }
 
 // ── In-app Toast ──────────────────────────────────
