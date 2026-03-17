@@ -154,10 +154,14 @@ export function syncSessionList(sessions, isReconnect = false) {
     }, 50);
 
     if (isInitialLoad) {
-      // Bypass streaming for restored sessions — dump output instantly
+      // Bypass streaming for restored sessions — dump output instantly, then scroll to bottom
       newIds.forEach(id => {
         bypassStream(id);
-        setTimeout(() => unbypassStream(id), 3000);
+        setTimeout(() => {
+          unbypassStream(id);
+          const entry = terminalMap.get(id);
+          if (entry) entry.term.scrollToBottom();
+        }, 3000);
       });
       const badge = document.getElementById('hdr-restore-badge');
       if (badge) {
