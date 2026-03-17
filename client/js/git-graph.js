@@ -565,7 +565,7 @@ function renderGraph(commits) {
     const coAuthorHtml = coAuthorBadge(coAuthors);
     return `<div class="gg-row" data-hash="${escHtml(c.hash)}" style="height:${ROW_H}px">` +
       `<span class="${hashClass}" data-hash="${escHtml(c.hash)}">${escHtml(c.hash.slice(0,7))}</span>` +
-      refs +
+      `<span class="gg-branch-col">${refs}</span>` +
       `<span class="gg-msg">${escHtml(c.message)}</span>` +
       `<span class="gg-stat">${statBadge(c.additions, c.deletions)}</span>` +
       `<span class="gg-author">${escHtml(c.author)}${coAuthorHtml}</span>` +
