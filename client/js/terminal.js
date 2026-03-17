@@ -4,7 +4,7 @@ import { wsSend } from './websocket.js';
 import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session.js';
 import { removeSplitPane, teardownSplitLayout, showDropZoneOverlay, hideDropZoneOverlay } from './split-pane.js';
 import { resetTabStatus, tabStatusOnInput } from './tab-status.js';
-import { setupTerminalImageHandlers } from './image-attach.js';
+import { setupTerminalImageHandlers, hasPendingAttachments, flushAttachments } from './image-attach.js';
 
 export function newSession() {
   showSessionPicker();
@@ -209,7 +209,14 @@ export function attachTerminal(sessionId, name) {
   });
 
   term.onData(data => {
-    if (S.activeSessionId === sessionId) wsSend({ type:'input', sessionId, data });
+    if (S.activeSessionId === sessionId) {
+      // Enter pressed with pending images → inject paths before Enter
+      if (data === '\r' && hasPendingAttachments(sessionId)) {
+        const paths = flushAttachments(sessionId);
+        if (paths) wsSend({ type: 'input', sessionId, data: ' ' + paths });
+      }
+      wsSend({ type: 'input', sessionId, data });
+    }
     tabStatusOnInput(sessionId);
   });
 
@@ -432,6 +439,14 @@ export function initContextMenu() {
       if (e.key === 'Enter') { finish(); e.preventDefault(); }
       if (e.key === 'Escape') { input.value = old; finish(); }
     });
+  });
+  document.getElementById('ctx-reveal').addEventListener('click', () => {
+    if (!S.ctxTargetId) return;
+    fetch('/api/reveal-in-finder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: S.ctxTargetId }),
+    }).catch(() => {});
   });
   document.getElementById('ctx-close').addEventListener('click', () => {
     if (S.ctxTargetId) closeSession(S.ctxTargetId);

@@ -154,6 +154,33 @@ app.post('/api/upload-image',
   }
 );
 
+// ─── DELETE UPLOADED IMAGE ─────────────────────────────────────────
+app.post('/api/delete-image', (req, res) => {
+  const filePath = req.body?.filePath as string;
+  if (!filePath || !filePath.includes('pasted-image-')) {
+    return res.status(400).json({ ok: false });
+  }
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+// ─── REVEAL IN FINDER ─────────────────────────────────────────────
+app.post('/api/reveal-in-finder', (req, res) => {
+  const sessionId = req.body?.sessionId as string;
+  if (!sessionId) return res.status(400).json({ ok: false });
+  const session = sessions.get(sessionId);
+  const dir = session?.cwd || currentSettings.shell.startDirectory || process.env.HOME || '/tmp';
+  if (!fs.existsSync(dir)) return res.status(404).json({ ok: false });
+  execFile('open', [dir], (err) => {
+    if (err) return res.status(500).json({ ok: false, error: String(err) });
+    res.json({ ok: true });
+  });
+});
+
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../../client/index.html'));
 });
