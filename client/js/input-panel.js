@@ -21,10 +21,6 @@ export function initInputPanel() {
   toggle.addEventListener('click', () => {
     panel.classList.toggle('collapsed');
     toggle.textContent = panel.classList.contains('collapsed') ? '▸' : '◂';
-    // Refit terminals after resize
-    setTimeout(() => {
-      terminalMap.forEach(({ fitAddon }) => fitAddon.fit());
-    }, 250);
   });
 
   clearBtn.addEventListener('click', () => {
