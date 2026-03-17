@@ -532,6 +532,14 @@ wss.on('connection', (ws: WebSocket) => {
       }
       session.pty.write(cmd + '\r');
       ws.send(JSON.stringify({ type: 'git_checkout_ack', sessionId: id, branch }));
+
+    } else if (parsed.type === 'git_pull') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      session.pty.write('git pull\r');
+      ws.send(JSON.stringify({ type: 'git_pull_ack', sessionId: id }));
     }
   });
 

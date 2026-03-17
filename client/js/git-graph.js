@@ -33,8 +33,9 @@ const branchDropdown = document.getElementById('gg-branch-dropdown');
 const branchTrigger  = document.getElementById('gg-branch-trigger');
 const branchMenu     = document.getElementById('gg-branch-menu');
 
-// GitHub button
+// GitHub button & Pull button
 const githubBtn = document.getElementById('gg-github-btn');
+const pullBtn   = document.getElementById('gg-pull-btn');
 
 // Confirm dialog
 const confirmEl      = document.getElementById('gg-confirm');
@@ -94,6 +95,10 @@ export function openGitGraph() {
   wsSend({ type: 'git_graph', sessionId: S.activeSessionId });
   wsSend({ type: 'git_branch_list', sessionId: S.activeSessionId });
   wsSend({ type: 'git_remote_url', sessionId: S.activeSessionId });
+
+  // Blur terminal so keydown events reach document listener
+  if (document.activeElement) document.activeElement.blur();
+  modal.focus();
 
   // Close dropdown on outside click
   if (dropdownAbort) dropdownAbort.abort();
@@ -194,12 +199,16 @@ export function handleGitGraphKeydown(e) {
     e.preventDefault();
     const newIdx = focusedRowIdx < rows.length - 1 ? focusedRowIdx + 1 : 0;
     updateRowFocus(rows, newIdx);
+    const hash = rows[newIdx].dataset.hash;
+    if (hash) selectCommit(hash);
     return true;
   }
   if (e.key === 'ArrowUp') {
     e.preventDefault();
     const newIdx = focusedRowIdx > 0 ? focusedRowIdx - 1 : rows.length - 1;
     updateRowFocus(rows, newIdx);
+    const hash = rows[newIdx].dataset.hash;
+    if (hash) selectCommit(hash);
     return true;
   }
 
@@ -304,6 +313,52 @@ export function handleGitCheckoutAck(msg) {
       }
     }, 1500);
   }
+}
+
+// ─── PULL ────────────────────────────────────────────
+let pullTimer = null;
+
+function resetPullBtn() {
+  pullBtn.classList.remove('pulling', 'pull-ok', 'pull-err');
+  pullBtn.textContent = '⬇ Pull';
+  if (pullTimer) { clearTimeout(pullTimer); pullTimer = null; }
+}
+
+function doPull() {
+  if (!S.activeSessionId || pullBtn.classList.contains('pulling')) return;
+  resetPullBtn();
+  pullBtn.classList.add('pulling');
+  pullBtn.textContent = '⬇ Pulling...';
+  wsSend({ type: 'git_pull', sessionId: S.activeSessionId });
+  // Fallback: auto-complete after 5s even without ack
+  pullTimer = setTimeout(() => {
+    if (pullBtn.classList.contains('pulling')) {
+      finishPull(false);
+    }
+  }, 5000);
+}
+
+function finishPull(isError) {
+  if (pullTimer) { clearTimeout(pullTimer); pullTimer = null; }
+  pullBtn.classList.remove('pulling');
+  if (isError) {
+    pullBtn.classList.add('pull-err');
+    pullBtn.textContent = '⬇ Failed';
+  } else {
+    pullBtn.classList.add('pull-ok');
+    pullBtn.textContent = '⬇ Done';
+    if (isOpen && S.activeSessionId) {
+      setTimeout(() => {
+        wsSend({ type: 'git_graph', sessionId: S.activeSessionId });
+        wsSend({ type: 'git_branch_list', sessionId: S.activeSessionId });
+      }, 1500);
+    }
+  }
+  setTimeout(resetPullBtn, 3000);
+}
+
+export function handleGitPullAck(msg) {
+  finishPull(!!msg.error);
 }
 
 // ─── GITHUB URL PARSING ─────────────────────────────
@@ -489,6 +544,25 @@ function renderGraph(commits) {
   }).join('');
 }
 
+// ─── COMMIT SELECT (no toggle, for keyboard nav) ────
+function selectCommit(hash) {
+  if (selectedHash === hash) return;
+  selectedHash = hash;
+  commitBox.querySelectorAll('.gg-row').forEach(r => {
+    r.classList.toggle('selected', r.dataset.hash === hash);
+  });
+  const commit = cachedCommits.find(c => c.hash === hash);
+  if (commit?.body) {
+    commitBody.style.display = 'block';
+    commitBody.textContent = commit.body;
+  } else {
+    commitBody.style.display = 'none';
+  }
+  fileList.innerHTML = '<div class="gg-file-item" style="color:var(--text-dim)">Loading...</div>';
+  filePanel.style.display = 'block';
+  wsSend({ type: 'git_file_list', sessionId: S.activeSessionId, hash });
+}
+
 // ─── COMMIT CLICK ────────────────────────────────────
 function onCommitClick(hash) {
   if (selectedHash === hash) {
@@ -569,6 +643,9 @@ branchMenu.addEventListener('click', e => {
 githubBtn.addEventListener('click', () => {
   if (githubBaseUrl) window.open(githubBaseUrl, '_blank');
 });
+
+// Pull button
+pullBtn.addEventListener('click', doPull);
 
 // Confirm dialog
 confirmOk.addEventListener('click', doCheckout);
