@@ -65,4 +65,15 @@ export const KB_DEFS = [
   { key:'clearTerminal',   label:'Clear Terminal' },
   { key:'openSettings',    label:'Open Settings' },
   { key:'fullscreen',      label:'Toggle Fullscreen' },
+  { key:'gitGraph',        label:'Git Graph' },
+];
+
+export const BRANCH_COLORS = [
+  'var(--accent)',
+  '#e06c75',
+  '#98c379',
+  '#e5c07b',
+  '#61afef',
+  '#c678dd',
+  '#56b6c2',
 ];
