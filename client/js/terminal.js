@@ -210,7 +210,12 @@ export function updateSessionInfo(sessionId, cwd, ai) {
       badgeEl = document.createElement('div');
       metaEl.appendChild(badgeEl);
     }
-    badgeEl.className = `session-ai-badge ${ai}`;
+    badgeEl.className = 'session-ai-badge';
+    badgeEl.dataset.ai = ai;
+    if (reg) {
+      badgeEl.style.setProperty('--badge-rgb', reg.rgb.join(','));
+      badgeEl.style.setProperty('--badge-color', reg.color);
+    }
     badgeEl.innerHTML = `<span class="badge-icon">${def.icon}</span>${def.label}`;
   } else if (badgeEl) {
     badgeEl.remove();

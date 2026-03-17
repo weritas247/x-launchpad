@@ -101,12 +101,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .session-cwd{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-dim);font-size:10px}
 .session-ai-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.04em;padding:2px 8px 2px 5px;border-radius:10px;margin-top:3px;width:fit-content;transition:box-shadow .3s;text-transform:none}
 .badge-icon{font-size:13px;line-height:1;flex-shrink:0}.badge-img{width:14px;height:14px;object-fit:contain;display:block;flex-shrink:0}.notif-icon{width:16px;height:16px;object-fit:contain;vertical-align:middle}
-.session-ai-badge.claude{background:rgba(191,128,255,.18);color:#d4a8ff;border:1px solid rgba(191,128,255,.45);box-shadow:0 0 8px rgba(191,128,255,.2)}
-.session-ai-badge.chatgpt{background:rgba(16,200,150,.15);color:#20d4a0;border:1px solid rgba(16,200,150,.45);box-shadow:0 0 8px rgba(16,200,150,.2)}
-.session-ai-badge.gemini{background:rgba(100,160,255,.15);color:#88bbff;border:1px solid rgba(100,160,255,.45);box-shadow:0 0 8px rgba(100,160,255,.2)}
-.session-ai-badge.copilot{background:rgba(96,200,255,.15);color:#60c8ff;border:1px solid rgba(96,200,255,.45);box-shadow:0 0 8px rgba(96,200,255,.2)}
-.session-ai-badge.aider{background:rgba(255,200,80,.15);color:#ffc850;border:1px solid rgba(255,200,80,.45);box-shadow:0 0 8px rgba(255,200,80,.2)}
-.session-ai-badge.cursor{background:rgba(80,220,255,.15);color:#50dcff;border:1px solid rgba(80,220,255,.45);box-shadow:0 0 8px rgba(80,220,255,.2)}.session-ai-badge.codex{background:rgba(16,163,127,.15);color:#10a37f;border:1px solid rgba(16,163,127,.45);box-shadow:0 0 8px rgba(16,163,127,.2)}.session-ai-badge.opencode{background:rgba(255,160,80,.15);color:#ffa050;border:1px solid rgba(255,160,80,.45);box-shadow:0 0 8px rgba(255,160,80,.2)}
+.session-ai-badge[data-ai]{background:rgba(var(--badge-rgb),.15);color:var(--badge-color);border:1px solid rgba(var(--badge-rgb),.45);box-shadow:0 0 8px rgba(var(--badge-rgb),.2)}
 .session-close{background:none;border:none;color:var(--text-ghost);font-size:14px;cursor:pointer;padding:2px 4px;border-radius:2px;opacity:0;transition:all .12s;font-family:var(--font-mono);line-height:1}
 .session-item:hover .session-close{opacity:1}
 .session-close:hover{color:var(--danger);background:rgba(255,51,102,.1)}
