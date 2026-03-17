@@ -5,7 +5,10 @@ import * as fs from 'fs';
 import * as pty from 'node-pty';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as os from 'os';
-import { execFileSync } from 'child_process';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 import * as gitService from './git-service';
 
 const app = express();
@@ -183,25 +186,22 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     broadcastSessionList();
   });
 
-  // Poll CWD + detect running AI every 2s
-  session.cwdTimer = setInterval(() => {
+  // Poll CWD + detect running AI every 2s (non-blocking)
+  session.cwdTimer = setInterval(async () => {
     try {
       const pid = ptyProcess.pid;
-      // macOS: lsof -p <pid> to get cwd
       let newCwd = cwd0;
       try {
-        const out = execFileSync('lsof', ['-p', String(pid), '-a', '-d', 'cwd', '-Fn'], {
+        const { stdout } = await execFileAsync('lsof', ['-p', String(pid), '-a', '-d', 'cwd', '-Fn'], {
           encoding: 'utf-8', timeout: 500,
         });
-        const match = out.match(/\nn(.+)/);
+        const match = stdout.match(/\nn(.+)/);
         if (match) newCwd = match[1].trim();
       } catch {}
 
-      // Detect AI process in full process tree under this PTY
-      // Use 'args' (full command line) instead of 'comm' so node-based CLIs are identifiable
       let newAi: string | null = null;
       try {
-        const psOut = execFileSync('ps', ['-eo', 'pid,ppid,args'], {
+        const { stdout: psOut } = await execFileAsync('ps', ['-eo', 'pid,ppid,args'], {
           encoding: 'utf-8', timeout: 800,
         });
         const rows = psOut.trim().split('\n').slice(1);
@@ -216,7 +216,6 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
             cmdOf.set(p, m[3]);
           }
         }
-        // Walk ancestors to find descendants of rootPid
         const rootPid = pid;
         const descendants = new Set<number>([rootPid]);
         for (const [p, pp] of parentOf) {
@@ -244,7 +243,6 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
       if (newCwd !== session.cwd || newAi !== session.ai) {
         session.cwd = newCwd;
         session.ai = newAi;
-        // Broadcast updated session info
         const msg = JSON.stringify({ type: 'session_info', sessionId: id, cwd: newCwd, ai: newAi });
         wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg); });
       }
