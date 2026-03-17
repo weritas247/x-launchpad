@@ -1,5 +1,5 @@
 import { S, terminalMap, sessionMeta, sbClock, tabAddBtn, settingsOverlay } from './state.js';
-import { THEMES } from './constants.js';
+import { THEMES, normalizeKey } from './constants.js';
 import { connect, wsSend, setOnInputSend } from './websocket.js';
 import { initThemeSwatches } from './themes.js';
 import { activateSession, updateStatusBar } from './session.js';
@@ -7,8 +7,9 @@ import { initSplitDnD, refitAllPanes, updateSidebarSplitGroup } from './split-pa
 import { newSession, closeSession, renameSession, syncSessionList, attachTerminal, updateSessionInfo, showSessionPicker, hideSessionPicker, initContextMenu } from './terminal.js';
 import { loadSettings, applySettings, openSettings, closeSettings, initSettingsUI } from './settings.js';
 import { aiNotifyCheck, resetNotifyState, initNotifications } from './notifications.js';
+import { tabStatusCheck, tabStatusOnAiChange, suppressTabStatus } from './tab-status.js';
 import { createFolder, initFolderDnD } from './folder.js';
-import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, requestBranch, handleGitGraphKeydown } from './git-graph.js';
+import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, handleGitPullAck, requestBranch, handleGitGraphKeydown } from './git-graph.js';
 
 S.currentTheme = THEMES[0];
 
@@ -24,6 +25,9 @@ setInterval(() => {
 function handleMessage(msg) {
   if (msg.type === 'session_list') {
     syncSessionList(msg.sessions, S.wsJustReconnected);
+    if (S.wsJustReconnected) {
+      msg.sessions.forEach(s => suppressTabStatus(s.id, 2000));
+    }
     S.wsJustReconnected = false;
     // Auto-close git graph if active session is gone
     if (isGitGraphOpen() && S.activeSessionId && !msg.sessions.some(s => s.id === S.activeSessionId)) {
@@ -52,12 +56,14 @@ function handleMessage(msg) {
     }, 50);
   } else if (msg.type === 'session_info') {
     updateSessionInfo(msg.sessionId, msg.cwd, msg.ai);
+    tabStatusOnAiChange(msg.sessionId, msg.ai);
     if (msg.sessionId === S.activeSessionId) requestBranch(msg.sessionId);
   } else if (msg.type === 'output') {
     const entry = terminalMap.get(msg.sessionId);
     if (entry) {
       entry.term.write(msg.data);
       aiNotifyCheck(msg.sessionId, msg.data);
+      tabStatusCheck(msg.sessionId, msg.data);
     }
   } else if (msg.type === 'git_graph_data') {
     handleGitGraphData(msg);
@@ -71,6 +77,8 @@ function handleMessage(msg) {
     handleGitRemoteUrlData(msg);
   } else if (msg.type === 'git_checkout_ack') {
     handleGitCheckoutAck(msg);
+  } else if (msg.type === 'git_pull_ack') {
+    handleGitPullAck(msg);
   }
 }
 
@@ -131,7 +139,8 @@ document.addEventListener('keydown', e => {
   if (e.shiftKey) parts.push('Shift');
   if (e.altKey) parts.push('Alt');
   if (e.metaKey) parts.push('Meta');
-  if (!['Control','Shift','Alt','Meta'].includes(e.key)) parts.push(e.key === ' ' ? 'Space' : e.key);
+  const nk = normalizeKey(e);
+  if (!['Control','Shift','Alt','Meta'].includes(e.key)) parts.push(nk);
   const combo = parts.join('+');
 
   const kb = S.settings.keybindings || {};
@@ -146,7 +155,7 @@ document.addEventListener('keydown', e => {
   if (combo === kb.gitGraph) { e.preventDefault(); isGitGraphOpen() ? closeGitGraph() : openGitGraph(); }
 
   if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey) {
-    const n = parseInt(e.key);
+    const n = parseInt(nk);
     if (n >= 1 && n <= 9) {
       const ids = Array.from(terminalMap.keys());
       if (ids[n - 1]) { e.preventDefault(); activateSession(ids[n - 1]); }

@@ -150,7 +150,15 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .tab{height:28px;padding:0 12px;font-size:12px;font-family:var(--font-mono);color:var(--text-main);background:var(--bg-deep);border:1px solid var(--border);border-bottom:none;border-radius:4px 4px 0 0;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;transition:all .12s;max-width:160px;overflow:hidden;animation:fadeIn .15s ease;flex-shrink:0}
 .tab:hover{color:var(--text-main);background:var(--bg-hover)}
 .tab.active{color:var(--text-bright);background:var(--bg-void);border-color:var(--border-lit);border-bottom-color:var(--bg-void)}
-.tab-indicator{width:5px;height:5px;border-radius:50%;background:var(--ok);box-shadow:0 0 4px var(--ok);flex-shrink:0}
+.tab-indicator{width:5px;height:5px;border-radius:50%;background:var(--ok);box-shadow:0 0 4px var(--ok);flex-shrink:0;transition:background-color .3s,box-shadow .3s}
+[data-status="idle"] .tab-indicator{background:var(--ok);box-shadow:0 0 4px var(--ok);opacity:.6;animation:none}
+[data-status="thinking"] .tab-indicator,[data-status="working"] .tab-indicator{background:var(--warn);box-shadow:0 0 4px var(--warn);opacity:1;animation:blink 1.5s ease-in-out infinite}
+[data-status="tool"] .tab-indicator{background:var(--accent2);box-shadow:0 0 4px var(--accent2);opacity:1;animation:none}
+[data-status="question"] .tab-indicator{background:var(--danger);box-shadow:0 0 4px var(--danger);opacity:1;animation:blink 1s ease-in-out infinite}
+[data-status="done"] .tab-indicator{background:var(--ok);box-shadow:0 0 6px var(--ok);opacity:1;animation:none}
+.tab-status-text{font-size:.7em;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;color:var(--text-dim);display:none}
+.tab.active .tab-status-text,.tab.split-active .tab-status-text{display:inline}
+.tab.active,.tab.split-active{max-width:240px}
 .tab-name{overflow:hidden;text-overflow:ellipsis;flex:1}
 .tab-close-btn{background:none;border:none;color:var(--text-ghost);font-size:13px;cursor:pointer;padding:0 2px;font-family:var(--font-mono);line-height:1;flex-shrink:0;opacity:0;transition:opacity .12s}
 .tab:hover .tab-close-btn{opacity:1}
@@ -449,6 +457,11 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .gg-branch-item.current::before{content:'● ';font-size:8px}
 .gg-branch-item-remote{color:var(--text-dim)}
 /* GitHub button */
+.gg-pull-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-dim);font-size:11px;padding:3px 10px;cursor:pointer;font-family:var(--font-mono);letter-spacing:.04em}
+.gg-pull-btn:hover{color:var(--accent);border-color:var(--accent)}
+.gg-pull-btn.pulling{color:var(--warn);border-color:var(--warn);cursor:wait}
+.gg-pull-btn.pull-ok{color:var(--ok);border-color:var(--ok)}
+.gg-pull-btn.pull-err{color:var(--danger);border-color:var(--danger)}
 .gg-github-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-dim);font-size:11px;padding:3px 10px;cursor:pointer;font-family:var(--font-mono);letter-spacing:.04em}
 .gg-github-btn:hover{color:var(--accent);border-color:var(--accent)}
 /* Close button */

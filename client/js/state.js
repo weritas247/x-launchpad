@@ -44,3 +44,12 @@ export const customCssTag = document.getElementById('custom-css-tag');
 export function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+
+export function stripAnsi(str) {
+  return str.replace(/\x1b\[[0-9;]*[mGKHFABCDJsuhl]/g, '')
+            .replace(/\x1b\][^\x07]*\x07/g, '')
+            .replace(/\x1b[()][AB012]/g, '')
+            .replace(/[\x00-\x09\x0b-\x1f]/g, '');
+}
+
+export const tabStatusState = new Map();

@@ -1,8 +1,9 @@
 import { S, terminalMap, sessionMeta, sessionList, sessionEmpty, tabBar, tabAddBtn, termWrapper, sbActiveName, sbSize, ctxMenu, escHtml } from './state.js';
-import { AI_REGISTRY } from './constants.js';
+import { AI_REGISTRY, normalizeKey } from './constants.js';
 import { wsSend } from './websocket.js';
 import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session.js';
 import { removeSplitPane, teardownSplitLayout, showDropZoneOverlay, hideDropZoneOverlay } from './split-pane.js';
+import { resetTabStatus } from './tab-status.js';
 
 export function newSession() {
   showSessionPicker();
@@ -89,6 +90,7 @@ export function closeSession(id) {
       entry.div.remove();
     }
   }
+  resetTabStatus(id);
   sessionMeta.delete(id);
   if (S.activeSessionId === id) {
     S.activeSessionId = null;
@@ -198,7 +200,7 @@ export function attachTerminal(sessionId, name) {
     if (e.shiftKey) parts.push('Shift');
     if (e.altKey) parts.push('Alt');
     if (e.metaKey) parts.push('Meta');
-    if (!['Control','Shift','Alt','Meta'].includes(e.key)) parts.push(e.key === ' ' ? 'Space' : e.key);
+    if (!['Control','Shift','Alt','Meta'].includes(e.key)) parts.push(normalizeKey(e));
     const combo = parts.join('+');
     const bindings = Object.values(kb);
     if (bindings.includes(combo)) return false; // false = don't let xterm handle it
@@ -321,9 +323,11 @@ export function createTab(sessionId, name) {
   el.className = 'tab';
   el.draggable = true;
   el.dataset.sessionId = sessionId;
+  el.dataset.status = 'idle';
   el.innerHTML = `
-    <div class="tab-indicator"></div>
+    <div class="tab-indicator" aria-label="대기"></div>
     <span class="tab-name">${escHtml(name)}</span>
+    <span class="tab-status-text">대기</span>
     <button class="tab-close-btn">✕</button>
   `;
   el.addEventListener('click', e => {

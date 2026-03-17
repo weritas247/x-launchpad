@@ -1,4 +1,4 @@
-import { S, sessionMeta, terminalMap, notifyBuffers, notifyTimers, notifyState, escHtml } from './state.js';
+import { S, sessionMeta, terminalMap, notifyBuffers, notifyTimers, notifyState, escHtml, stripAnsi } from './state.js';
 import { AI_REGISTRY } from './constants.js';
 import { activateSession } from './session.js';
 import { wsSend } from './websocket.js';
@@ -20,13 +20,6 @@ const AI_PATTERNS = [
 function getAiIcon(aiKey) {
   const reg = AI_REGISTRY[aiKey];
   return reg ? reg.notifyIcon : '💻';
-}
-
-function stripAnsi(str) {
-  return str.replace(/\x1b\[[0-9;]*[mGKHFABCDJsuhl]/g, '')
-            .replace(/\x1b\][^\x07]*\x07/g, '')
-            .replace(/\x1b[()][AB012]/g, '')
-            .replace(/[\x00-\x09\x0b-\x1f]/g, '');
 }
 
 export function aiNotifyCheck(sessionId, chunk) {
