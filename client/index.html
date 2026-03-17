@@ -90,6 +90,15 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .session-list{flex:1;overflow-y:auto;padding:6px 0}
 .session-list::-webkit-scrollbar{width:3px}
 .session-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.split-group{border:1px solid var(--accent);border-radius:6px;margin:6px 8px;overflow:hidden;background:var(--accent-dim)}
+.split-group-header{display:flex;align-items:center;gap:6px;padding:5px 10px 4px;font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--accent);background:rgba(0,0,0,.3);border-bottom:1px solid var(--accent)}
+.split-group-header-icon{font-size:10px}
+.split-group-header-label{flex:1}
+.split-group-badge{font-size:9px;background:var(--accent);color:var(--bg);border-radius:3px;padding:1px 5px;font-weight:700}
+.split-group .session-item{padding-left:12px;border-left:none;border-bottom:1px solid var(--border)}
+.split-group .session-item:last-child{border-bottom:none}
+.split-group .session-item.active{background:var(--bg-active);border-left:2px solid var(--accent)}
+.split-group .session-item.active::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,var(--accent-dim),transparent);pointer-events:none}
 .session-item{padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .12s;border-left:2px solid transparent;position:relative;animation:fadeIn .2s ease}
 .session-item:hover{background:var(--bg-hover)}
 .session-item.active{background:var(--bg-active);border-left-color:var(--accent)}
@@ -1653,6 +1662,43 @@ function enterSplitMode(existingSessionId) {
   tabBar.style.display = 'none';
 }
 
+function collectPaneIds(node, out = []) {
+  if (!node) return out;
+  if (node.type === 'pane') { out.push(node.sessionId); return out; }
+  collectPaneIds(node.children[0], out);
+  collectPaneIds(node.children[1], out);
+  return out;
+}
+
+function updateSidebarSplitGroup() {
+  // Remove existing split group if any
+  const existing = sessionList.querySelector('.split-group');
+  if (existing) {
+    // Move items back to sessionList before removing group
+    [...existing.querySelectorAll('.session-item')].forEach(el => sessionList.appendChild(el));
+    existing.remove();
+  }
+  if (!layoutTree) return;
+
+  const paneIds = collectPaneIds(layoutTree);
+  if (paneIds.length < 2) return;
+
+  // Build group element
+  const group = document.createElement('div');
+  group.className = 'split-group';
+  group.innerHTML = `<div class="split-group-header"><span class="split-group-header-icon">⊞</span><span class="split-group-header-label">SPLIT</span><span class="split-group-badge">${paneIds.length}</span></div>`;
+
+  // Move pane session items into group
+  paneIds.forEach(id => {
+    const entry = terminalMap.get(id);
+    if (entry && entry.sidebarEl) group.appendChild(entry.sidebarEl);
+  });
+
+  // Insert group at position of first pane item in sessionList
+  // Find first non-split item's position, or just append
+  sessionList.appendChild(group);
+}
+
 function teardownSplitLayout() {
   if (!layoutTree) return;
   function removeDividers(node) {
@@ -1671,6 +1717,7 @@ function teardownSplitLayout() {
     splitRoot = null;
   }
   tabBar.style.display = '';
+  updateSidebarSplitGroup(); // removes group (layoutTree is null)
 }
 
 function findPaneNode(node, sessionId) {
@@ -2236,6 +2283,7 @@ dzZones.forEach(zone => {
         };
         renderSplitLayout(layoutTree, { left:0, top:0, width:100, height:100 });
         refitAllPanes();
+        updateSidebarSplitGroup();
         activateSession(existingId);
       } catch (err) { console.error('4-way split failed', err); }
       return;
@@ -2277,6 +2325,7 @@ dzZones.forEach(zone => {
       splitRoot.appendChild(newPane.element);
       renderSplitLayout(layoutTree, { left:0, top:0, width:100, height:100 });
       refitAllPanes();
+      updateSidebarSplitGroup();
       activateSession(newId);
     } catch (err) { console.error('split failed', err); }
   });
