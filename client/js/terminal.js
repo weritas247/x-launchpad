@@ -443,6 +443,12 @@ export function initContextMenu() {
       if (e.key === 'Escape') { input.value = old; finish(); }
     });
   });
+  document.getElementById('ctx-duplicate').addEventListener('click', () => {
+    if (!S.ctxTargetId) return;
+    const meta = sessionMeta.get(S.ctxTargetId);
+    const name = meta ? meta.name : 'Shell';
+    wsSend({ type: 'session_duplicate', sourceSessionId: S.ctxTargetId, name });
+  });
   document.getElementById('ctx-reveal').addEventListener('click', () => {
     if (!S.ctxTargetId) return;
     fetch('/api/reveal-in-finder', {

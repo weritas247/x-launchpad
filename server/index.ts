@@ -229,7 +229,14 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
 
   // PTY output → clients with this session active OR subscribed
   ptyProcess.onData((chunk: string) => {
-    const msg = JSON.stringify({ type: 'output', sessionId: id, data: chunk });
+    // Strip inline image protocols that xterm.js cannot render:
+    // - iTerm2 inline images: OSC 1337 ; File=... ST
+    // - Sixel graphics: DCS ... ST
+    let filtered = chunk
+      .replace(/\x1b\]1337;[^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+      .replace(/\x1bP[pq][^\x1b]*\x1b\\/g, '');
+    if (!filtered) return;
+    const msg = JSON.stringify({ type: 'output', sessionId: id, data: filtered });
     wss.clients.forEach(c => {
       const cws = c as WebSocket;
       if (cws.readyState !== WebSocket.OPEN) return;
@@ -456,6 +463,17 @@ wss.on('connection', (ws: WebSocket) => {
       if (Array.isArray(ids)) {
         wsSubscriptions.set(ws, new Set(ids.filter(id => sessions.has(id))));
       }
+
+    } else if (parsed.type === 'session_duplicate') {
+      const sourceId = parsed.sourceSessionId as string;
+      const source = sessions.get(sourceId);
+      const id = `session-${Date.now()}`;
+      const name = (parsed.name as string) || 'Shell';
+      const cwd = source?.cwd || currentSettings.shell.startDirectory || process.env.HOME || '/';
+      createSession(id, name, cwd);
+      wsSession.set(ws, id);
+      ws.send(JSON.stringify({ type: 'session_created', sessionId: id, name }));
+      broadcastSessionList();
 
     } else if (parsed.type === 'session_attach') {
       const id = parsed.sessionId as string;
