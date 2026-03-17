@@ -1,7 +1,7 @@
 import { S, terminalMap } from './state.js';
 import { wsSend } from './websocket.js';
 
-// Per-session attached images: Map<sessionId, [{file, objectUrl, filename, fullPath, uploaded}]>
+// Per-session pending images (NOT uploaded yet): Map<sessionId, [{file, objectUrl}]>
 const attachments = new Map();
 
 // ─── PASTE HANDLER ───────────────────────────────────────────────
@@ -50,25 +50,14 @@ function handleDrop(e, sessionId) {
 function addAttachment(file, sessionId) {
   if (!attachments.has(sessionId)) attachments.set(sessionId, []);
   const list = attachments.get(sessionId);
-  const objectUrl = URL.createObjectURL(file);
-  const item = { file, objectUrl, filename: null, fullPath: null, uploaded: false, error: false };
-  list.push(item);
+  list.push({ file, objectUrl: URL.createObjectURL(file) });
   renderPreview(sessionId);
-  uploadAttachment(item, sessionId);
 }
 
 function removeAttachment(sessionId, idx) {
   const list = attachments.get(sessionId);
   if (!list || !list[idx]) return;
-  const item = list[idx];
-  URL.revokeObjectURL(item.objectUrl);
-  if (item.fullPath) {
-    fetch('/api/delete-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filePath: item.fullPath }),
-    }).catch(() => {});
-  }
+  URL.revokeObjectURL(list[idx].objectUrl);
   list.splice(idx, 1);
   if (list.length === 0) attachments.delete(sessionId);
   renderPreview(sessionId);
@@ -78,7 +67,6 @@ function clearAll(sessionId) {
   const list = attachments.get(sessionId);
   if (list) list.forEach(i => URL.revokeObjectURL(i.objectUrl));
   attachments.delete(sessionId);
-  // Force remove bar + reset xterm
   const entry = terminalMap.get(sessionId);
   if (entry) {
     entry.div.querySelector('.img-attach-bar')?.remove();
@@ -87,39 +75,37 @@ function clearAll(sessionId) {
   }
 }
 
-async function uploadAttachment(item, sessionId) {
-  try {
-    const res = await fetch(
-      `/api/upload-image?sessionId=${encodeURIComponent(sessionId)}&filename=${encodeURIComponent(item.file.name || 'image.png')}`,
-      { method: 'POST', headers: { 'Content-Type': item.file.type }, body: item.file }
-    );
-    const result = await res.json();
-    if (result.ok) {
-      item.filename = result.filename;
-      item.fullPath = result.fullPath;
-      item.uploaded = true;
-    } else {
-      item.error = true;
-    }
-  } catch {
-    item.error = true;
+// ─── UPLOAD (only called on confirm) ─────────────────────────────
+async function uploadAll(sessionId) {
+  const list = attachments.get(sessionId);
+  if (!list || list.length === 0) return [];
+  const results = [];
+  for (const item of list) {
+    try {
+      const res = await fetch(
+        `/api/upload-image?sessionId=${encodeURIComponent(sessionId)}&filename=${encodeURIComponent(item.file.name || 'image.png')}`,
+        { method: 'POST', headers: { 'Content-Type': item.file.type }, body: item.file }
+      );
+      const result = await res.json();
+      if (result.ok) results.push(result.fullPath);
+    } catch {}
   }
-  renderPreview(sessionId);
+  return results;
 }
 
-// ─── CONFIRM: insert absolute paths into terminal ────────────────
-function confirmAttachments(sessionId) {
-  const paths = flushAttachments(sessionId);
+// ─── CONFIRM: upload + insert paths ──────────────────────────────
+async function confirmAttachments(sessionId) {
+  const paths = await uploadAndFlush(sessionId);
   if (paths) {
     wsSend({ type: 'input', sessionId, data: paths });
   }
 }
 
-// Returns paths string and clears bar, or null if nothing pending
-export function flushAttachments(sessionId) {
+// Upload all pending, clear bar, return paths string
+export async function uploadAndFlush(sessionId) {
   const list = attachments.get(sessionId);
   if (!list || list.length === 0) return null;
-  const paths = list.filter(i => i.uploaded && i.fullPath).map(i => i.fullPath);
+  const paths = await uploadAll(sessionId);
   clearAll(sessionId);
   return paths.length > 0 ? paths.join(' ') : null;
 }
@@ -153,12 +139,10 @@ function renderPreview(sessionId) {
   list.forEach((item, idx) => {
     const thumb = document.createElement('div');
     thumb.className = 'img-attach-thumb';
-    if (item.error) thumb.classList.add('img-attach-error');
-    if (!item.uploaded && !item.error) thumb.classList.add('img-attach-loading');
 
     const img = document.createElement('img');
     img.src = item.objectUrl;
-    img.alt = item.filename || 'image';
+    img.alt = 'image';
 
     const closeBtn = document.createElement('button');
     closeBtn.className = 'img-attach-close';
@@ -170,23 +154,13 @@ function renderPreview(sessionId) {
 
     thumb.appendChild(img);
     thumb.appendChild(closeBtn);
-
-    if (item.uploaded && item.filename) {
-      const label = document.createElement('div');
-      label.className = 'img-attach-label';
-      label.textContent = item.filename;
-      thumb.appendChild(label);
-    }
-
     bar.appendChild(thumb);
   });
 
   // Confirm button
-  const allUploaded = list.some(i => i.uploaded);
   const confirmBtn = document.createElement('button');
   confirmBtn.className = 'img-attach-confirm';
   confirmBtn.textContent = '↵ 첨부';
-  confirmBtn.disabled = !allUploaded;
   confirmBtn.addEventListener('click', e => {
     e.stopPropagation();
     confirmAttachments(sessionId);
@@ -199,16 +173,6 @@ function renderPreview(sessionId) {
   cancelBtn.textContent = '✕';
   cancelBtn.addEventListener('click', e => {
     e.stopPropagation();
-    // Delete all files from server
-    list.forEach(item => {
-      if (item.fullPath) {
-        fetch('/api/delete-image', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filePath: item.fullPath }),
-        }).catch(() => {});
-      }
-    });
     clearAll(sessionId);
   });
   bar.appendChild(cancelBtn);

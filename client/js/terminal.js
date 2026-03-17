@@ -4,7 +4,7 @@ import { wsSend } from './websocket.js';
 import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session.js';
 import { removeSplitPane, teardownSplitLayout, showDropZoneOverlay, hideDropZoneOverlay } from './split-pane.js';
 import { resetTabStatus, tabStatusOnInput } from './tab-status.js';
-import { setupTerminalImageHandlers, hasPendingAttachments, flushAttachments } from './image-attach.js';
+import { setupTerminalImageHandlers, hasPendingAttachments, uploadAndFlush } from './image-attach.js';
 
 export function newSession() {
   showSessionPicker();
@@ -210,10 +210,14 @@ export function attachTerminal(sessionId, name) {
 
   term.onData(data => {
     if (S.activeSessionId === sessionId) {
-      // Enter pressed with pending images → inject paths before Enter
+      // Enter pressed with pending images → upload, inject paths, then send Enter
       if (data === '\r' && hasPendingAttachments(sessionId)) {
-        const paths = flushAttachments(sessionId);
-        if (paths) wsSend({ type: 'input', sessionId, data: ' ' + paths });
+        uploadAndFlush(sessionId).then(paths => {
+          if (paths) wsSend({ type: 'input', sessionId, data: ' ' + paths });
+          wsSend({ type: 'input', sessionId, data: '\r' });
+        });
+        tabStatusOnInput(sessionId);
+        return;
       }
       wsSend({ type: 'input', sessionId, data });
     }
