@@ -172,6 +172,31 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .term-pane .xterm-viewport::-webkit-scrollbar{width:4px}
 .term-pane .xterm-viewport::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 
+/* ═══ SPLIT PANE ═══ */
+#split-root{position:absolute;inset:0;overflow:hidden}
+#split-root .term-pane{display:block !important;position:absolute;overflow:hidden;padding:6px 8px;transition:border-color .1s,box-shadow .1s,opacity .15s,filter .15s}
+.term-pane.split-active{border:1px solid var(--accent)!important;box-shadow:0 0 0 1px var(--accent-glow);opacity:1;filter:none}
+.term-pane.split-inactive{opacity:0.55;filter:brightness(0.65);border:1px solid var(--border)!important}
+.split-divider{position:absolute;z-index:10;display:flex;align-items:center;justify-content:center}
+.split-divider-v{cursor:col-resize;width:8px;top:0;bottom:0}
+.split-divider-h{cursor:row-resize;height:8px;left:0;right:0}
+.split-divider::after{content:'';background:var(--border-lit);transition:background .15s}
+.split-divider-v::after{width:1px;height:100%}
+.split-divider-h::after{width:100%;height:1px}
+.split-divider:hover::after,.split-divider.dragging::after{background:var(--accent);box-shadow:0 0 6px var(--accent-glow)}
+
+/* ═══ DROP ZONE OVERLAY ═══ */
+#drop-zone-overlay{position:absolute;inset:0;z-index:500;pointer-events:none;display:none}
+#drop-zone-overlay.active{display:block;pointer-events:all}
+.dz{position:absolute;background:transparent;transition:background .12s,border-color .12s}
+.dz-top{top:0;left:0;right:0;height:25%}
+.dz-bottom{bottom:0;left:0;right:0;height:25%}
+.dz-left{top:25%;bottom:25%;left:0;width:25%}
+.dz-right{top:25%;bottom:25%;right:0;width:25%}
+.dz-center{top:25%;bottom:25%;left:25%;right:25%}
+.dz.dz-hover{background:var(--accent-dim);border:2px dashed var(--accent);box-sizing:border-box}
+.dz-center.dz-hover{background:rgba(0,255,229,0.08);border:2px dashed var(--accent2)}
+
 #empty-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--text-ghost)}
 .empty-art{font-size:11px;line-height:1.5;color:var(--text-ghost);opacity:.5;text-align:center;white-space:pre;letter-spacing:.05em}
 .empty-hint{font-size:11px;color:var(--text-dim);letter-spacing:.08em}
@@ -449,6 +474,13 @@ body.theme-violet{--bg-void:#070510;--bg-deep:#0a0816;--bg-panel:#0d0b1e;--bg-su
     </div>
 
     <div id="terminal-wrapper">
+      <div id="drop-zone-overlay">
+        <div class="dz dz-top"    data-zone="top"></div>
+        <div class="dz dz-bottom" data-zone="bottom"></div>
+        <div class="dz dz-left"   data-zone="left"></div>
+        <div class="dz dz-right"  data-zone="right"></div>
+        <div class="dz dz-center" data-zone="center"></div>
+      </div>
       <div id="empty-state">
         <div class="empty-art">╔══════════════════╗
 ║  SUPER TERMINAL   ║
@@ -946,6 +978,11 @@ let activeSessionId = null;
 let currentTheme = THEMES[0];
 const terminalMap = new Map();
 const sessionMeta = new Map();
+
+// ── Split Pane State ──
+let layoutTree = null;      // null = single mode, SplitNode = split mode
+let splitRoot = null;       // #split-root element reference
+let pendingSplitQueue = []; // async session creation queue
 let settings = null;
 let pendingSettings = null;
 let wsReconnectInterval = 3000;
@@ -962,6 +999,8 @@ const tabBar       = document.getElementById('tab-bar');
 const tabAddBtn    = document.getElementById('tab-add-btn');
 const termWrapper  = document.getElementById('terminal-wrapper');
 const emptyState   = document.getElementById('empty-state');
+const dropOverlay  = document.getElementById('drop-zone-overlay');
+const dzZones      = dropOverlay.querySelectorAll('.dz');
 const sbActiveName = document.getElementById('sb-active-name');
 const sbCount      = document.getElementById('sb-count');
 const sbSize       = document.getElementById('sb-size');
@@ -1115,12 +1154,19 @@ function connect() {
       applySettings(msg.settings);
     } else if (msg.type === 'session_created') {
       attachTerminal(msg.sessionId, msg.name);
-      activateSession(msg.sessionId);
-      // Send actual terminal size to PTY after session is ready
-      setTimeout(() => {
-        const e = terminalMap.get(msg.sessionId);
-        if (e) { e.fitAddon.fit(); wsSend({ type:'resize', sessionId:msg.sessionId, cols:e.term.cols, rows:e.term.rows }); }
-      }, 50);
+      if (pendingSplitQueue.length > 0) {
+        // Split mode: promise resolve, activateSession은 split 완료 후 호출
+        const pending = pendingSplitQueue.shift();
+        pending.resolve(msg.sessionId);
+      } else {
+        activateSession(msg.sessionId);
+        wsSend({ type:'session_attach', sessionId: msg.sessionId });
+        // Send actual terminal size to PTY after session is ready
+        setTimeout(() => {
+          const e = terminalMap.get(msg.sessionId);
+          if (e) { e.fitAddon.fit(); wsSend({ type:'resize', sessionId:msg.sessionId, cols:e.term.cols, rows:e.term.rows }); }
+        }, 50);
+      }
     } else if (msg.type === 'session_attached') {
       activateSession(msg.sessionId);
       // Sync PTY size on attach
@@ -1178,18 +1224,27 @@ function closeSession(id) {
   wsSend({ type: 'session_close', sessionId: id });
   const entry = terminalMap.get(id);
   if (entry) {
-    entry.term.dispose();
-    entry.div.remove();
+    entry.term.dispose();  // 항상 dispose
     entry.tabEl.remove();
     entry.sidebarEl.remove();
     terminalMap.delete(id);
+
+    if (layoutTree !== null) {
+      removeSplitPane(id);  // div removal은 removeSplitPane 내부에서
+    } else {
+      entry.div.remove();
+    }
   }
   sessionMeta.delete(id);
   if (activeSessionId === id) {
     activeSessionId = null;
     const first = terminalMap.keys().next().value;
-    if (first) activateSession(first);
-    else showEmptyState();
+    if (first) {
+      activateSession(first);
+      wsSend({ type:'session_attach', sessionId: first });
+    } else {
+      showEmptyState();
+    }
   }
   updateStatusBar();
 }
@@ -1208,6 +1263,9 @@ function renameSession(id, newName) {
 }
 
 function syncSessionList(sessions) {
+  // Teardown split layout on reconnect (not persisted)
+  if (layoutTree !== null) teardownSplitLayout();
+
   const isInitialLoad = terminalMap.size === 0 && sessions.length > 0;
 
   const newIds = [];
@@ -1264,7 +1322,8 @@ function attachTerminal(sessionId, name) {
   const div = document.createElement('div');
   div.className = 'term-pane';
   div.dataset.sessionId = sessionId;
-  termWrapper.appendChild(div);
+  const container = (layoutTree !== null && splitRoot) ? splitRoot : termWrapper;
+  container.appendChild(div);
 
   const term = new Terminal({
     cursorBlink: settings?.appearance?.cursorBlink !== false,
@@ -1300,6 +1359,11 @@ function attachTerminal(sessionId, name) {
         if (text) wsSend({ type:'input', sessionId, data: text });
       } catch {}
     }
+  });
+
+  // Split mode: click pane to focus
+  div.addEventListener('mousedown', () => {
+    if (layoutTree !== null) activateSession(sessionId);
   });
 
   const sidebarEl = createSidebarItem(sessionId, name);
@@ -1407,12 +1471,17 @@ function createTab(sessionId, name) {
   // ── Tab DnD ──
   el.addEventListener('dragstart', e => {
     e.dataTransfer.setData('text/tab-session', sessionId);
+    e.dataTransfer.setData('text/split-tab', sessionId);
     e.dataTransfer.effectAllowed = 'move';
-    setTimeout(() => el.classList.add('dragging'), 0);
+    setTimeout(() => {
+      el.classList.add('dragging');
+      showDropZoneOverlay();
+    }, 0);
   });
   el.addEventListener('dragend', () => {
     el.classList.remove('dragging');
     document.querySelectorAll('.tab.drag-over').forEach(t => t.classList.remove('drag-over'));
+    hideDropZoneOverlay();
   });
   el.addEventListener('dragover', e => {
     e.preventDefault();
@@ -1443,21 +1512,210 @@ function createTab(sessionId, name) {
   return el;
 }
 
+// ═══════════════════════════════════════════════════
+//  SPLIT PANE — LAYOUT ENGINE
+// ═══════════════════════════════════════════════════
+function renderSplitLayout(node, rect) {
+  if (!splitRoot) return;
+  if (node.type === 'pane') {
+    const el = node.element;
+    el.style.left   = rect.left + '%';
+    el.style.top    = rect.top + '%';
+    el.style.width  = rect.width + '%';
+    el.style.height = rect.height + '%';
+    return;
+  }
+  const { direction, ratio, children } = node;
+  let r0, r1;
+  if (direction === 'v') {
+    r0 = { left: rect.left, top: rect.top, width: rect.width * ratio, height: rect.height };
+    r1 = { left: rect.left + rect.width * ratio, top: rect.top, width: rect.width * (1 - ratio), height: rect.height };
+  } else {
+    r0 = { left: rect.left, top: rect.top, width: rect.width, height: rect.height * ratio };
+    r1 = { left: rect.left, top: rect.top + rect.height * ratio, width: rect.width, height: rect.height * (1 - ratio) };
+  }
+  renderSplitLayout(children[0], r0);
+  renderSplitLayout(children[1], r1);
+  attachDivider(node, direction === 'v'
+    ? { left: rect.left + rect.width * ratio, top: rect.top, width: 0, height: rect.height }
+    : { left: rect.left, top: rect.top + rect.height * ratio, width: rect.width, height: 0 },
+    rect);
+}
+
+function attachDivider(node, pos, parentRect) {
+  if (!node._divider) {
+    const d = document.createElement('div');
+    d.className = `split-divider split-divider-${node.direction}`;
+    splitRoot.appendChild(d);
+    node._divider = d;
+    d.addEventListener('mousedown', e => startDividerDrag(e, node, parentRect));
+  }
+  const d = node._divider;
+  if (node.direction === 'v') {
+    d.style.left   = pos.left + '%';
+    d.style.top    = pos.top + '%';
+    d.style.height = pos.height + '%';
+    d.style.width  = '8px';
+    d.style.marginLeft = '-4px';
+    d.style.marginTop  = '';
+  } else {
+    d.style.left   = pos.left + '%';
+    d.style.top    = pos.top + '%';
+    d.style.width  = pos.width + '%';
+    d.style.height = '8px';
+    d.style.marginTop  = '-4px';
+    d.style.marginLeft = '';
+  }
+}
+
+function startDividerDrag(e, node, parentRect) {
+  e.preventDefault();
+  node._divider.classList.add('dragging');
+  const wrapRect = termWrapper.getBoundingClientRect();
+  const parentSizePx = node.direction === 'v'
+    ? wrapRect.width  * parentRect.width  / 100
+    : wrapRect.height * parentRect.height / 100;
+  const startRatio = node.ratio;
+  const startPos = node.direction === 'v' ? e.clientX : e.clientY;
+
+  const onMove = ev => {
+    const delta = (node.direction === 'v' ? ev.clientX : ev.clientY) - startPos;
+    node.ratio = Math.min(0.8, Math.max(0.2, startRatio + delta / parentSizePx));
+    renderSplitLayout(layoutTree, { left:0, top:0, width:100, height:100 });
+    refitAllPanes();
+  };
+  const onUp = () => {
+    node._divider.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+  };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp, { once: true });
+}
+
+function refitAllPanes() {
+  if (!layoutTree || !splitRoot) return;
+  terminalMap.forEach(({ fitAddon, div }) => {
+    if (div.parentElement === splitRoot) {
+      try { fitAddon.fit(); } catch {}
+    }
+  });
+}
+
+function enterSplitMode(existingSessionId) {
+  if (splitRoot) return;
+  splitRoot = document.createElement('div');
+  splitRoot.id = 'split-root';
+  termWrapper.appendChild(splitRoot);
+  const entry = terminalMap.get(existingSessionId);
+  if (entry) {
+    entry.div.classList.remove('active');
+    splitRoot.appendChild(entry.div);
+  }
+}
+
+function teardownSplitLayout() {
+  if (!layoutTree) return;
+  function removeDividers(node) {
+    if (!node || node.type === 'pane') return;
+    if (node._divider) { node._divider.remove(); node._divider = null; }
+    node.children.forEach(removeDividers);
+  }
+  removeDividers(layoutTree);
+  layoutTree = null;
+  if (splitRoot) {
+    [...splitRoot.querySelectorAll('.term-pane')].forEach(div => {
+      div.classList.remove('split-active', 'split-inactive');
+      termWrapper.appendChild(div);
+    });
+    splitRoot.remove();
+    splitRoot = null;
+  }
+}
+
+function findPaneNode(node, sessionId) {
+  if (!node) return null;
+  if (node.type === 'pane') return node.sessionId === sessionId ? node : null;
+  return findPaneNode(node.children[0], sessionId) || findPaneNode(node.children[1], sessionId);
+}
+
+function findParentNode(tree, target, parent = null) {
+  if (!tree) return null;
+  if (tree === target) return parent;
+  if (tree.type === 'split') {
+    return findParentNode(tree.children[0], target, tree) || findParentNode(tree.children[1], target, tree);
+  }
+  return null;
+}
+
+function removeSplitPane(sessionId) {
+  if (!layoutTree) return;
+  const pane = findPaneNode(layoutTree, sessionId);
+  if (!pane) return;
+  pane.element.remove();
+
+  const parent = findParentNode(layoutTree, pane);
+  if (!parent) {
+    // 마지막 pane이었음
+    teardownSplitLayout();
+    return;
+  }
+  const sibling = parent.children.find(c => c !== pane);
+  if (parent._divider) { parent._divider.remove(); parent._divider = null; }
+
+  const grandParent = findParentNode(layoutTree, parent);
+  if (!grandParent) {
+    layoutTree = sibling;
+  } else {
+    const idx = grandParent.children.indexOf(parent);
+    grandParent.children[idx] = sibling;
+  }
+
+  // terminalMap에서 이미 제거된 후 호출되므로 size로 판단
+  if (terminalMap.size <= 1) {
+    teardownSplitLayout();
+    const lastId = terminalMap.keys().next().value;
+    if (lastId) {
+      const lastEntry = terminalMap.get(lastId);
+      if (lastEntry) lastEntry.div.classList.add('active');
+      activateSession(lastId);
+    }
+  } else {
+    renderSplitLayout(layoutTree, { left:0, top:0, width:100, height:100 });
+    refitAllPanes();
+  }
+}
+
 function activateSession(id) {
   if (!terminalMap.has(id)) return;
   activeSessionId = id;
-  terminalMap.forEach(({ div, tabEl, sidebarEl }, sid) => {
-    const a = sid === id;
-    div.classList.toggle('active', a);
-    tabEl.classList.toggle('active', a);
-    sidebarEl.classList.toggle('active', a);
-  });
+
+  if (layoutTree === null) {
+    // Single mode: 기존 동작
+    terminalMap.forEach(({ div, tabEl, sidebarEl }, sid) => {
+      const a = sid === id;
+      div.classList.toggle('active', a);
+      tabEl.classList.toggle('active', a);
+      sidebarEl.classList.toggle('active', a);
+    });
+  } else {
+    // Split mode: 모든 pane 표시, highlight만 변경
+    terminalMap.forEach(({ div, tabEl, sidebarEl }, sid) => {
+      const a = sid === id;
+      div.classList.toggle('split-active', a);
+      div.classList.toggle('split-inactive', !a);
+      tabEl.classList.toggle('active', a);
+      sidebarEl.classList.toggle('active', a);
+    });
+  }
+
   const entry = terminalMap.get(id);
-  entry.fitAddon.fit();
-  entry.term.focus();
-  const meta = sessionMeta.get(id);
-  sbActiveName.textContent = meta ? meta.name : id;
-  sbSize.textContent = `${entry.term.cols}×${entry.term.rows}`;
+  if (entry) {
+    entry.fitAddon.fit();
+    entry.term.focus();
+    const meta = sessionMeta.get(id);
+    sbActiveName.textContent = meta ? meta.name : id;
+    sbSize.textContent = `${entry.term.cols}×${entry.term.rows}`;
+  }
   updateStatusBar();
 }
 
@@ -1872,6 +2130,118 @@ document.getElementById('btn-add-env').addEventListener('click', () => {
 document.getElementById('btn-settings').addEventListener('click', openSettings);
 
 // ═══════════════════════════════════════════════════
+//  SPLIT PANE — DnD LOGIC
+// ═══════════════════════════════════════════════════
+function createSplitSession() {
+  return new Promise((resolve, reject) => {
+    let resolved = false;
+    const wrappedResolve = (id) => { resolved = true; resolve(id); };
+    pendingSplitQueue.push({ resolve: wrappedResolve });
+    wsSend({ type: 'session_create', name: 'split', cmd: settings?.shell?.defaultShell || '' });
+    setTimeout(() => {
+      if (!resolved) {
+        pendingSplitQueue = pendingSplitQueue.filter(p => p.resolve !== wrappedResolve);
+        reject(new Error('split session timeout'));
+      }
+    }, 8000);
+  });
+}
+
+function showDropZoneOverlay() {
+  const paneCount = terminalMap.size;
+  if (paneCount >= 4) return;
+  dropOverlay.classList.add('active');
+  dropOverlay.querySelector('.dz-center').style.display = paneCount === 1 ? '' : 'none';
+}
+
+function hideDropZoneOverlay() {
+  dropOverlay.classList.remove('active');
+  dzZones.forEach(z => z.classList.remove('dz-hover'));
+}
+
+dzZones.forEach(zone => {
+  zone.addEventListener('dragover', e => {
+    if (!e.dataTransfer.types.includes('text/split-tab')) return;
+    e.preventDefault();
+    dzZones.forEach(z => z.classList.remove('dz-hover'));
+    zone.classList.add('dz-hover');
+  });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dz-hover'));
+  zone.addEventListener('drop', async e => {
+    e.preventDefault();
+    hideDropZoneOverlay();
+    const z = zone.dataset.zone;
+    const existingId = activeSessionId;
+    if (!existingId) return;
+
+    if (z === 'center') {
+      try {
+        const [id1, id2, id3] = await Promise.all([
+          createSplitSession(), createSplitSession(), createSplitSession()
+        ]);
+        const existingEntry = terminalMap.get(existingId);
+        const existingPane = { type: 'pane', sessionId: existingId, element: existingEntry.div };
+        const pane1 = { type: 'pane', sessionId: id1, element: terminalMap.get(id1).div };
+        const pane2 = { type: 'pane', sessionId: id2, element: terminalMap.get(id2).div };
+        const pane3 = { type: 'pane', sessionId: id3, element: terminalMap.get(id3).div };
+        enterSplitMode(existingId);
+        [pane1, pane2, pane3].forEach(p => splitRoot.appendChild(p.element));
+        layoutTree = {
+          type: 'split', direction: 'h', ratio: 0.5,
+          children: [
+            { type: 'split', direction: 'v', ratio: 0.5, children: [existingPane, pane1] },
+            { type: 'split', direction: 'v', ratio: 0.5, children: [pane2, pane3] }
+          ]
+        };
+        renderSplitLayout(layoutTree, { left:0, top:0, width:100, height:100 });
+        refitAllPanes();
+        activateSession(existingId);
+      } catch (err) { console.error('4-way split failed', err); }
+      return;
+    }
+
+    const dirMap = { left: 'v', right: 'v', top: 'h', bottom: 'h' };
+    const direction = dirMap[z];
+    try {
+      const newId = await createSplitSession();
+      const newEntry = terminalMap.get(newId);
+      const newPane = { type: 'pane', sessionId: newId, element: newEntry.div };
+      newPane.element.classList.add('split-inactive');
+
+      const firstNew = (z === 'left' || z === 'top');
+
+      if (!layoutTree) {
+        enterSplitMode(existingId);
+        const existingEntry = terminalMap.get(existingId);
+        const existingPane = { type: 'pane', sessionId: existingId, element: existingEntry.div };
+        layoutTree = {
+          type: 'split', direction, ratio: 0.5,
+          children: firstNew ? [newPane, existingPane] : [existingPane, newPane]
+        };
+      } else {
+        const existingPane = findPaneNode(layoutTree, existingId);
+        if (!existingPane) return;
+        const parent = findParentNode(layoutTree, existingPane);
+        const newNode = {
+          type: 'split', direction, ratio: 0.5,
+          children: firstNew ? [newPane, existingPane] : [existingPane, newPane]
+        };
+        if (!parent) {
+          layoutTree = newNode;
+        } else {
+          const idx = parent.children.indexOf(existingPane);
+          parent.children[idx] = newNode;
+        }
+      }
+      splitRoot.appendChild(newPane.element);
+      renderSplitLayout(layoutTree, { left:0, top:0, width:100, height:100 });
+      refitAllPanes();
+      activateSession(newId);
+    } catch (err) { console.error('split failed', err); }
+  });
+});
+
+// ═══════════════════════════════════════════════════
 //  KEYBINDINGS HANDLER
 // ═══════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
@@ -1885,6 +2255,45 @@ document.addEventListener('keydown', e => {
   }
 
   if (settingsOverlay.classList.contains('open')) return;
+
+  // Split pane keyboard navigation: Ctrl+Shift+Arrow
+  if (e.ctrlKey && e.shiftKey && layoutTree !== null) {
+    const dirs = { ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down' };
+    const dir = dirs[e.key];
+    if (dir) {
+      e.preventDefault();
+      const panes = [];
+      function collectPanes(node) {
+        if (!node) return;
+        if (node.type === 'pane') {
+          const rect = node.element.getBoundingClientRect();
+          panes.push({ sessionId: node.sessionId, cx: rect.left + rect.width/2, cy: rect.top + rect.height/2 });
+        } else { node.children.forEach(collectPanes); }
+      }
+      collectPanes(layoutTree);
+      const activeEntry = terminalMap.get(activeSessionId);
+      if (!activeEntry) return;
+      const ar = activeEntry.div.getBoundingClientRect();
+      const ax = ar.left + ar.width/2, ay = ar.top + ar.height/2;
+      const coneMap = { left: Math.PI, right: 0, up: -Math.PI/2, down: Math.PI/2 };
+      const targetAngle = coneMap[dir];
+      let best = null, bestDist = Infinity;
+      panes.forEach(p => {
+        if (p.sessionId === activeSessionId) return;
+        const dx = p.cx - ax, dy = p.cy - ay;
+        const angle = Math.atan2(dy, dx);
+        let diff = angle - targetAngle;
+        while (diff > Math.PI) diff -= 2*Math.PI;
+        while (diff < -Math.PI) diff += 2*Math.PI;
+        if (Math.abs(diff) <= Math.PI/4) {
+          const primaryDist = (dir === 'left' || dir === 'right') ? Math.abs(dx) : Math.abs(dy);
+          if (primaryDist < bestDist) { bestDist = primaryDist; best = p; }
+        }
+      });
+      if (best) activateSession(best.sessionId);
+      return;
+    }
+  }
 
   const parts = [];
   if (e.ctrlKey) parts.push('Ctrl');
