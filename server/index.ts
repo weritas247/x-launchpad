@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as pty from 'node-pty';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as os from 'os';
+import { execFileSync } from 'child_process';
 
 const app = express();
 const server = http.createServer(app);
@@ -55,6 +56,7 @@ const DEFAULT_SETTINGS = {
     renameSession: 'Ctrl+Shift+r',
     clearTerminal: 'Meta+k',
     splitSession: '',
+    gitGraph: 'Ctrl+g',
   },
   advanced: {
     customCss: '',
@@ -172,10 +174,11 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     try {
       const pid = ptyProcess.pid;
       // macOS: lsof -p <pid> to get cwd
-      const { execSync } = require('child_process') as typeof import('child_process');
       let newCwd = cwd0;
       try {
-        const out = execSync(`lsof -p ${pid} -a -d cwd -Fn 2>/dev/null`, { encoding: 'utf-8', timeout: 500 });
+        const out = execFileSync('lsof', ['-p', String(pid), '-a', '-d', 'cwd', '-Fn'], {
+          encoding: 'utf-8', timeout: 500,
+        });
         const match = out.match(/\nn(.+)/);
         if (match) newCwd = match[1].trim();
       } catch {}
@@ -184,7 +187,9 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
       // Use 'args' (full command line) instead of 'comm' so node-based CLIs are identifiable
       let newAi: string | null = null;
       try {
-        const psOut = execSync(`ps -eo pid,ppid,args 2>/dev/null`, { encoding: 'utf-8', timeout: 800 });
+        const psOut = execFileSync('ps', ['-eo', 'pid,ppid,args'], {
+          encoding: 'utf-8', timeout: 800,
+        });
         const rows = psOut.trim().split('\n').slice(1);
         const parentOf = new Map<number, number>();
         const cmdOf = new Map<number, string>();
@@ -432,6 +437,73 @@ wss.on('connection', (ws: WebSocket) => {
           console.log(`[session] Running '${cmd}' in '${session.name}' after resize to ${parsed.cols}x${parsed.rows}`);
           runCmdWhenReady(session, cmd);
         }
+      }
+
+    } else if (parsed.type === 'git_graph') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      try {
+        const raw = execFileSync('git', [
+          'log', '--format=%H%x00%P%x00%D%x00%an%x00%aI%x00%s', '--max-count=50', '--all',
+        ], { cwd: session.cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+        const commits = raw.split('\n').filter(Boolean).map(line => {
+          const [hash, parentStr, refStr, author, date, ...msgParts] = line.split('\x00');
+          return {
+            hash,
+            parents: parentStr ? parentStr.split(' ') : [],
+            refs: refStr ? refStr.split(', ').map((r: string) => r.trim()).filter(Boolean) : [],
+            author,
+            date,
+            message: msgParts.join('\x00'),
+          };
+        });
+        ws.send(JSON.stringify({ type: 'git_graph_data', sessionId: id, commits }));
+      } catch (e) {
+        ws.send(JSON.stringify({ type: 'git_graph_data', sessionId: id, commits: [], error: String(e) }));
+      }
+
+    } else if (parsed.type === 'git_file_list') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const hash = parsed.hash as string;
+      if (!hash || !/^[0-9a-f]{4,40}$/i.test(hash)) {
+        ws.send(JSON.stringify({ type: 'git_file_list_data', hash, files: [], error: 'Invalid hash' }));
+        return;
+      }
+      try {
+        const raw = execFileSync('git', [
+          'diff-tree', '--no-commit-id', '--name-status', '-r', hash,
+        ], { cwd: session.cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+        const files = raw.split('\n').filter(Boolean).map(line => {
+          const [status, ...pathParts] = line.split('\t');
+          return { status, path: pathParts.join('\t') };
+        });
+        ws.send(JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files }));
+      } catch (e) {
+        ws.send(JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files: [], error: String(e) }));
+      }
+
+    } else if (parsed.type === 'git_branch') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      try {
+        let branch = execFileSync('git', ['branch', '--show-current'], {
+          cwd: session.cwd, encoding: 'utf-8', timeout: 3000,
+        }).trim();
+        if (!branch) {
+          branch = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+            cwd: session.cwd, encoding: 'utf-8', timeout: 3000,
+          }).trim();
+        }
+        ws.send(JSON.stringify({ type: 'git_branch_data', sessionId: id, branch }));
+      } catch {
+        ws.send(JSON.stringify({ type: 'git_branch_data', sessionId: id, branch: null }));
       }
     }
   });
