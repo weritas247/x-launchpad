@@ -1011,8 +1011,18 @@ function connect() {
     } else if (msg.type === 'session_created') {
       attachTerminal(msg.sessionId, msg.name);
       activateSession(msg.sessionId);
+      // Send actual terminal size to PTY after session is ready
+      setTimeout(() => {
+        const e = terminalMap.get(msg.sessionId);
+        if (e) { e.fitAddon.fit(); wsSend({ type:'resize', sessionId:msg.sessionId, cols:e.term.cols, rows:e.term.rows }); }
+      }, 50);
     } else if (msg.type === 'session_attached') {
       activateSession(msg.sessionId);
+      // Sync PTY size on attach
+      setTimeout(() => {
+        const e = terminalMap.get(msg.sessionId);
+        if (e) { e.fitAddon.fit(); wsSend({ type:'resize', sessionId:msg.sessionId, cols:e.term.cols, rows:e.term.rows }); }
+      }, 50);
     } else if (msg.type === 'session_info') {
       updateSessionInfo(msg.sessionId, msg.cwd, msg.ai);
     } else if (msg.type === 'output') {

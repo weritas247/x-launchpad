@@ -207,6 +207,7 @@ function createSession(id: string, name: string, restoreCwd?: string): Session {
           if (/copilot/.test(cmd)) { newAi = 'copilot'; break; }
           if (/aider/.test(cmd)) { newAi = 'aider'; break; }
           if (/cursor/.test(cmd)) { newAi = 'cursor'; break; }
+          if (/opencode/.test(cmd)) { newAi = 'opencode'; break; }
         }
       } catch {}
 
