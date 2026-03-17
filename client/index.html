@@ -983,6 +983,7 @@ const sessionMeta = new Map();
 let layoutTree = null;      // null = single mode, SplitNode = split mode
 let splitRoot = null;       // #split-root element reference
 let pendingSplitQueue = []; // async session creation queue
+let wsJustReconnected = false; // true on first session_list after WS connect
 let settings = null;
 let pendingSettings = null;
 let wsReconnectInterval = 3000;
@@ -1143,13 +1144,14 @@ function connect() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${proto}//${location.host}`);
 
-  ws.onopen = () => setWsStatus(true);
+  ws.onopen = () => { setWsStatus(true); wsJustReconnected = true; };
 
   ws.onmessage = (event) => {
     let msg;
     try { msg = JSON.parse(event.data); } catch { return; }
     if (msg.type === 'session_list') {
-      syncSessionList(msg.sessions);
+      syncSessionList(msg.sessions, wsJustReconnected);
+      wsJustReconnected = false;
     } else if (msg.type === 'settings') {
       applySettings(msg.settings);
     } else if (msg.type === 'session_created') {
@@ -1262,9 +1264,9 @@ function renameSession(id, newName) {
   if (activeSessionId === id) sbActiveName.textContent = newName;
 }
 
-function syncSessionList(sessions) {
-  // Teardown split layout on reconnect (not persisted)
-  if (layoutTree !== null) teardownSplitLayout();
+function syncSessionList(sessions, isReconnect = false) {
+  // Teardown split layout only on WS reconnect (layout is not persisted)
+  if (isReconnect && layoutTree !== null) teardownSplitLayout();
 
   const isInitialLoad = terminalMap.size === 0 && sessions.length > 0;
 
