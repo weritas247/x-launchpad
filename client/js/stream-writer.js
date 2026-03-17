@@ -14,6 +14,8 @@ const INCOMPLETE_ESC = /\x1b(\[[0-9;?]*)?$/;
 
 const CURSOR_HIDE = '\x1b[?25l';
 const CURSOR_SHOW = '\x1b[?25h';
+// Regex to strip cursor visibility sequences from PTY data
+const CURSOR_VIS_RE = /\x1b\[\?25[lh]/g;
 
 const buffers = new Map();   // sessionId → { queue, timer, term, cursorHidden, restoreTimer }
 const bypassed = new Set();  // sessionIds that skip streaming (e.g. session restore)
@@ -48,7 +50,11 @@ export function streamWrite(sessionId, term, data) {
   // Cancel pending cursor restore — new data is arriving
   if (buf.restoreTimer) { clearTimeout(buf.restoreTimer); buf.restoreTimer = null; }
 
-  buf.queue += data;
+  // Strip cursor show/hide from incoming data — we manage cursor visibility ourselves
+  const cleaned = data.replace(CURSOR_VIS_RE, '');
+  if (!cleaned) return;
+
+  buf.queue += cleaned;
 
   // Small data with empty queue → write immediately for responsiveness
   if (buf.queue.length <= INSTANT_THRESHOLD && !buf.timer) {
