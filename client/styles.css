@@ -209,7 +209,8 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .sp-title{font-size:11px;letter-spacing:.18em;color:var(--text-dim);margin-bottom:20px;text-align:center}
 .sp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .sp-btn{display:flex;flex-direction:column;align-items:center;gap:9px;padding:16px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;color:var(--text-main);font-family:var(--font-mono);transition:all .14s}
-.sp-btn:hover{border-color:var(--border-lit);background:var(--bg-hover);box-shadow:0 0 14px var(--accent-glow);transform:translateY(-1px)}
+.sp-btn:hover,.sp-btn.sp-focused{border-color:var(--border-lit);background:var(--bg-hover);box-shadow:0 0 14px var(--accent-glow);transform:translateY(-1px)}
+.sp-btn.sp-focused{border-color:var(--accent);box-shadow:0 0 18px var(--accent-glow)}
 .sp-btn img{width:32px;height:32px;object-fit:contain}
 .sp-shell-icon{font-size:18px;font-family:var(--font-mono);color:var(--accent);line-height:32px;height:32px;display:flex;align-items:center}
 .sp-name{font-size:11px;letter-spacing:.06em;color:var(--text-dim)}

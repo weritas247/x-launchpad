@@ -8,12 +8,70 @@ export function newSession() {
   showSessionPicker();
 }
 
+let spFocusIdx = -1;
+let spAbort = null;
+
+function getSpButtons() {
+  return Array.from(document.querySelectorAll('.sp-grid .sp-btn'));
+}
+
+function updateSpFocus(btns, idx) {
+  btns.forEach(b => b.classList.remove('sp-focused'));
+  spFocusIdx = idx;
+  if (idx >= 0 && idx < btns.length) {
+    btns[idx].classList.add('sp-focused');
+  }
+}
+
 export function showSessionPicker() {
-  document.getElementById('session-picker').style.display = 'flex';
+  const picker = document.getElementById('session-picker');
+  picker.style.display = 'flex';
+  spFocusIdx = 0;
+  const btns = getSpButtons();
+  updateSpFocus(btns, 0);
+
+  if (spAbort) spAbort.abort();
+  spAbort = new AbortController();
+
+  document.addEventListener('keydown', e => {
+    const btns = getSpButtons();
+    const cols = 3;
+    const len = btns.length;
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      hideSessionPicker();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (spFocusIdx >= 0 && spFocusIdx < len) btns[spFocusIdx].click();
+      return;
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      updateSpFocus(btns, (spFocusIdx + 1) % len);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      updateSpFocus(btns, (spFocusIdx - 1 + len) % len);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = spFocusIdx + cols;
+      if (next < len) updateSpFocus(btns, next);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = spFocusIdx - cols;
+      if (prev >= 0) updateSpFocus(btns, prev);
+    }
+  }, { signal: spAbort.signal, capture: true });
 }
 
 export function hideSessionPicker() {
   document.getElementById('session-picker').style.display = 'none';
+  if (spAbort) { spAbort.abort(); spAbort = null; }
+  getSpButtons().forEach(b => b.classList.remove('sp-focused'));
+  spFocusIdx = -1;
 }
 
 export function closeSession(id) {
@@ -130,6 +188,22 @@ export function attachTerminal(sessionId, name) {
   term.loadAddon(fitAddon);
   term.open(div);
   fitAddon.fit();
+
+  // Let app-level keybindings override xterm
+  term.attachCustomKeyEventHandler(e => {
+    if (e.type !== 'keydown') return true;
+    const kb = S.settings?.keybindings || {};
+    const parts = [];
+    if (e.ctrlKey) parts.push('Ctrl');
+    if (e.shiftKey) parts.push('Shift');
+    if (e.altKey) parts.push('Alt');
+    if (e.metaKey) parts.push('Meta');
+    if (!['Control','Shift','Alt','Meta'].includes(e.key)) parts.push(e.key === ' ' ? 'Space' : e.key);
+    const combo = parts.join('+');
+    const bindings = Object.values(kb);
+    if (bindings.includes(combo)) return false; // false = don't let xterm handle it
+    return true;
+  });
 
   term.onData(data => {
     if (S.activeSessionId === sessionId) wsSend({ type:'input', sessionId, data });
