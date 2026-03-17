@@ -64,11 +64,13 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
   display:flex;align-items:center;padding:0 14px;gap:12px;position:relative;overflow:hidden}
 #header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
   background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent);opacity:.5}
-.header-logo{display:flex;align-items:center;gap:8px;color:var(--accent);font-size:13px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
-.logo-icon{width:22px;height:22px;border:1.5px solid var(--accent);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;
-  box-shadow:0 0 8px var(--accent-glow),inset 0 0 6px var(--accent-dim);animation:pulse-logo 3s ease-in-out infinite}
-@keyframes pulse-logo{0%,100%{box-shadow:0 0 8px var(--accent-glow),inset 0 0 6px var(--accent-dim)}50%{box-shadow:0 0 16px var(--accent),inset 0 0 10px var(--accent-glow)}}
-.header-slash{color:var(--text-ghost);margin:0 2px}
+.header-logo{display:flex;align-items:center;gap:10px;color:var(--accent);font-size:13px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
+.logo-icon{width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0;filter:drop-shadow(0 0 6px var(--accent));animation:pulse-logo 3s ease-in-out infinite}
+.logo-icon svg{width:28px;height:28px}
+@keyframes pulse-logo{0%,100%{filter:drop-shadow(0 0 4px var(--accent))}50%{filter:drop-shadow(0 0 12px var(--accent)) drop-shadow(0 0 4px var(--accent2))}}
+.logo-text-super{color:var(--accent);letter-spacing:.2em}
+.logo-text-term{color:var(--text-bright);letter-spacing:.12em;font-weight:500}
+.header-slash{color:var(--accent2);margin:0 4px;font-weight:300}
 .header-spacer{flex:1}
 .header-meta{display:flex;align-items:center;gap:14px;font-size:12px;color:#d0d0ee;letter-spacing:.06em}
 .meta-item{display:flex;align-items:center;gap:5px}
@@ -314,8 +316,13 @@ body.theme-violet{--bg-void:#070510;--bg-deep:#0a0816;--bg-panel:#0d0b1e;--bg-su
   <!-- HEADER -->
   <header id="header">
     <div class="header-logo">
-      <div class="logo-icon">⬡</div>
-      SUPER<span class="header-slash">/</span>TERMINAL
+      <div class="logo-icon">
+        <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="26" height="26" rx="5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <polyline points="9,6 5,14 12,14 8,22 19,11 13,11 17,6" fill="currentColor" stroke="none"/>
+        </svg>
+      </div>
+      <span class="logo-text-super">SUPER</span><span class="header-slash">/</span><span class="logo-text-term">TERMINAL</span>
     </div>
     <div class="header-spacer"></div>
     <div class="header-meta">
