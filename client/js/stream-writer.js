@@ -8,6 +8,10 @@ const TICK_MS = 12;          // ms between ticks (~83 writes/sec)
 const INSTANT_THRESHOLD = 60; // chunks <= this size are written immediately
 const CURSOR_RESTORE_DELAY = 200; // ms to wait before restoring cursor after drain
 
+// Regex to detect if we're in the middle of an ANSI escape sequence at the end of a string
+// Matches incomplete: ESC not followed by complete sequence, or ESC[ with incomplete params
+const INCOMPLETE_ESC = /\x1b(\[[0-9;?]*)?$/;
+
 const CURSOR_HIDE = '\x1b[?25l';
 const CURSOR_SHOW = '\x1b[?25h';
 
@@ -76,8 +80,23 @@ function drain(sessionId) {
     return;
   }
 
-  const chunk = buf.queue.slice(0, CHUNK_SIZE);
-  buf.queue = buf.queue.slice(CHUNK_SIZE);
+  let end = Math.min(CHUNK_SIZE, buf.queue.length);
+  // Avoid splitting in the middle of an ANSI escape sequence
+  const candidate = buf.queue.slice(0, end);
+  const escMatch = candidate.match(INCOMPLETE_ESC);
+  if (escMatch) {
+    // Back up to before the incomplete escape
+    end = escMatch.index;
+    if (end === 0) {
+      // The whole chunk IS the start of an escape — grab more to complete it
+      const rest = buf.queue.slice(0, CHUNK_SIZE * 2);
+      const full = rest.match(/\x1b(?:\[[0-9;?]*[A-Za-z]|\][^\x07]*\x07|\[[\s\S])/);
+      end = full ? full.index + full[0].length : Math.min(CHUNK_SIZE * 2, buf.queue.length);
+    }
+  }
+  if (end === 0) end = CHUNK_SIZE; // safety fallback
+  const chunk = buf.queue.slice(0, end);
+  buf.queue = buf.queue.slice(end);
   buf.term.write(chunk);
 
   if (buf.queue.length > 0) {
