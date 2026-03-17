@@ -9,7 +9,13 @@ export function updateSwatches() {
 
 export function applyTheme(t) {
   S.currentTheme = t;
-  document.body.className = `theme-${t.id}`;
+  document.body.className = '';
+  if (t.css) {
+    const root = document.documentElement;
+    for (const [prop, val] of Object.entries(t.css)) {
+      root.style.setProperty(prop, val);
+    }
+  }
   terminalMap.forEach(({ term }) => { term.options.theme = t.term; });
   updateSwatches();
 }
