@@ -36,24 +36,70 @@
     <button class="btn-icon" id="btn-settings" title="Settings (Ctrl+,)">⚙</button>
   </header>
 
+  <!-- ACTIVITY BAR -->
+  <nav id="activity-bar">
+    <button class="activity-btn active" data-panel="sessions" title="Sessions">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    </button>
+    <button class="activity-btn" data-panel="explorer" title="Explorer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7V5a2 2 0 012-2h4l2 2h8a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+    </button>
+    <button class="activity-btn" data-panel="source-control" title="Source Control">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M12 8.5V12M12 12C12 14 6 14 6 15.5M12 12C12 14 18 14 18 15.5"/></svg>
+    </button>
+  </nav>
+
   <!-- SIDEBAR -->
   <aside id="sidebar">
-    <div class="sidebar-header">
-      <span class="sidebar-title-text">SESSIONS</span>
-      <div class="sidebar-header-actions">
-        <button class="btn-folder" id="btn-new-folder" title="New folder">▶</button>
-        <button class="btn-new" id="btn-new-session" title="New session">+</button>
+    <!-- SESSIONS PANEL -->
+    <div class="sidebar-panel active" id="panel-sessions">
+      <div class="sidebar-header">
+        <span class="sidebar-title-text">SESSIONS</span>
+        <div class="sidebar-header-actions">
+          <button class="btn-folder" id="btn-new-folder" title="New folder">▶</button>
+          <button class="btn-new" id="btn-new-session" title="New session">+</button>
+        </div>
+      </div>
+      <div class="session-list" id="session-list">
+        <div class="session-empty" id="session-empty">No active sessions.<br/>Press <span style="color:var(--accent)">+</span> to start.</div>
+      </div>
+      <div class="sidebar-themes">
+        <div class="themes-label">Theme</div>
+        <div class="theme-swatches" id="theme-swatches"></div>
+      </div>
+      <div class="sidebar-footer">
+        <span>node-pty · xterm.js</span>
       </div>
     </div>
-    <div class="session-list" id="session-list">
-      <div class="session-empty" id="session-empty">No active sessions.<br/>Press <span style="color:var(--accent)">+</span> to start.</div>
+
+    <!-- EXPLORER PANEL -->
+    <div class="sidebar-panel" id="panel-explorer">
+      <div class="sidebar-header">
+        <span class="sidebar-title-text">EXPLORER</span>
+        <div class="sidebar-header-actions">
+          <button class="btn-icon-sm" id="explorer-refresh" title="Refresh">↻</button>
+        </div>
+      </div>
+      <div class="explorer-path-bar">
+        <span class="explorer-path-label" id="explorer-path" title="">—</span>
+      </div>
+      <div class="explorer-tree-container" id="explorer-tree"></div>
     </div>
-    <div class="sidebar-themes">
-      <div class="themes-label">Theme</div>
-      <div class="theme-swatches" id="theme-swatches"></div>
-    </div>
-    <div class="sidebar-footer">
-      <span>node-pty · xterm.js</span>
+
+    <!-- SOURCE CONTROL PANEL -->
+    <div class="sidebar-panel" id="panel-source-control">
+      <div class="sidebar-header">
+        <span class="sidebar-title-text">SOURCE CONTROL</span>
+        <div class="sidebar-header-actions">
+          <button class="btn-icon-sm" id="sc-refresh" title="Refresh">↻</button>
+        </div>
+      </div>
+      <div class="sc-branch-bar">
+        <span class="sc-branch-icon">⎇</span>
+        <span class="sc-branch-label" id="sc-branch-name">—</span>
+      </div>
+      <div class="sc-empty" id="sc-empty">No changes detected</div>
+      <div class="sc-file-list-container" id="sc-file-list"></div>
     </div>
   </aside>
 

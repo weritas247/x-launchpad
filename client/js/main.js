@@ -2,7 +2,7 @@ import { S, terminalMap, sessionMeta, sbClock, tabAddBtn, settingsOverlay } from
 import { THEMES } from './constants.js';
 import { connect, wsSend, setOnInputSend } from './websocket.js';
 import { initThemeSwatches } from './themes.js';
-import { activateSession, updateStatusBar } from './session.js';
+import { activateSession, updateStatusBar, setOnSessionChangeSidePanels } from './session.js';
 import { initSplitDnD, refitAllPanes, updateSidebarSplitGroup } from './split-pane.js';
 import { newSession, closeSession, renameSession, syncSessionList, attachTerminal, updateSessionInfo, showSessionPicker, hideSessionPicker, initContextMenu } from './terminal.js';
 import { loadSettings, applySettings, openSettings, closeSettings, initSettingsUI } from './settings.js';
@@ -14,6 +14,9 @@ import { streamWrite, bypassStream, unbypassStream } from './stream-writer.js';
 import { registerAction, buildCombo, matchCombo, tryKeybinding } from './keyboard.js';
 import { initInputPanel, onSessionChange as inputPanelSessionChange } from './input-panel.js';
 import { handleClaudeUsageData, startUsagePolling, onSessionChangeUsage, onAiChangeUsage } from './claude-usage.js';
+import { initActivityBar, getActivePanel } from './activity-bar.js';
+import { initExplorer, handleFileTreeData, onExplorerSessionChange, requestFileTree } from './explorer.js';
+import { initSourceControl, handleGitStatusData, onSourceControlSessionChange } from './source-control.js';
 
 S.currentTheme = THEMES[0];
 
@@ -67,7 +70,13 @@ function handleMessage(msg) {
     updateSessionInfo(msg.sessionId, msg.cwd, msg.ai);
     tabStatusOnAiChange(msg.sessionId, msg.ai);
     onAiChangeUsage(msg.sessionId, msg.ai);
-    if (msg.sessionId === S.activeSessionId) requestBranch(msg.sessionId);
+    if (msg.sessionId === S.activeSessionId) {
+      requestBranch(msg.sessionId);
+      // Refresh side panels when CWD changes
+      const panel = getActivePanel();
+      if (panel === 'explorer') onExplorerSessionChange();
+      else if (panel === 'source-control') onSourceControlSessionChange();
+    }
   } else if (msg.type === 'output') {
     const entry = terminalMap.get(msg.sessionId);
     if (entry) {
@@ -91,6 +100,10 @@ function handleMessage(msg) {
     handleGitPullAck(msg);
   } else if (msg.type === 'claude_usage_data') {
     handleClaudeUsageData(msg);
+  } else if (msg.type === 'file_tree_data') {
+    handleFileTreeData(msg);
+  } else if (msg.type === 'git_status_data') {
+    handleGitStatusData(msg);
   }
 }
 
@@ -240,5 +253,18 @@ initSplitDnD();
 initFolderDnD();
 initNotifications();
 initInputPanel();
+initActivityBar();
+initExplorer();
+initSourceControl();
+
+// Register side panel refresh on session change
+setOnSessionChangeSidePanels(() => {
+  const panel = getActivePanel();
+  if (panel === 'explorer') onExplorerSessionChange();
+  else if (panel === 'source-control') onSourceControlSessionChange();
+});
+
+// Explorer refresh button
+document.getElementById('explorer-refresh')?.addEventListener('click', requestFileTree);
 
 loadSettings().then(() => { connect(handleMessage); startUsagePolling(); });

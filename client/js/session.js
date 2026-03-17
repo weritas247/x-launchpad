@@ -3,6 +3,10 @@ import { requestBranch } from './git-graph.js';
 import { collectPaneIds, teardownSplitLayout } from './split-pane.js';
 import { renderPanel as renderInputPanel } from './input-panel.js';
 
+// Lazy-loaded callbacks to avoid circular imports
+let _onSessionChangeSidePanels = null;
+export function setOnSessionChangeSidePanels(fn) { _onSessionChangeSidePanels = fn; }
+
 export function activateSession(id) {
   if (!terminalMap.has(id)) return;
   S.activeSessionId = id;
@@ -46,6 +50,7 @@ export function activateSession(id) {
   }
   updateStatusBar();
   renderInputPanel();
+  if (_onSessionChangeSidePanels) _onSessionChangeSidePanels();
 }
 
 export function updateStatusBar() {
