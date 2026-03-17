@@ -174,9 +174,15 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 
 /* ═══ SPLIT PANE ═══ */
 #split-root{position:absolute;inset:0;overflow:hidden}
-#split-root .term-pane{display:block !important;position:absolute;overflow:hidden;padding:6px 8px;transition:border-color .1s,box-shadow .1s,opacity .15s,filter .15s}
+#split-root .term-pane{display:block !important;position:absolute;overflow:hidden;padding:0;transition:border-color .1s,box-shadow .1s,opacity .15s,filter .15s}
 .term-pane.split-active{border:1px solid var(--accent)!important;box-shadow:0 0 0 1px var(--accent-glow);opacity:1;filter:none}
 .term-pane.split-inactive{opacity:0.55;filter:brightness(0.65);border:1px solid var(--border)!important}
+.split-pane-title{position:absolute;top:0;left:0;right:0;height:22px;z-index:5;display:flex;align-items:center;padding:0 8px;gap:6px;font-size:11px;font-family:inherit;background:var(--bg-panel);border-bottom:1px solid var(--border);pointer-events:none;white-space:nowrap;overflow:hidden}
+.split-pane-title .spt-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0}
+.split-pane-title .spt-name{color:var(--fg);opacity:0.9;flex-shrink:0}
+.split-pane-title .spt-path{color:var(--fg-dim);overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.term-pane.split-inactive .split-pane-title .spt-dot{background:var(--border-lit)}
+#split-root .term-pane .xterm{position:absolute!important;top:22px!important;left:0!important;right:0!important;bottom:0!important;width:auto!important;height:auto!important}
 .split-divider{position:absolute;z-index:10;display:flex;align-items:center;justify-content:center}
 .split-divider-v{cursor:col-resize;width:8px;top:0;bottom:0}
 .split-divider-h{cursor:row-resize;height:8px;left:0;right:0}
@@ -1452,6 +1458,19 @@ function updateSessionInfo(sessionId, cwd, ai) {
   if (activeSessionId === sessionId) {
     sbActiveName.textContent = `${baseName}  ${shortCwd}${ai ? `  [${ai}]` : ''}`;
   }
+
+  // Store cwd in sessionMeta for split pane title
+  const metaObj = sessionMeta.get(sessionId);
+  if (metaObj) { metaObj.cwd = cwd; if (ai) metaObj.ai = ai; }
+
+  // Update split pane title if in split mode
+  if (layoutTree !== null) {
+    const titleEl = entry.div.querySelector('.split-pane-title');
+    if (titleEl) {
+      titleEl.querySelector('.spt-name').textContent = baseName;
+      titleEl.querySelector('.spt-path').textContent = shortCwd;
+    }
+  }
 }
 
 function createTab(sessionId, name) {
@@ -1517,6 +1536,20 @@ function createTab(sessionId, name) {
 // ═══════════════════════════════════════════════════
 //  SPLIT PANE — LAYOUT ENGINE
 // ═══════════════════════════════════════════════════
+function updateSplitPaneTitle(el, sessionId) {
+  let titleEl = el.querySelector('.split-pane-title');
+  if (!titleEl) {
+    titleEl = document.createElement('div');
+    titleEl.className = 'split-pane-title';
+    titleEl.innerHTML = '<span class="spt-dot"></span><span class="spt-name"></span><span class="spt-path"></span>';
+    el.insertBefore(titleEl, el.firstChild);
+  }
+  const meta = sessionMeta.get(sessionId) || {};
+  titleEl.querySelector('.spt-name').textContent = meta.name || sessionId;
+  const cwd = meta.cwd || '';
+  titleEl.querySelector('.spt-path').textContent = cwd ? cwd.replace(/^\/Users\/[^/]+/, '~') : '';
+}
+
 function renderSplitLayout(node, rect) {
   if (!splitRoot) return;
   if (node.type === 'pane') {
@@ -1525,6 +1558,7 @@ function renderSplitLayout(node, rect) {
     el.style.top    = rect.top + '%';
     el.style.width  = rect.width + '%';
     el.style.height = rect.height + '%';
+    updateSplitPaneTitle(el, node.sessionId);
     return;
   }
   const { direction, ratio, children } = node;
