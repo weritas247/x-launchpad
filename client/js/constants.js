@@ -28,6 +28,17 @@ export const THEMES = [
            brightBlack:'#201840',brightRed:'#ff88aa',brightGreen:'#a0ffd0',brightYellow:'#ffe080',brightBlue:'#a0b8ff',brightMagenta:'#d0a0ff',brightCyan:'#a0e0ff',brightWhite:'#f0e0ff'}},
 ];
 
+export const AI_REGISTRY = {
+  claude:   { label: 'Claude',   icon: 'icons/claude.svg',   notifyIcon: '✦', rgb: [191,128,255], color: '#d4a8ff' },
+  chatgpt:  { label: 'ChatGPT',  icon: 'icons/chatgpt.svg',  notifyIcon: '●', rgb: [16,200,150],  color: '#20d4a0' },
+  gemini:   { label: 'Gemini',   icon: 'icons/gemini.svg',   notifyIcon: '✦', rgb: [100,160,255], color: '#88bbff' },
+  copilot:  { label: 'Copilot',  icon: 'icons/copilot.svg',  notifyIcon: '◎', rgb: [96,200,255],  color: '#60c8ff' },
+  aider:    { label: 'Aider',    icon: 'icons/aider.svg',    notifyIcon: '◈', rgb: [255,200,80],  color: '#ffc850' },
+  cursor:   { label: 'Cursor',   icon: 'icons/cursor.svg',   notifyIcon: '▸', rgb: [80,220,255],  color: '#50dcff' },
+  codex:    { label: 'Codex',    icon: 'icons/codex.svg',    notifyIcon: '●', rgb: [16,163,127],  color: '#10a37f' },
+  opencode: { label: 'OpenCode', icon: 'icons/opencode.svg', notifyIcon: '🔶', rgb: [255,160,80],  color: '#ffa050' },
+};
+
 export const KB_DEFS = [
   { key:'newSession',      label:'New Session' },
   { key:'closeSession',    label:'Close Session' },

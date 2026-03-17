@@ -1,4 +1,5 @@
 import { S, sessionMeta, terminalMap, notifyBuffers, notifyTimers, notifyState, escHtml } from './state.js';
+import { AI_REGISTRY } from './constants.js';
 import { activateSession } from './session.js';
 import { wsSend } from './websocket.js';
 
@@ -16,11 +17,10 @@ const AI_PATTERNS = [
   { re: /[\$❯›»]\s*$/m,                                ai:'any',      type:'question', msg:'Terminal is waiting for input' },
 ];
 
-const AI_ICONS = {
-  claude: '✦', chatgpt: '●', gemini: '✦',
-  copilot: '◎', aider: '◈', cursor: '▸',
-  opencode: '🔶', any: '💻',
-};
+function getAiIcon(aiKey) {
+  const reg = AI_REGISTRY[aiKey];
+  return reg ? reg.notifyIcon : '💻';
+}
 
 function stripAnsi(str) {
   return str.replace(/\x1b\[[0-9;]*[mGKHFABCDJsuhl]/g, '')
@@ -54,7 +54,7 @@ export function aiNotifyCheck(sessionId, chunk) {
 
     const meta = sessionMeta.get(sessionId);
     const sessName = meta?.name || sessionId;
-    const icon = AI_ICONS[currentAi || 'any'] || '💻';
+    const icon = getAiIcon(currentAi);
     const title = matched.type === 'done'
       ? `${icon} Task Done — ${sessName}`
       : `${icon} Needs Input — ${sessName}`;

@@ -1,4 +1,5 @@
 import { S, terminalMap, sessionMeta, sessionList, sessionEmpty, tabBar, tabAddBtn, termWrapper, sbActiveName, sbSize, ctxMenu, escHtml } from './state.js';
+import { AI_REGISTRY } from './constants.js';
 import { wsSend } from './websocket.js';
 import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session.js';
 import { removeSplitPane, teardownSplitLayout, showDropZoneOverlay, hideDropZoneOverlay } from './split-pane.js';
@@ -201,17 +202,10 @@ export function updateSessionInfo(sessionId, cwd, ai) {
   let badgeEl = entry.sidebarEl.querySelector('.session-ai-badge');
   const metaEl = entry.sidebarEl.querySelector('.session-meta');
   if (ai) {
-    const aiDefs = {
-      claude:   { icon: '<img src="icons/claude.svg" class="badge-img" alt="Claude">', label: 'Claude' },
-      chatgpt:  { icon: '<img src="icons/chatgpt.svg" class="badge-img" alt="ChatGPT">', label: 'ChatGPT' },
-      gemini:   { icon: '<img src="icons/gemini.svg" class="badge-img" alt="Gemini">', label: 'Gemini' },
-      copilot:  { icon: '<img src="icons/copilot.svg" class="badge-img" alt="Copilot">', label: 'Copilot' },
-      aider:    { icon: '<img src="icons/aider.svg" class="badge-img" alt="Aider">', label: 'Aider' },
-      cursor:   { icon: '<img src="icons/cursor.svg" class="badge-img" alt="Cursor">', label: 'Cursor' },
-      codex:    { icon: '<img src="icons/codex.svg" class="badge-img" alt="Codex">', label: 'Codex' },
-      opencode: { icon: '<img src="icons/opencode.svg" class="badge-img" alt="OpenCode">', label: 'OpenCode' },
-    };
-    const def = aiDefs[ai] || { icon: '🤖', label: ai };
+    const reg = AI_REGISTRY[ai];
+    const def = reg
+      ? { icon: `<img src="${reg.icon}" class="badge-img" alt="${reg.label}">`, label: reg.label }
+      : { icon: '🤖', label: ai };
     if (!badgeEl) {
       badgeEl = document.createElement('div');
       metaEl.appendChild(badgeEl);
