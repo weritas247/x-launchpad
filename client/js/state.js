@@ -42,5 +42,5 @@ export const settingsOverlay = document.getElementById('settings-overlay');
 export const customCssTag = document.getElementById('custom-css-tag');
 
 export function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
