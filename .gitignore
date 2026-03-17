@@ -3,3 +3,4 @@ dist/
 sessions.json
 settings.json
 *.js.map
+.worktrees/
