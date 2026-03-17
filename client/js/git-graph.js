@@ -5,7 +5,6 @@ import { BRANCH_COLORS } from './constants.js';
 // ─── STATE ───────────────────────────────────────────
 let isOpen = false;
 let selectedHash = null;
-let cachedCommits = [];
 
 // ─── DOM REFS ────────────────────────────────────────
 const overlay   = document.getElementById('git-graph-overlay');
@@ -16,11 +15,11 @@ const errorEl   = document.getElementById('gg-error');
 const content   = document.getElementById('gg-content');
 const svgEl     = document.getElementById('gg-svg');
 const commitBox = document.getElementById('gg-commits');
-const scrollBox = document.getElementById('gg-scroll');
 const filePanel = document.getElementById('gg-file-panel');
 const fileList  = document.getElementById('gg-file-list');
 const fileTitle = document.getElementById('gg-file-title');
 const sbBranch  = document.getElementById('sb-branch');
+const sbBrSep   = document.getElementById('sb-branch-sep');
 const sbBrName  = document.getElementById('sb-branch-name');
 
 // ─── OPEN / CLOSE ────────────────────────────────────
@@ -60,7 +59,6 @@ export function handleGitGraphData(msg) {
     content.style.display = 'none';
     return;
   }
-  cachedCommits = msg.commits;
   content.style.display = 'flex';
   renderGraph(msg.commits);
 }
@@ -80,9 +78,11 @@ export function handleGitFileListData(msg) {
 export function handleGitBranchData(msg) {
   if (msg.branch) {
     sbBranch.style.display = '';
+    sbBrSep.style.display = '';
     sbBrName.textContent = msg.branch;
   } else {
     sbBranch.style.display = 'none';
+    sbBrSep.style.display = 'none';
     sbBrName.textContent = '';
   }
 }
@@ -219,8 +219,8 @@ function renderGraph(commits) {
   // Commit rows
   commitBox.innerHTML = commits.map((c, i) => {
     const refs = c.refs.length > 0 ? `<span class="gg-refs">${c.refs.map(refBadge).join('')}</span>` : '';
-    return `<div class="gg-row" data-hash="${c.hash}" style="height:${ROW_H}px">` +
-      `<span class="gg-hash">${c.hash.slice(0,7)}</span>` +
+    return `<div class="gg-row" data-hash="${escHtml(c.hash)}" style="height:${ROW_H}px">` +
+      `<span class="gg-hash">${escHtml(c.hash.slice(0,7))}</span>` +
       refs +
       `<span class="gg-msg">${escHtml(c.message)}</span>` +
       `<span class="gg-author">${escHtml(c.author)}</span>` +

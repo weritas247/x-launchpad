@@ -135,7 +135,7 @@ document.addEventListener('keydown', e => {
   if (combo === kb.prevTab)      { e.preventDefault(); switchTabBy(-1); }
   if (combo === kb.renameSession && S.activeSessionId) { e.preventDefault(); promptRenameSession(S.activeSessionId); }
   if (combo === kb.clearTerminal && S.activeSessionId) { e.preventDefault(); clearActiveTerminal(); }
-  if (combo === kb.gitGraph) { e.preventDefault(); openGitGraph(); }
+  if (combo === kb.gitGraph) { e.preventDefault(); isGitGraphOpen() ? closeGitGraph() : openGitGraph(); }
 
   if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey) {
     const n = parseInt(e.key);
