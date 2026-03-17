@@ -66,11 +66,24 @@ const DEFAULT_SETTINGS = {
 };
 
 // ─── SETTINGS PERSISTENCE ─────────────────────────────────────────
+function deepMerge(defaults: any, saved: any): any {
+  const result = { ...defaults };
+  for (const key of Object.keys(saved)) {
+    if (saved[key] && typeof saved[key] === 'object' && !Array.isArray(saved[key])
+        && defaults[key] && typeof defaults[key] === 'object') {
+      result[key] = deepMerge(defaults[key], saved[key]);
+    } else {
+      result[key] = saved[key];
+    }
+  }
+  return result;
+}
+
 function loadSettings(): typeof DEFAULT_SETTINGS {
   try {
     if (fs.existsSync(SETTINGS_PATH)) {
       const raw = fs.readFileSync(SETTINGS_PATH, 'utf-8');
-      return JSON.parse(raw);
+      return deepMerge(DEFAULT_SETTINGS, JSON.parse(raw));
     }
   } catch {}
   return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
