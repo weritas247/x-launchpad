@@ -3,7 +3,7 @@ import { AI_REGISTRY, normalizeKey } from './constants.js';
 import { wsSend } from './websocket.js';
 import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session.js';
 import { removeSplitPane, teardownSplitLayout, showDropZoneOverlay, hideDropZoneOverlay } from './split-pane.js';
-import { resetTabStatus } from './tab-status.js';
+import { resetTabStatus, tabStatusOnInput } from './tab-status.js';
 
 export function newSession() {
   showSessionPicker();
@@ -209,6 +209,7 @@ export function attachTerminal(sessionId, name) {
 
   term.onData(data => {
     if (S.activeSessionId === sessionId) wsSend({ type:'input', sessionId, data });
+    tabStatusOnInput(sessionId);
   });
 
   term.onResize(({ cols, rows }) => {

@@ -3,7 +3,9 @@ import { sessionMeta, terminalMap, tabStatusState, stripAnsi } from './state.js'
 // ─── Constants ───────────────────────────────────────
 const STATUS_DEBOUNCE = 800;
 const DONE_TO_IDLE_MS = 3000;
+const INACTIVITY_MS = 2000;
 const BUFFER_MAX = 2048;
+const RECENT_LINES = 5;
 
 // ─── AI-specific patterns (Claude Code) ──────────────
 const CLAUDE_PATTERNS = [
@@ -13,7 +15,7 @@ const CLAUDE_PATTERNS = [
     status: 'tool', text: '파일 편집 중' },
   { re: /^[\s•⚡●◐▸]*(?:Bash|WebFetch|WebSearch|Task)\b/m,
     status: 'tool', text: '명령 실행 중' },
-  { re: /^[❯>]\s*$/m, status: 'question', text: '입력 대기',
+  { re: /^[❯>]\s/, status: 'question', text: '입력 대기',
     lastLineOnly: true },
   { re: /✓|✔|Task complete|Done\./i,
     status: 'done', text: '완료' },
@@ -21,7 +23,7 @@ const CLAUDE_PATTERNS = [
 
 // ─── General AI patterns ─────────────────────────────
 const GENERAL_AI_PATTERNS = [
-  { re: /^[❯>]\s*$/m, status: 'question', text: '입력 대기', lastLineOnly: true },
+  { re: /^[❯>]\s/, status: 'question', text: '입력 대기', lastLineOnly: true },
   { re: /✓|✔|Done|Completed|Finished/i, status: 'done', text: '완료' },
 ];
 
@@ -36,8 +38,9 @@ const SHELL_PATTERNS = [
 const statusBuffers = new Map();
 const statusTimers = new Map();
 const doneTimers = new Map();
+const inactivityTimers = new Map();
 const suppressUntil = new Map();
-const lastKnownAi = new Map();  // track AI changes internally
+const lastKnownAi = new Map();
 
 // ─── Core API ────────────────────────────────────────
 
@@ -54,13 +57,25 @@ export function tabStatusCheck(sessionId, chunk) {
   const ai = meta?.ai || null;
   const currentStatus = tabStatusState.get(sessionId);
 
-  // Immediately switch to working/thinking when output arrives
-  // (if we're currently idle or done)
+  // Clear inactivity timer — output is actively flowing
+  clearTimeout(inactivityTimers.get(sessionId));
+
+  // Immediately switch to working/thinking when output arrives (if idle/done)
   if (currentStatus === 'idle' || currentStatus === 'done' || !currentStatus) {
     if (ai) {
       updateTabUI(sessionId, 'thinking', '생각 중...');
     } else {
       updateTabUI(sessionId, 'working', '작업 중...');
+    }
+  }
+
+  // Instant prompt detection for AI — don't wait for debounce
+  // When Claude shows ❯ prompt, switch to "question" immediately
+  if (ai && (currentStatus === 'thinking' || currentStatus === 'tool') && chunk.includes('❯')) {
+    const quickBuf = stripAnsi(next);
+    const lastLine = getLastLine(quickBuf);
+    if (/^[❯>]\s/.test(lastLine)) {
+      updateTabUI(sessionId, 'question', '입력 대기');
     }
   }
 
@@ -70,59 +85,26 @@ export function tabStatusCheck(sessionId, chunk) {
     const buf = stripAnsi(statusBuffers.get(sessionId) || '');
     if (!buf.trim()) return;
 
-    let matched = null;
-
-    if (ai) {
-      const patterns = (ai === 'claude') ? CLAUDE_PATTERNS : GENERAL_AI_PATTERNS;
-      for (const p of patterns) {
-        const target = p.lastLineOnly ? getLastLine(buf) : buf;
-        if (p.re.test(target)) { matched = p; break; }
-      }
-      // AI active but no pattern matched → keep thinking
-      if (!matched) {
-        matched = { status: 'thinking', text: '생각 중...' };
-      }
-    } else {
-      // Shell mode
-      for (const p of SHELL_PATTERNS) {
-        const target = p.lastLineOnly ? getLastLine(buf) : buf;
-        if (p.re.test(target)) { matched = p; break; }
-      }
-      if (!matched) {
-        matched = { status: 'working', text: '작업 중...' };
-      }
-    }
-
+    const matched = matchPatterns(buf, ai);
     updateTabUI(sessionId, matched.status, matched.text);
+
+    // Start inactivity timer — if no more output arrives, fall back to idle
+    startInactivityTimer(sessionId);
   }, STATUS_DEBOUNCE));
 }
 
 export function tabStatusOnAiChange(sessionId, ai) {
   const prev = lastKnownAi.get(sessionId) ?? null;
   const curr = ai || null;
-  if (prev === curr) return;  // AI didn't actually change — skip reset
+  if (prev === curr) return;
   lastKnownAi.set(sessionId, curr);
   clearTimeout(doneTimers.get(sessionId));
+  clearTimeout(inactivityTimers.get(sessionId));
   suppressUntil.delete(sessionId);
 
-  // Re-analyze existing buffer with new AI context instead of just resetting
   const buf = stripAnsi(statusBuffers.get(sessionId) || '');
   if (buf.trim()) {
-    let matched = null;
-    if (curr) {
-      const patterns = (curr === 'claude') ? CLAUDE_PATTERNS : GENERAL_AI_PATTERNS;
-      for (const p of patterns) {
-        const target = p.lastLineOnly ? getLastLine(buf) : buf;
-        if (p.re.test(target)) { matched = p; break; }
-      }
-      if (!matched) matched = { status: 'thinking', text: '생각 중...' };
-    } else {
-      for (const p of SHELL_PATTERNS) {
-        const target = p.lastLineOnly ? getLastLine(buf) : buf;
-        if (p.re.test(target)) { matched = p; break; }
-      }
-      if (!matched) matched = { status: 'idle', text: '대기' };
-    }
+    const matched = matchPatterns(buf, curr);
     updateTabUI(sessionId, matched.status, matched.text);
   } else {
     updateTabUI(sessionId, 'idle', '대기');
@@ -135,9 +117,24 @@ export function resetTabStatus(sessionId) {
   statusTimers.delete(sessionId);
   clearTimeout(doneTimers.get(sessionId));
   doneTimers.delete(sessionId);
+  clearTimeout(inactivityTimers.get(sessionId));
+  inactivityTimers.delete(sessionId);
   suppressUntil.delete(sessionId);
   lastKnownAi.delete(sessionId);
   tabStatusState.delete(sessionId);
+}
+
+export function tabStatusOnInput(sessionId) {
+  const currentStatus = tabStatusState.get(sessionId);
+  if (currentStatus === 'thinking' || currentStatus === 'working' || currentStatus === 'tool') {
+    const meta = sessionMeta.get(sessionId);
+    const ai = meta?.ai || null;
+    if (ai) {
+      updateTabUI(sessionId, 'question', '입력 대기');
+    } else {
+      updateTabUI(sessionId, 'idle', '대기');
+    }
+  }
 }
 
 export function suppressTabStatus(sessionId, durationMs) {
@@ -149,6 +146,56 @@ export function suppressTabStatus(sessionId, durationMs) {
 function getLastLine(buf) {
   const lines = buf.split('\n').filter(l => l.trim());
   return lines.length > 0 ? lines[lines.length - 1] : '';
+}
+
+function getRecentLines(buf, n) {
+  const lines = buf.split('\n').filter(l => l.trim());
+  return lines.slice(-n).join('\n');
+}
+
+function matchPatterns(buf, ai) {
+  const lastLine = getLastLine(buf);
+  const recentText = getRecentLines(buf, RECENT_LINES);
+
+  if (ai) {
+    const patterns = (ai === 'claude') ? CLAUDE_PATTERNS : GENERAL_AI_PATTERNS;
+    for (const p of patterns) {
+      const target = p.lastLineOnly ? lastLine : recentText;
+      if (p.re.test(target)) return p;
+    }
+    return { status: 'thinking', text: '생각 중...' };
+  } else {
+    for (const p of SHELL_PATTERNS) {
+      const target = p.lastLineOnly ? lastLine : recentText;
+      if (p.re.test(target)) return p;
+    }
+    return { status: 'working', text: '작업 중...' };
+  }
+}
+
+function startInactivityTimer(sessionId) {
+  clearTimeout(inactivityTimers.get(sessionId));
+  inactivityTimers.set(sessionId, setTimeout(() => {
+    const currentStatus = tabStatusState.get(sessionId);
+    if (currentStatus !== 'thinking' && currentStatus !== 'working' && currentStatus !== 'tool') return;
+
+    const meta = sessionMeta.get(sessionId);
+    const ai = meta?.ai || null;
+    const buf = stripAnsi(statusBuffers.get(sessionId) || '');
+    const lastLine = getLastLine(buf);
+
+    if (ai) {
+      if (/^[❯>]/.test(lastLine)) {
+        updateTabUI(sessionId, 'question', '입력 대기');
+      } else {
+        updateTabUI(sessionId, 'idle', '대기');
+      }
+    } else {
+      updateTabUI(sessionId, 'idle', '대기');
+    }
+    // Trim buffer to prevent stale data from affecting future analyses
+    statusBuffers.set(sessionId, lastLine);
+  }, INACTIVITY_MS));
 }
 
 function updateTabUI(sessionId, status, text) {
