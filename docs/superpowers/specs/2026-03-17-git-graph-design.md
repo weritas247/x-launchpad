@@ -35,6 +35,11 @@ Client                          Server
   | <-- git_branch_data { ... } --|
 ```
 
+### 보안
+
+- **커밋 해시 검증:** `git_file_list` 요청의 `hash` 파라미터는 서버에서 `/^[0-9a-f]{4,40}$/i` 정규식으로 검증 후 사용. 미통과 시 에러 응답.
+- **명령어 실행:** 모든 git 명령어는 `execFileSync` (또는 `spawn`)를 사용하여 인자 배열로 전달. 문자열 보간으로 셸에 전달하지 않음.
+
 ### 서버 측 (server/index.ts)
 
 #### 새 WebSocket 메시지 핸들러 3개:
@@ -81,6 +86,12 @@ Client                          Server
 - `renderGraph(commits)` — 레이아웃 계산 + SVG/HTML 렌더링
 - `onCommitClick(hash)` — `git_file_list` 요청 + 파일 목록 패널 표시
 - `requestBranch(sessionId)` — 상태바용 브랜치명 요청
+- `handleGitGraphData(msg)` — WebSocket 응답 핸들러 (main.js에서 호출)
+- `handleGitFileListData(msg)` — WebSocket 응답 핸들러 (main.js에서 호출)
+- `handleGitBranchData(msg)` — WebSocket 응답 핸들러 (main.js에서 호출)
+- `updateStatusBarBranch(branch)` — 상태바 브랜치명 UI 업데이트
+
+상태(오버레이 열림/닫힘, 선택 커밋, 캐시 등)는 모듈 내부에서 관리.
 
 #### 기존 파일 변경:
 
@@ -122,6 +133,8 @@ Client                          Server
 - 좌측 (40%): SVG 그래프 영역
 - 우측 (60%): 커밋 리스트 + 하단 파일 목록 패널
 - 행 높이 40px 고정, 그래프 노드와 커밋 행 수평 정렬
+- **스크롤:** 좌측 SVG 그래프와 우측 커밋 리스트는 동기화 스크롤 (하나의 스크롤 컨테이너에 좌우 영역을 배치)
+- **로딩 상태:** 오버레이 열림 후 데이터 수신 전까지 중앙에 로딩 스피너 표시
 
 ### 커밋 행 구성
 
@@ -146,10 +159,19 @@ Client                          Server
 
 ### 레이아웃 알고리즘
 
-1. 커밋 목록을 순회하며 각 커밋에 컬럼(x좌표) 할당
-2. 첫 번째 부모(first parent)는 같은 컬럼 유지
-3. 분기(두 번째 부모, 머지 소스)는 새 컬럼 할당
-4. 사용이 끝난 컬럼은 재사용 가능하도록 풀에 반환
+`git log --graph`와 유사한 레인 기반 접근법을 사용한다. 2-pass 알고리즘:
+
+**Pass 1 — 활성 레인 추적:**
+1. 활성 레인 배열을 유지 (각 슬롯에 예상되는 커밋 해시를 저장)
+2. 각 커밋 순회 시, 해당 커밋의 해시가 있는 레인 위치를 찾아 x좌표로 사용 (없으면 새 레인 추가)
+3. 해당 레인에서 현재 커밋을 제거하고, 부모 커밋들을 레인에 삽입
+   - 첫 번째 부모: 같은 레인 위치에 삽입 (직선 연결)
+   - 추가 부모: 비어있는 레인 또는 새 레인에 삽입 (분기/병합 곡선)
+4. 비어있는 레인은 축소하여 불필요한 빈 공간 방지
+
+**Pass 2 — 연결선 생성:**
+- 같은 레인의 부모-자식: 직선 `<line>`
+- 다른 레인의 부모-자식: cubic bezier `<path>`로 곡선 연결
 
 ### SVG 요소
 
@@ -187,11 +209,15 @@ const BRANCH_COLORS = [
 
 - `Ctrl+G` — git graph 토글 (열기/닫기)
 - `Escape` — git graph 닫기
-- 기존 keybindings 시스템(`settings.js`)에 등록
+- 등록 위치:
+  1. `server/index.ts` — `DEFAULT_SETTINGS.keybindings`에 기본값 추가
+  2. `client/js/constants.js` — `KB_DEFS` 배열에 표시 라벨 추가
+  3. `client/js/main.js` — `keydown` 핸들러에 `Ctrl+G` 분기 추가
+- 참고: `Ctrl+G`는 ASCII BEL(0x07) 문자이나, keydown 핸들러에서 `preventDefault()`로 터미널 전달을 차단함
 
 ## 에러 처리
 
-- git repo가 아닌 CWD: 상태바에 브랜치명 미표시, `Ctrl+G` 시 토스트 알림 "Not a git repository"
+- git repo가 아닌 CWD: 상태바에 브랜치명 미표시, `Ctrl+G` 시 오버레이 내 에러 메시지 표시 "Not a git repository"
 - git 명령어 실행 실패: 오버레이에 에러 메시지 표시
 - 세션 연결 끊김: 오버레이 자동 닫기
 
