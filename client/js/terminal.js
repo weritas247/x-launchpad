@@ -5,7 +5,7 @@ import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from
 import { removeSplitPane, teardownSplitLayout, showDropZoneOverlay, hideDropZoneOverlay } from './split-pane.js';
 import { resetTabStatus, tabStatusOnInput } from './tab-status.js';
 import { setupTerminalImageHandlers, hasPendingAttachments, uploadAndFlush } from './image-attach.js';
-import { destroyStream } from './stream-writer.js';
+import { destroyStream, bypassStream, unbypassStream } from './stream-writer.js';
 
 export function newSession() {
   showSessionPicker();
@@ -154,6 +154,11 @@ export function syncSessionList(sessions, isReconnect = false) {
     }, 50);
 
     if (isInitialLoad) {
+      // Bypass streaming for restored sessions — dump output instantly
+      newIds.forEach(id => {
+        bypassStream(id);
+        setTimeout(() => unbypassStream(id), 3000);
+      });
       const badge = document.getElementById('hdr-restore-badge');
       if (badge) {
         badge.style.display = '';

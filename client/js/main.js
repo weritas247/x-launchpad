@@ -10,7 +10,7 @@ import { aiNotifyCheck, resetNotifyState, initNotifications } from './notificati
 import { tabStatusCheck, tabStatusOnAiChange, suppressTabStatus } from './tab-status.js';
 import { createFolder, initFolderDnD } from './folder.js';
 import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, handleGitPullAck, requestBranch, handleGitGraphKeydown } from './git-graph.js';
-import { streamWrite } from './stream-writer.js';
+import { streamWrite, bypassStream, unbypassStream } from './stream-writer.js';
 
 S.currentTheme = THEMES[0];
 
@@ -27,7 +27,11 @@ function handleMessage(msg) {
   if (msg.type === 'session_list') {
     syncSessionList(msg.sessions, S.wsJustReconnected);
     if (S.wsJustReconnected) {
-      msg.sessions.forEach(s => suppressTabStatus(s.id, 2000));
+      msg.sessions.forEach(s => {
+        suppressTabStatus(s.id, 2000);
+        bypassStream(s.id);
+        setTimeout(() => unbypassStream(s.id), 3000);
+      });
     }
     S.wsJustReconnected = false;
     // Auto-close git graph if active session is gone

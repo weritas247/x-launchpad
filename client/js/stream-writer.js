@@ -7,8 +7,13 @@ const TICK_MS = 12;          // ms between ticks (~83 writes/sec)
 const INSTANT_THRESHOLD = 60; // chunks <= this size are written immediately
 
 const buffers = new Map();   // sessionId → { queue: string, timer: null, term: Terminal }
+const bypassed = new Set();  // sessionIds that skip streaming (e.g. session restore)
+
+export function bypassStream(sessionId) { bypassed.add(sessionId); }
+export function unbypassStream(sessionId) { bypassed.delete(sessionId); }
 
 export function streamWrite(sessionId, term, data) {
+  if (bypassed.has(sessionId)) { term.write(data); return; }
   let buf = buffers.get(sessionId);
   if (!buf) {
     buf = { queue: '', timer: null, term };
