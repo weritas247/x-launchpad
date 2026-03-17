@@ -1,6 +1,6 @@
 import { S, sessionMeta, escHtml } from './state.js';
 import { wsSend } from './websocket.js';
-import { BRANCH_COLORS } from './constants.js';
+import { BRANCH_COLORS, AI_REGISTRY } from './constants.js';
 
 // ─── STATE ───────────────────────────────────────────
 let isOpen = false;
@@ -418,11 +418,22 @@ function parseCoAuthors(body) {
   return authors;
 }
 
+function coAuthorAvatar(author) {
+  const name = author.name.toLowerCase();
+  // Match known AI tools
+  for (const [key, reg] of Object.entries(AI_REGISTRY)) {
+    if (name.includes(key)) {
+      return `<img class="gg-coauthor-img" src="${reg.icon}" title="${escHtml(author.name)}" alt="${reg.label}">`;
+    }
+  }
+  // Fallback: initial letter avatar
+  const initial = author.name.charAt(0).toUpperCase();
+  return `<span class="gg-coauthor-initial" title="${escHtml(author.name)} &lt;${escHtml(author.email)}&gt;">${initial}</span>`;
+}
+
 function coAuthorBadge(coAuthors) {
   if (!coAuthors.length) return '';
-  return coAuthors.map(a =>
-    `<span class="gg-coauthor" title="${escHtml(a.name)} &lt;${escHtml(a.email)}&gt;">${escHtml(a.name)}</span>`
-  ).join('');
+  return coAuthors.map(a => coAuthorAvatar(a)).join('');
 }
 
 // ─── STAT BADGE ──────────────────────────────────────
