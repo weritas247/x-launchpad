@@ -185,6 +185,123 @@ app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../../client/index.html'));
 });
 
+// ─── CLAUDE USAGE TRACKING ───────────────────────────────────────
+const CLAUDE_DIR = path.join(os.homedir(), '.claude');
+const CLAUDE_PROJECTS_DIR = path.join(CLAUDE_DIR, 'projects');
+
+interface ClaudeUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreateTokens: number;
+  totalCost: number;
+  sessionId: string | null;
+  model: string | null;
+}
+
+// Model pricing per million tokens (input / output)
+const MODEL_PRICING: Record<string, { input: number; output: number; cacheRead: number; cacheCreate: number }> = {
+  'claude-opus-4-6':   { input: 15, output: 75, cacheRead: 1.5, cacheCreate: 18.75 },
+  'claude-sonnet-4-6': { input: 3, output: 15, cacheRead: 0.30, cacheCreate: 3.75 },
+  'claude-haiku-4-5':  { input: 0.80, output: 4, cacheRead: 0.08, cacheCreate: 1 },
+  // Fallback for older models
+  'claude-sonnet-4-5': { input: 3, output: 15, cacheRead: 0.30, cacheCreate: 3.75 },
+};
+
+function cwdToProjectDir(cwd: string): string {
+  // Convert /Users/foo/Dev/project → -Users-foo-Dev-project
+  return cwd.replace(/\//g, '-');
+}
+
+function getClaudeUsage(cwd: string): ClaudeUsage | null {
+  try {
+    const projectKey = cwdToProjectDir(cwd);
+    const projectDir = path.join(CLAUDE_PROJECTS_DIR, projectKey);
+    if (!fs.existsSync(projectDir)) return null;
+
+    // Find active session from ~/.claude/sessions/
+    let activeSessionId: string | null = null;
+    try {
+      const sessDir = path.join(CLAUDE_DIR, 'sessions');
+      if (fs.existsSync(sessDir)) {
+        const sessFiles = fs.readdirSync(sessDir).filter(f => f.endsWith('.json'));
+        for (const sf of sessFiles) {
+          try {
+            const raw = fs.readFileSync(path.join(sessDir, sf), 'utf-8');
+            const sess = JSON.parse(raw);
+            if (sess.cwd === cwd && sess.sessionId) {
+              activeSessionId = sess.sessionId;
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+
+    // Find the most recent JSONL file (or the active session's file)
+    let targetJsonl: string | null = null;
+    if (activeSessionId) {
+      const candidate = path.join(projectDir, `${activeSessionId}.jsonl`);
+      if (fs.existsSync(candidate)) targetJsonl = candidate;
+    }
+    if (!targetJsonl) {
+      // Fallback: find the most recently modified .jsonl
+      const jsonls = fs.readdirSync(projectDir)
+        .filter(f => f.endsWith('.jsonl'))
+        .map(f => ({ name: f, mtime: fs.statSync(path.join(projectDir, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime);
+      if (jsonls.length > 0) targetJsonl = path.join(projectDir, jsonls[0].name);
+    }
+    if (!targetJsonl) return null;
+
+    // Parse JSONL and aggregate usage
+    const content = fs.readFileSync(targetJsonl, 'utf-8');
+    const lines = content.trim().split('\n');
+
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let cacheReadTokens = 0;
+    let cacheCreateTokens = 0;
+    let totalCost = 0;
+    let model: string | null = null;
+    let claudeSessionId: string | null = null;
+
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+        if (entry.type !== 'assistant' || !entry.message?.usage) continue;
+
+        const usage = entry.message.usage;
+        const m = entry.message.model || '';
+        if (m) model = m;
+        if (entry.sessionId) claudeSessionId = entry.sessionId;
+
+        const inp = usage.input_tokens || 0;
+        const out = usage.output_tokens || 0;
+        const cacheRead = usage.cache_read_input_tokens || 0;
+        const cacheCreate = usage.cache_creation_input_tokens || 0;
+
+        inputTokens += inp;
+        outputTokens += out;
+        cacheReadTokens += cacheRead;
+        cacheCreateTokens += cacheCreate;
+
+        // Calculate cost
+        const pricing = MODEL_PRICING[m] || MODEL_PRICING['claude-sonnet-4-6'];
+        totalCost += (inp / 1_000_000) * pricing.input
+                   + (out / 1_000_000) * pricing.output
+                   + (cacheRead / 1_000_000) * pricing.cacheRead
+                   + (cacheCreate / 1_000_000) * pricing.cacheCreate;
+      } catch {}
+    }
+
+    if (inputTokens === 0 && outputTokens === 0) return null;
+
+    return { inputTokens, outputTokens, cacheReadTokens, cacheCreateTokens, totalCost, sessionId: claudeSessionId, model };
+  } catch {
+    return null;
+  }
+}
+
 // ─── SESSION MANAGEMENT ───────────────────────────────────────────
 interface Session {
   id: string;
@@ -643,6 +760,14 @@ wss.on('connection', (ws: WebSocket) => {
       if (!session) return;
       session.pty.write('git pull\r');
       ws.send(JSON.stringify({ type: 'git_pull_ack', sessionId: id }));
+
+    } else if (parsed.type === 'claude_usage') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const usage = getClaudeUsage(session.cwd);
+      ws.send(JSON.stringify({ type: 'claude_usage_data', sessionId: id, usage }));
     }
   });
 

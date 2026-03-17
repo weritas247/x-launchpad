@@ -13,6 +13,7 @@ import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handle
 import { streamWrite, bypassStream, unbypassStream } from './stream-writer.js';
 import { registerAction, buildCombo, matchCombo, tryKeybinding } from './keyboard.js';
 import { initInputPanel, onSessionChange as inputPanelSessionChange } from './input-panel.js';
+import { handleClaudeUsageData, startUsagePolling, onSessionChangeUsage, onAiChangeUsage } from './claude-usage.js';
 
 S.currentTheme = THEMES[0];
 
@@ -57,6 +58,7 @@ function handleMessage(msg) {
     }
   } else if (msg.type === 'session_attached') {
     activateSession(msg.sessionId);
+    onSessionChangeUsage();
     setTimeout(() => {
       const e = terminalMap.get(msg.sessionId);
       if (e) { e.fitAddon.fit(); wsSend({ type:'resize', sessionId:msg.sessionId, cols:e.term.cols, rows:e.term.rows }); }
@@ -64,6 +66,7 @@ function handleMessage(msg) {
   } else if (msg.type === 'session_info') {
     updateSessionInfo(msg.sessionId, msg.cwd, msg.ai);
     tabStatusOnAiChange(msg.sessionId, msg.ai);
+    onAiChangeUsage(msg.sessionId, msg.ai);
     if (msg.sessionId === S.activeSessionId) requestBranch(msg.sessionId);
   } else if (msg.type === 'output') {
     const entry = terminalMap.get(msg.sessionId);
@@ -86,6 +89,8 @@ function handleMessage(msg) {
     handleGitCheckoutAck(msg);
   } else if (msg.type === 'git_pull_ack') {
     handleGitPullAck(msg);
+  } else if (msg.type === 'claude_usage_data') {
+    handleClaudeUsageData(msg);
   }
 }
 
@@ -236,4 +241,4 @@ initFolderDnD();
 initNotifications();
 initInputPanel();
 
-loadSettings().then(() => connect(handleMessage));
+loadSettings().then(() => { connect(handleMessage); startUsagePolling(); });
