@@ -475,7 +475,9 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .gg-row.selected{background:var(--bg-active);border-left:2px solid var(--accent)}
 .gg-row.focused{background:var(--bg-hover);outline:1px solid var(--accent);outline-offset:-1px}
 .gg-row.focused.selected{background:var(--bg-active)}
-.gg-hash{color:var(--accent);font-size:11px;flex-shrink:0;width:60px;font-weight:500}
+.gg-hash{color:var(--accent);font-size:11px;flex-shrink:0;width:60px;font-weight:500;cursor:pointer;border-radius:3px;padding:1px 3px;margin:-1px -3px;transition:background .15s,color .15s}
+.gg-hash:hover{background:var(--accent-dim);color:var(--text-bright)}
+.gg-hash-copied{background:var(--accent)!important;color:var(--bg-panel)!important}
 .gg-branch-col{width:160px;min-width:160px;flex-shrink:0;overflow:hidden;display:flex;align-items:center}
 .gg-refs{display:flex;gap:4px;flex-shrink:0;overflow:hidden}
 .gg-ref{font-size:9px;padding:1px 6px;border-radius:8px;letter-spacing:.04em;font-weight:700;border:1px solid;white-space:nowrap}

@@ -568,10 +568,9 @@ function renderGraph(commits) {
   svgEl.innerHTML = svg;
 
   // Commit rows
-  const hasGithub = !!githubBaseUrl;
   commitBox.innerHTML = commits.map((c, i) => {
     const refs = c.refs.length > 0 ? `<span class="gg-refs">${c.refs.map(refBadge).join('')}</span>` : '';
-    const hashClass = hasGithub ? 'gg-hash gg-hash-link' : 'gg-hash';
+    const hashClass = 'gg-hash';
     const coAuthors = parseCoAuthors(c.body);
     const coAuthorHtml = coAuthorBadge(coAuthors);
     return `<div class="gg-row" data-hash="${escHtml(c.hash)}" style="height:${ROW_H}px">` +
@@ -641,11 +640,20 @@ document.getElementById('gg-file-close').addEventListener('click', () => {
 });
 
 commitBox.addEventListener('click', e => {
-  // GitHub hash link click
-  const hashLink = e.target.closest('.gg-hash-link');
-  if (hashLink && githubBaseUrl) {
+  // Hash click → copy to clipboard
+  const hashEl = e.target.closest('.gg-hash');
+  if (hashEl) {
     e.stopPropagation();
-    window.open(`${githubBaseUrl}/commit/${hashLink.dataset.hash}`, '_blank');
+    const fullHash = hashEl.dataset.hash;
+    navigator.clipboard.writeText(fullHash).then(() => {
+      hashEl.classList.add('gg-hash-copied');
+      const orig = hashEl.textContent;
+      hashEl.textContent = 'Copied!';
+      setTimeout(() => {
+        hashEl.textContent = orig;
+        hashEl.classList.remove('gg-hash-copied');
+      }, 1200);
+    });
     return;
   }
 
