@@ -8,6 +8,7 @@ import { newSession, closeSession, renameSession, syncSessionList, attachTermina
 import { loadSettings, applySettings, openSettings, closeSettings, initSettingsUI } from './settings.js';
 import { aiNotifyCheck, resetNotifyState, initNotifications } from './notifications.js';
 import { createFolder, initFolderDnD } from './folder.js';
+import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, requestBranch } from './git-graph.js';
 
 S.currentTheme = THEMES[0];
 
@@ -24,6 +25,10 @@ function handleMessage(msg) {
   if (msg.type === 'session_list') {
     syncSessionList(msg.sessions, S.wsJustReconnected);
     S.wsJustReconnected = false;
+    // Auto-close git graph if active session is gone
+    if (isGitGraphOpen() && S.activeSessionId && !msg.sessions.some(s => s.id === S.activeSessionId)) {
+      closeGitGraph();
+    }
   } else if (msg.type === 'settings') {
     applySettings(msg.settings);
   } else if (msg.type === 'session_created') {
@@ -47,12 +52,19 @@ function handleMessage(msg) {
     }, 50);
   } else if (msg.type === 'session_info') {
     updateSessionInfo(msg.sessionId, msg.cwd, msg.ai);
+    if (msg.sessionId === S.activeSessionId) requestBranch(msg.sessionId);
   } else if (msg.type === 'output') {
     const entry = terminalMap.get(msg.sessionId);
     if (entry) {
       entry.term.write(msg.data);
       aiNotifyCheck(msg.sessionId, msg.data);
     }
+  } else if (msg.type === 'git_graph_data') {
+    handleGitGraphData(msg);
+  } else if (msg.type === 'git_file_list_data') {
+    handleGitFileListData(msg);
+  } else if (msg.type === 'git_branch_data') {
+    handleGitBranchData(msg);
   }
 }
 
@@ -60,6 +72,7 @@ document.addEventListener('keydown', e => {
   if (!S.settings) return;
 
   if (e.key === 'Escape') {
+    if (isGitGraphOpen()) { closeGitGraph(); return; }
     const picker = document.getElementById('session-picker');
     if (picker.style.display !== 'none') { hideSessionPicker(); return; }
     if (settingsOverlay.classList.contains('open')) { closeSettings(); return; }
@@ -122,6 +135,7 @@ document.addEventListener('keydown', e => {
   if (combo === kb.prevTab)      { e.preventDefault(); switchTabBy(-1); }
   if (combo === kb.renameSession && S.activeSessionId) { e.preventDefault(); promptRenameSession(S.activeSessionId); }
   if (combo === kb.clearTerminal && S.activeSessionId) { e.preventDefault(); clearActiveTerminal(); }
+  if (combo === kb.gitGraph) { e.preventDefault(); openGitGraph(); }
 
   if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey) {
     const n = parseInt(e.key);

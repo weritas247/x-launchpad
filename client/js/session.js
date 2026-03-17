@@ -1,4 +1,5 @@
 import { S, terminalMap, sessionMeta, sbActiveName, sbCount, sbSize, hdrCount, sessionEmpty, emptyState } from './state.js';
+import { requestBranch } from './git-graph.js';
 
 export function activateSession(id) {
   if (!terminalMap.has(id)) return;
@@ -28,6 +29,7 @@ export function activateSession(id) {
     const meta = sessionMeta.get(id);
     sbActiveName.textContent = meta ? meta.name : id;
     sbSize.textContent = `${entry.term.cols}×${entry.term.rows}`;
+    requestBranch(id);
   }
   updateStatusBar();
 }
