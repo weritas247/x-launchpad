@@ -46,12 +46,15 @@ const DEFAULT_SETTINGS = {
     autoReconnect: true,
   },
   keybindings: {
-    newSession: 'Ctrl+Shift+T',
-    closeSession: 'Ctrl+Shift+W',
-    nextTab: 'Ctrl+Tab',
-    prevTab: 'Ctrl+Shift+Tab',
-    openSettings: 'Ctrl+,',
+    newSession: 'Ctrl+t',
+    closeSession: 'Ctrl+w',
+    nextTab: 'Ctrl+Shift+]',
+    prevTab: 'Ctrl+Shift+[',
+    openSettings: 'Meta+,',
     fullscreen: 'F11',
+    renameSession: 'Ctrl+Shift+r',
+    clearTerminal: 'Meta+k',
+    splitSession: '',
   },
   advanced: {
     customCss: '',
@@ -111,13 +114,18 @@ interface Session {
   createdAt: number;
   cwd: string;
   ai: string | null;
+  cmd?: string;
   cwdTimer?: ReturnType<typeof setInterval>;
+  pendingCmd?: string;
+  resized?: boolean;
 }
 
 const sessions = new Map<string, Session>();
 const wsSession = new Map<WebSocket, string>();
+// Extra subscriptions: receive output without changing active session
+const wsSubscriptions = new Map<WebSocket, Set<string>>();
 
-function createSession(id: string, name: string, restoreCwd?: string): Session {
+function createSession(id: string, name: string, restoreCwd?: string, restoreCmd?: string): Session {
   const s = currentSettings.shell;
   const shellPath = s.shellPath || (os.platform() === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash'));
   const mergedEnv = {
@@ -130,23 +138,25 @@ function createSession(id: string, name: string, restoreCwd?: string): Session {
   };
   const cwd0 = restoreCwd || s.startDirectory || process.env.HOME || '/';
 
-  const ptyProcess = pty.spawn(shellPath, [], {
+  const ptyProcess = pty.spawn(shellPath, ['-i'], {
     name: 'xterm-256color',
     cols: 80,
     rows: 24,
     cwd: fs.existsSync(cwd0) ? cwd0 : (process.env.HOME || '/'),
     env: mergedEnv,
   });
-  const session: Session = { id, name, pty: ptyProcess, createdAt: Date.now(), cwd: cwd0, ai: null };
+  const session: Session = { id, name, pty: ptyProcess, createdAt: Date.now(), cwd: cwd0, ai: null, cmd: restoreCmd };
   sessions.set(id, session);
 
-  // PTY output → all WS clients that have this session active
+  // PTY output → clients with this session active OR subscribed
   ptyProcess.onData((chunk: string) => {
     const msg = JSON.stringify({ type: 'output', sessionId: id, data: chunk });
     wss.clients.forEach(c => {
-      if (c.readyState === WebSocket.OPEN && wsSession.get(c as WebSocket) === id) {
-        (c as WebSocket).send(msg);
-      }
+      const cws = c as WebSocket;
+      if (cws.readyState !== WebSocket.OPEN) return;
+      const active = wsSession.get(cws) === id;
+      const subscribed = wsSubscriptions.get(cws)?.has(id) ?? false;
+      if (active || subscribed) cws.send(msg);
     });
   });
 
@@ -208,6 +218,7 @@ function createSession(id: string, name: string, restoreCwd?: string): Session {
           if (/aider/.test(cmd)) { newAi = 'aider'; break; }
           if (/cursor/.test(cmd)) { newAi = 'cursor'; break; }
           if (/opencode/.test(cmd)) { newAi = 'opencode'; break; }
+          if (/codex/.test(cmd)) { newAi = 'codex'; break; }
         }
       } catch {}
 
@@ -228,10 +239,61 @@ function createSession(id: string, name: string, restoreCwd?: string): Session {
 function persistSessions() {
   try {
     const data = Array.from(sessions.values()).map(s => ({
-      id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd,
+      id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd, cmd: s.cmd,
     }));
     fs.writeFileSync(SESSIONS_PATH, JSON.stringify(data, null, 2), 'utf-8');
   } catch {}
+}
+
+function stripEscape(s: string): string {
+  return s
+    .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '') // CSI sequences
+    .replace(/\x1b[()][AB012]/g, '')          // character set
+    .replace(/\x1b./g, '')                    // other ESC sequences
+    .replace(/[\x00-\x09\x0b-\x1f\x7f]/g, '') // control chars except \n
+    .replace(/\r/g, '');
+}
+
+function runCmdWhenReady(sess: Session, cmd: string) {
+  let sent = false;
+
+  // Primary: detect shell prompt in PTY output
+  let buf = '';
+  let gotFirstData = false;
+  const unsub = sess.pty.onData((chunk: string) => {
+    if (sent) return;
+    buf += chunk;
+    gotFirstData = true;
+    const clean = stripEscape(buf);
+    if (/[$%>#❯›]\s*$/.test(clean)) {
+      sent = true;
+      unsub.dispose();
+      setTimeout(() => sess.pty.write(cmd + '\r'), 100);
+    }
+    if (buf.length > 4000 && !sent) {
+      sent = true;
+      unsub.dispose();
+      sess.pty.write(cmd + '\r');
+    }
+  });
+
+  // Fallback A: if we got data but prompt regex never matched, send after 3s
+  setTimeout(() => {
+    if (!sent && gotFirstData) {
+      sent = true;
+      unsub.dispose();
+      sess.pty.write(cmd + '\r');
+    }
+  }, 3000);
+
+  // Fallback B: hard timeout — send no matter what after 6s
+  setTimeout(() => {
+    if (!sent) {
+      sent = true;
+      unsub.dispose();
+      sess.pty.write(cmd + '\r');
+    }
+  }, 6000);
 }
 
 function broadcastSessionList(exclude?: WebSocket) {
@@ -248,15 +310,33 @@ function broadcastSessionList(exclude?: WebSocket) {
 }
 
 // ─── RESTORE SESSIONS ON STARTUP ──────────────────────────────────
+// Map session names to their CLI commands
+const NAME_TO_CMD: Record<string, string> = {
+  claude: 'claude', gemini: 'gemini', codex: 'codex',
+  opencode: 'opencode', aider: 'aider', copilot: 'copilot',
+};
+
+function cmdForSession(s: { name: string; cmd?: string }): string | undefined {
+  if (s.cmd) return s.cmd;
+  return NAME_TO_CMD[s.name.toLowerCase()];
+}
+
 function restoreSessions() {
   try {
     if (!fs.existsSync(SESSIONS_PATH)) return;
     const raw = fs.readFileSync(SESSIONS_PATH, 'utf-8');
-    const saved: Array<{ id: string; name: string; createdAt: number; cwd: string }> = JSON.parse(raw);
+    const saved: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string }> = JSON.parse(raw);
     if (!Array.isArray(saved) || saved.length === 0) return;
     console.log(`[session] Restoring ${saved.length} session(s) from disk...`);
     for (const s of saved) {
-      createSession(s.id, s.name, s.cwd);
+      const cmd = cmdForSession(s);
+      const sess = createSession(s.id, s.name, s.cwd, cmd);
+      if (cmd) {
+        console.log(`[session] Will run '${cmd}' in restored session '${s.name}' after first resize`);
+        // Store as pending — will be executed when client sends first resize (correct terminal size)
+        sess.pendingCmd = cmd;
+        sess.resized = false;
+      }
     }
   } catch (e) {
     console.warn('[session] Could not restore sessions:', e);
@@ -283,11 +363,22 @@ wss.on('connection', (ws: WebSocket) => {
       const id = `session-${Date.now()}`;
       const nameFormat = currentSettings.shell.sessionNameFormat || 'shell-{n}';
       const name = (parsed.name as string) || nameFormat.replace('{n}', String(sessions.size + 1));
-      createSession(id, name);
+      const sess = createSession(id, name);
       wsSession.set(ws, id);
+      if (parsed.cmd) {
+        sess.cmd = parsed.cmd as string;
+        runCmdWhenReady(sess, sess.cmd);
+      }
 
       ws.send(JSON.stringify({ type: 'session_created', sessionId: id, name }));
-      broadcastSessionList();
+      broadcastSessionList(); // calls persistSessions() — cmd is set above before this
+
+    } else if (parsed.type === 'session_subscribe') {
+      // Subscribe to output without changing the active session
+      const ids = parsed.sessionIds as string[];
+      if (Array.isArray(ids)) {
+        wsSubscriptions.set(ws, new Set(ids.filter(id => sessions.has(id))));
+      }
 
     } else if (parsed.type === 'session_attach') {
       const id = parsed.sessionId as string;
@@ -296,6 +387,8 @@ wss.on('connection', (ws: WebSocket) => {
         return;
       }
       wsSession.set(ws, id);
+      // Remove from subscriptions — active session gets output via wsSession
+      wsSubscriptions.get(ws)?.delete(id);
       ws.send(JSON.stringify({ type: 'session_attached', sessionId: id }));
       // Replay current CWD/AI info immediately
       const sess = sessions.get(id)!;
@@ -329,11 +422,21 @@ wss.on('connection', (ws: WebSocket) => {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
       if (!id) return;
       const session = sessions.get(id);
-      if (session) session.pty.resize(parsed.cols as number, parsed.rows as number);
+      if (session) {
+        session.pty.resize(parsed.cols as number, parsed.rows as number);
+        // First resize after restore: now run the pending command at correct terminal size
+        if (session.pendingCmd && !session.resized) {
+          session.resized = true;
+          const cmd = session.pendingCmd;
+          session.pendingCmd = undefined;
+          console.log(`[session] Running '${cmd}' in '${session.name}' after resize to ${parsed.cols}x${parsed.rows}`);
+          runCmdWhenReady(session, cmd);
+        }
+      }
     }
   });
 
-  ws.on('close', () => { wsSession.delete(ws); });
+  ws.on('close', () => { wsSession.delete(ws); wsSubscriptions.delete(ws); });
   ws.on('error', (err) => { console.error('[ws] Error:', err.message); });
 });
 

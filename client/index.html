@@ -102,13 +102,13 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .session-meta{font-size:10px;color:var(--text-dim);margin-top:3px;display:flex;flex-direction:column;gap:2px}
 .session-cwd{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-dim);font-size:10px}
 .session-ai-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.04em;padding:2px 8px 2px 5px;border-radius:10px;margin-top:3px;width:fit-content;transition:box-shadow .3s;text-transform:none}
-.badge-icon{font-size:13px;line-height:1;flex-shrink:0}
+.badge-icon{font-size:13px;line-height:1;flex-shrink:0}.badge-img{width:14px;height:14px;object-fit:contain;display:block;flex-shrink:0}.notif-icon{width:16px;height:16px;object-fit:contain;vertical-align:middle}
 .session-ai-badge.claude{background:rgba(191,128,255,.18);color:#d4a8ff;border:1px solid rgba(191,128,255,.45);box-shadow:0 0 8px rgba(191,128,255,.2)}
 .session-ai-badge.chatgpt{background:rgba(16,200,150,.15);color:#20d4a0;border:1px solid rgba(16,200,150,.45);box-shadow:0 0 8px rgba(16,200,150,.2)}
 .session-ai-badge.gemini{background:rgba(100,160,255,.15);color:#88bbff;border:1px solid rgba(100,160,255,.45);box-shadow:0 0 8px rgba(100,160,255,.2)}
 .session-ai-badge.copilot{background:rgba(96,200,255,.15);color:#60c8ff;border:1px solid rgba(96,200,255,.45);box-shadow:0 0 8px rgba(96,200,255,.2)}
 .session-ai-badge.aider{background:rgba(255,200,80,.15);color:#ffc850;border:1px solid rgba(255,200,80,.45);box-shadow:0 0 8px rgba(255,200,80,.2)}
-.session-ai-badge.cursor{background:rgba(80,220,255,.15);color:#50dcff;border:1px solid rgba(80,220,255,.45);box-shadow:0 0 8px rgba(80,220,255,.2)}
+.session-ai-badge.cursor{background:rgba(80,220,255,.15);color:#50dcff;border:1px solid rgba(80,220,255,.45);box-shadow:0 0 8px rgba(80,220,255,.2)}.session-ai-badge.codex{background:rgba(16,163,127,.15);color:#10a37f;border:1px solid rgba(16,163,127,.45);box-shadow:0 0 8px rgba(16,163,127,.2)}.session-ai-badge.opencode{background:rgba(255,160,80,.15);color:#ffa050;border:1px solid rgba(255,160,80,.45);box-shadow:0 0 8px rgba(255,160,80,.2)}
 .session-close{background:none;border:none;color:var(--text-ghost);font-size:14px;cursor:pointer;padding:2px 4px;border-radius:2px;opacity:0;transition:all .12s;font-family:var(--font-mono);line-height:1}
 .session-item:hover .session-close{opacity:1}
 .session-close:hover{color:var(--danger);background:rgba(255,51,102,.1)}
@@ -151,7 +151,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .folder-children .session-item{padding-left:8px}
 
 /* ═══ MAIN ═══ */
-#main{grid-area:main;display:flex;flex-direction:column;background:var(--bg-deep);overflow:hidden}
+#main{grid-area:main;display:flex;flex-direction:column;background:var(--bg-deep);overflow:hidden;position:relative}
 #tab-bar{height:36px;background:var(--bg-panel);border-bottom:1px solid var(--border);display:flex;align-items:flex-end;padding:0 0 0 4px;gap:2px;flex-shrink:0;overflow-x:auto}
 #tab-bar::-webkit-scrollbar{height:0}
 .tab{height:28px;padding:0 12px;font-size:12px;font-family:var(--font-mono);color:var(--text-main);background:var(--bg-deep);border:1px solid var(--border);border-bottom:none;border-radius:4px 4px 0 0;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;transition:all .12s;max-width:160px;overflow:hidden;animation:fadeIn .15s ease;flex-shrink:0}
@@ -178,6 +178,22 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .empty-hint span{color:var(--accent)}
 .btn-start{margin-top:8px;padding:8px 24px;background:none;border:1px solid var(--accent);border-radius:4px;color:var(--accent);font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;cursor:pointer;text-transform:uppercase;transition:all .15s;box-shadow:0 0 12px var(--accent-dim)}
 .btn-start:hover{background:var(--accent-dim);box-shadow:0 0 20px var(--accent-glow)}
+#session-picker{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);z-index:200;animation:fadeIn .12s ease}
+#session-picker-box{background:var(--bg-panel);border:1px solid var(--border-lit);border-radius:10px;padding:28px 32px 24px;position:relative;min-width:320px;box-shadow:0 0 40px var(--accent-glow)}
+.sp-title{font-size:11px;letter-spacing:.18em;color:var(--text-dim);margin-bottom:20px;text-align:center}
+.sp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.sp-btn{display:flex;flex-direction:column;align-items:center;gap:9px;padding:16px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;color:var(--text-main);font-family:var(--font-mono);transition:all .14s}
+.sp-btn:hover{border-color:var(--border-lit);background:var(--bg-hover);box-shadow:0 0 14px var(--accent-glow);transform:translateY(-1px)}
+.sp-btn img{width:32px;height:32px;object-fit:contain}
+.sp-shell-icon{font-size:18px;font-family:var(--font-mono);color:var(--accent);line-height:32px;height:32px;display:flex;align-items:center}
+.sp-name{font-size:11px;letter-spacing:.06em;color:var(--text-dim)}
+.sp-btn:hover .sp-name{color:var(--text-main)}
+.sp-close{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--text-ghost);font-size:14px;cursor:pointer;line-height:1;padding:2px 4px}
+.sp-close:hover{color:var(--text-main)}
+.ai-quick-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:4px}
+.btn-ai-quick{display:flex;align-items:center;gap:7px;padding:7px 16px;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;color:var(--text-main);font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;cursor:pointer;transition:all .15s}
+.btn-ai-quick:hover{border-color:var(--border-lit);background:var(--bg-hover);color:var(--text-bright)}
+.btn-ai-quick img{width:16px;height:16px;object-fit:contain;flex-shrink:0}
 
 #statusbar{height:22px;background:var(--bg-panel);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:14px;font-size:11px;color:var(--text-main);letter-spacing:.06em;flex-shrink:0;position:relative}
 .sb-item{display:flex;align-items:center;gap:4px}
@@ -402,6 +418,36 @@ body.theme-violet{--bg-void:#070510;--bg-deep:#0a0816;--bg-panel:#0d0b1e;--bg-su
     <div id="tab-bar">
       <button class="tab-add-btn" id="tab-add-btn" title="New terminal">+</button>
     </div>
+    <!-- SESSION PICKER OVERLAY -->
+    <div id="session-picker" style="display:none">
+      <div id="session-picker-box">
+        <div class="sp-title">NEW SESSION</div>
+        <div class="sp-grid">
+          <button class="sp-btn" data-cmd="claude" data-label="Claude">
+            <img src="icons/claude.svg" alt="Claude">
+            <span class="sp-name">Claude</span>
+          </button>
+          <button class="sp-btn" data-cmd="gemini" data-label="Gemini">
+            <img src="icons/gemini.svg" alt="Gemini">
+            <span class="sp-name">Gemini</span>
+          </button>
+          <button class="sp-btn" data-cmd="codex" data-label="Codex">
+            <img src="icons/codex.svg" alt="Codex">
+            <span class="sp-name">Codex</span>
+          </button>
+          <button class="sp-btn" data-cmd="opencode" data-label="OpenCode">
+            <img src="icons/opencode.svg" alt="OpenCode">
+            <span class="sp-name">OpenCode</span>
+          </button>
+          <button class="sp-btn sp-btn-shell" data-cmd="" data-label="">
+            <span class="sp-shell-icon">$_</span>
+            <span class="sp-name">Shell</span>
+          </button>
+        </div>
+        <button class="sp-close" id="sp-close">✕</button>
+      </div>
+    </div>
+
     <div id="terminal-wrapper">
       <div id="empty-state">
         <div class="empty-art">╔══════════════════╗
@@ -409,6 +455,12 @@ body.theme-violet{--bg-void:#070510;--bg-deep:#0a0816;--bg-panel:#0d0b1e;--bg-su
 ╚══════════════════╝</div>
         <div class="empty-hint">Press <span>+</span> or click <span>New Session</span></div>
         <button class="btn-start" id="btn-start-empty">INIT SESSION</button>
+        <div class="ai-quick-btns">
+          <button class="btn-ai-quick" data-ai="claude" data-cmd="claude" data-label="Claude"><img src="icons/claude.svg" alt="Claude">Claude</button>
+          <button class="btn-ai-quick" data-ai="gemini" data-cmd="gemini" data-label="Gemini"><img src="icons/gemini.svg" alt="Gemini">Gemini</button>
+          <button class="btn-ai-quick" data-ai="codex" data-cmd="codex" data-label="Codex"><img src="icons/codex.svg" alt="Codex">Codex</button>
+          <button class="btn-ai-quick" data-ai="opencode" data-cmd="opencode" data-label="OpenCode"><img src="icons/opencode.svg" alt="OpenCode">OpenCode</button>
+        </div>
       </div>
     </div>
     <div id="statusbar">
@@ -880,6 +932,8 @@ const KB_DEFS = [
   { key:'closeSession',    label:'Close Session' },
   { key:'nextTab',         label:'Next Tab' },
   { key:'prevTab',         label:'Previous Tab' },
+  { key:'renameSession',   label:'Rename Session' },
+  { key:'clearTerminal',   label:'Clear Terminal' },
   { key:'openSettings',    label:'Open Settings' },
   { key:'fullscreen',      label:'Toggle Fullscreen' },
 ];
@@ -1109,7 +1163,15 @@ function wsSend(obj) {
 //  SESSIONS
 // ═══════════════════════════════════════════════════
 function newSession() {
-  wsSend({ type: 'session_create' });
+  showSessionPicker();
+}
+
+function showSessionPicker() {
+  document.getElementById('session-picker').style.display = 'flex';
+}
+
+function hideSessionPicker() {
+  document.getElementById('session-picker').style.display = 'none';
 }
 
 function closeSession(id) {
@@ -1148,17 +1210,30 @@ function renameSession(id, newName) {
 function syncSessionList(sessions) {
   const isInitialLoad = terminalMap.size === 0 && sessions.length > 0;
 
+  const newIds = [];
   sessions.forEach(s => {
     if (!sessionMeta.has(s.id)) {
       sessionMeta.set(s.id, { name: s.name, createdAt: s.createdAt });
       attachTerminal(s.id, s.name);
+      newIds.push(s.id);
     }
   });
+  // Subscribe ALL restored sessions so PTY output flows to each terminal
+  // Also send resize for every restored session so TUI apps (opencode, etc.) get correct dimensions
+  if (newIds.length > 0) {
+    wsSend({ type: 'session_subscribe', sessionIds: newIds });
+    setTimeout(() => {
+      newIds.forEach(id => {
+        const e = terminalMap.get(id);
+        if (e) { e.fitAddon.fit(); wsSend({ type:'resize', sessionId:id, cols:e.term.cols, rows:e.term.rows }); }
+      });
+    }, 100);
+  }
 
   if (!activeSessionId && terminalMap.size > 0) {
     const firstId = terminalMap.keys().next().value;
-    // Activate immediately (don't wait for server round-trip)
     activateSession(firstId);
+    // Also attach the first session so input works
     wsSend({ type: 'session_attach', sessionId: firstId });
     setTimeout(() => {
       const e = terminalMap.get(firstId);
@@ -1281,12 +1356,14 @@ function updateSessionInfo(sessionId, cwd, ai) {
   const metaEl = entry.sidebarEl.querySelector('.session-meta');
   if (ai) {
     const aiDefs = {
-      claude:  { icon: '🤖', label: 'Claude' },
-      chatgpt: { icon: '🟢', label: 'ChatGPT' },
-      gemini:  { icon: '✨', label: 'Gemini' },
-      copilot: { icon: '🛸', label: 'Copilot' },
-      aider:   { icon: '🪄', label: 'Aider' },
-      cursor:  { icon: '⚡', label: 'Cursor' },
+      claude:   { icon: '<img src="icons/claude.svg" class="badge-img" alt="Claude">', label: 'Claude' },
+      chatgpt:  { icon: '<img src="icons/chatgpt.svg" class="badge-img" alt="ChatGPT">', label: 'ChatGPT' },
+      gemini:   { icon: '<img src="icons/gemini.svg" class="badge-img" alt="Gemini">', label: 'Gemini' },
+      copilot:  { icon: '<img src="icons/copilot.svg" class="badge-img" alt="Copilot">', label: 'Copilot' },
+      aider:    { icon: '<img src="icons/aider.svg" class="badge-img" alt="Aider">', label: 'Aider' },
+      cursor:   { icon: '<img src="icons/cursor.svg" class="badge-img" alt="Cursor">', label: 'Cursor' },
+      codex:    { icon: '<img src="icons/codex.svg" class="badge-img" alt="Codex">', label: 'Codex' },
+      opencode: { icon: '<img src="icons/opencode.svg" class="badge-img" alt="OpenCode">', label: 'OpenCode' },
     };
     const def = aiDefs[ai] || { icon: '🤖', label: ai };
     if (!badgeEl) {
@@ -1799,6 +1876,14 @@ document.getElementById('btn-settings').addEventListener('click', openSettings);
 // ═══════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
   if (!settings) return;
+
+  // Escape: close picker or settings
+  if (e.key === 'Escape') {
+    const picker = document.getElementById('session-picker');
+    if (picker.style.display !== 'none') { hideSessionPicker(); return; }
+    if (settingsOverlay.classList.contains('open')) { closeSettings(); return; }
+  }
+
   if (settingsOverlay.classList.contains('open')) return;
 
   const parts = [];
@@ -1816,11 +1901,35 @@ document.addEventListener('keydown', e => {
   if (combo === kb.fullscreen)   { e.preventDefault(); toggleFullscreen(); }
   if (combo === kb.nextTab)      { e.preventDefault(); switchTabBy(1); }
   if (combo === kb.prevTab)      { e.preventDefault(); switchTabBy(-1); }
+  if (combo === kb.renameSession && activeSessionId) { e.preventDefault(); promptRenameSession(activeSessionId); }
+  if (combo === kb.clearTerminal && activeSessionId) { e.preventDefault(); clearActiveTerminal(); }
+
+  // Cmd+1~9: jump to session by index (Mac)
+  if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey) {
+    const n = parseInt(e.key);
+    if (n >= 1 && n <= 9) {
+      const ids = Array.from(terminalMap.keys());
+      if (ids[n - 1]) { e.preventDefault(); activateSession(ids[n - 1]); }
+    }
+  }
 });
 
 function toggleFullscreen() {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
   else document.exitFullscreen().catch(()=>{});
+}
+
+function promptRenameSession(id) {
+  const meta = sessionMeta.get(id);
+  if (!meta) return;
+  const name = window.prompt('Rename session:', meta.name);
+  if (name && name.trim()) renameSession(id, name.trim());
+}
+
+function clearActiveTerminal() {
+  if (!activeSessionId) return;
+  const entry = terminalMap.get(activeSessionId);
+  if (entry) entry.term.clear();
 }
 
 function switchTabBy(dir) {
@@ -1885,8 +1994,8 @@ const AI_PATTERNS = [
 ];
 
 const AI_ICONS = {
-  claude:   '🤖', chatgpt: '🟢', gemini: '✨',
-  copilot:  '🛸', aider:   '🪄', cursor: '⚡',
+  claude:   '✦', chatgpt: '●', gemini: '✦',
+  copilot:  '◎', aider:   '◈', cursor: '▸',
   opencode: '🔶', any:     '💻',
 };
 
@@ -2009,6 +2118,28 @@ document.getElementById('btn-new-session').addEventListener('click', newSession)
 tabAddBtn.addEventListener('click', newSession);
 document.getElementById('btn-start-empty').addEventListener('click', newSession);
 document.getElementById('btn-new-folder').addEventListener('click', createFolder);
+
+// Session picker overlay
+document.getElementById('sp-close').addEventListener('click', hideSessionPicker);
+document.getElementById('session-picker').addEventListener('click', e => {
+  if (e.target === e.currentTarget) hideSessionPicker();
+});
+document.querySelectorAll('.sp-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const label = btn.dataset.label || 'Shell';
+    const cmd   = btn.dataset.cmd || null;
+    hideSessionPicker();
+    wsSend({ type: 'session_create', name: label, cmd });
+  });
+});
+
+document.querySelectorAll('.btn-ai-quick').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const label = btn.dataset.label || btn.dataset.ai;
+    const cmd   = btn.dataset.cmd;
+    wsSend({ type: 'session_create', name: label, cmd });
+  });
+});
 
 // ═══════════════════════════════════════════════════
 //  FOLDER SYSTEM
