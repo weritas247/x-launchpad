@@ -10,6 +10,7 @@ import { aiNotifyCheck, resetNotifyState, initNotifications } from './notificati
 import { tabStatusCheck, tabStatusOnAiChange, suppressTabStatus } from './tab-status.js';
 import { createFolder, initFolderDnD } from './folder.js';
 import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, handleGitPullAck, requestBranch, handleGitGraphKeydown } from './git-graph.js';
+import { streamWrite } from './stream-writer.js';
 
 S.currentTheme = THEMES[0];
 
@@ -61,7 +62,7 @@ function handleMessage(msg) {
   } else if (msg.type === 'output') {
     const entry = terminalMap.get(msg.sessionId);
     if (entry) {
-      entry.term.write(msg.data);
+      streamWrite(msg.sessionId, entry.term, msg.data);
       aiNotifyCheck(msg.sessionId, msg.data);
       tabStatusCheck(msg.sessionId, msg.data);
     }

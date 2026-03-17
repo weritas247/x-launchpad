@@ -5,6 +5,7 @@ import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from
 import { removeSplitPane, teardownSplitLayout, showDropZoneOverlay, hideDropZoneOverlay } from './split-pane.js';
 import { resetTabStatus, tabStatusOnInput } from './tab-status.js';
 import { setupTerminalImageHandlers, hasPendingAttachments, uploadAndFlush } from './image-attach.js';
+import { destroyStream } from './stream-writer.js';
 
 export function newSession() {
   showSessionPicker();
@@ -92,6 +93,7 @@ export function closeSession(id) {
     }
   }
   resetTabStatus(id);
+  destroyStream(id);
   sessionMeta.delete(id);
   if (S.activeSessionId === id) {
     S.activeSessionId = null;
