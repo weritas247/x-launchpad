@@ -1,5 +1,5 @@
 import { S, terminalMap, customCssTag, settingsOverlay, escHtml } from './state.js';
-import { THEMES, KB_DEFS } from './constants.js';
+import { THEMES, KB_DEFS, normalizeKey } from './constants.js';
 import { applyTheme, updateSwatches } from './themes.js';
 
 export async function loadSettings() {
@@ -129,7 +129,7 @@ function buildKbList(kb) {
         if (e.altKey) parts.push('Alt');
         if (e.metaKey) parts.push('Meta');
         if (!['Control','Shift','Alt','Meta'].includes(e.key)) {
-          parts.push(e.key === ' ' ? 'Space' : e.key);
+          parts.push(normalizeKey(e));
         }
         if (parts.length > 0 && !['Control','Shift','Alt','Meta'].includes(e.key)) {
           const combo = parts.join('+');

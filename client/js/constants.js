@@ -68,6 +68,16 @@ export const KB_DEFS = [
   { key:'gitGraph',        label:'Git Graph' },
 ];
 
+/** IME(한글 등) 활성 시에도 물리 키 기준으로 단축키가 동작하도록 e.code 사용 */
+export function normalizeKey(e) {
+  const code = e.code;
+  if (code) {
+    if (code.startsWith('Key'))   return code.slice(3).toLowerCase(); // KeyA → a
+    if (code.startsWith('Digit')) return code.slice(5);               // Digit1 → 1
+  }
+  return e.key === ' ' ? 'Space' : e.key;
+}
+
 export const BRANCH_COLORS = [
   'var(--accent)',
   '#e06c75',
