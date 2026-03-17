@@ -1,4 +1,4 @@
-# Claude CLI Web Terminal (xterm.js) 구축 계획서
+# Super Terminal (xterm.js) 구축 계획서
 
 ## 🎯 목표
 

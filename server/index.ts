@@ -338,6 +338,6 @@ wss.on('connection', (ws: WebSocket) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Claude Web Terminal → http://localhost:${PORT}`);
+  console.log(`Super Terminal → http://localhost:${PORT}`);
   restoreSessions();
 });

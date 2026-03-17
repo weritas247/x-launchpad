@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>CLAUDE // TERMINAL</title>
+  <title>SUPER TERMINAL</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Fira+Code:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Source+Code+Pro:wght@300;400;500;600;700&family=Inconsolata:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Roboto+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
@@ -315,7 +315,7 @@ body.theme-violet{--bg-void:#070510;--bg-deep:#0a0816;--bg-panel:#0d0b1e;--bg-su
   <header id="header">
     <div class="header-logo">
       <div class="logo-icon">⬡</div>
-      CLAUDE<span class="header-slash">/</span>TERMINAL
+      SUPER<span class="header-slash">/</span>TERMINAL
     </div>
     <div class="header-spacer"></div>
     <div class="header-meta">
@@ -356,7 +356,7 @@ body.theme-violet{--bg-void:#070510;--bg-deep:#0a0816;--bg-panel:#0d0b1e;--bg-su
     <div id="terminal-wrapper">
       <div id="empty-state">
         <div class="empty-art">╔══════════════════╗
-║  CLAUDE TERMINAL  ║
+║  SUPER TERMINAL   ║
 ╚══════════════════╝</div>
         <div class="empty-hint">Press <span>+</span> or click <span>New Session</span></div>
         <button class="btn-start" id="btn-start-empty">INIT SESSION</button>
@@ -1663,7 +1663,7 @@ document.getElementById('btn-export').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'claude-terminal-settings.json';
+  a.download = 'super-terminal-settings.json';
   a.click();
 });
 

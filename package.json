@@ -1,7 +1,7 @@
 {
-  "name": "claude-web-terminal",
+  "name": "super-terminal",
   "version": "1.0.0",
-  "description": "Web terminal for Claude CLI using xterm.js + node-pty",
+  "description": "Super Terminal — browser-based multi-session terminal with AI detection, themes, and xterm.js + node-pty",
   "main": "dist/server/index.js",
   "scripts": {
     "build": "tsc",
