@@ -793,6 +793,49 @@ wss.on('connection', (ws: WebSocket) => {
         ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], error: String(e), isRepo: false }));
       }
 
+    } else if (parsed.type === 'git_diff') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const filePath = parsed.filePath as string | undefined;
+      const staged = parsed.staged as boolean || false;
+      const diff = gitService.getGitDiff(session.cwd, filePath, staged);
+      ws.send(JSON.stringify({ type: 'git_diff_data', sessionId: id, filePath, staged, diff }));
+
+    } else if (parsed.type === 'git_stage') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const filePath = parsed.filePath as string;
+      const all = parsed.all as boolean || false;
+      const ok = all ? gitService.gitStageAll(session.cwd) : gitService.gitStageFile(session.cwd, filePath);
+      ws.send(JSON.stringify({ type: 'git_stage_ack', sessionId: id, ok }));
+      // Auto-refresh status after staging
+      if (ok) {
+        const files = gitService.getGitStatus(session.cwd);
+        const branch = gitService.getCurrentBranch(session.cwd);
+        const root = gitService.getGitRoot(session.cwd);
+        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+      }
+
+    } else if (parsed.type === 'git_unstage') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const filePath = parsed.filePath as string;
+      const all = parsed.all as boolean || false;
+      const ok = all ? gitService.gitUnstageAll(session.cwd) : gitService.gitUnstageFile(session.cwd, filePath);
+      ws.send(JSON.stringify({ type: 'git_unstage_ack', sessionId: id, ok }));
+      if (ok) {
+        const files = gitService.getGitStatus(session.cwd);
+        const branch = gitService.getCurrentBranch(session.cwd);
+        const root = gitService.getGitRoot(session.cwd);
+        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+      }
+
     } else if (parsed.type === 'claude_usage') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
       if (!id) return;

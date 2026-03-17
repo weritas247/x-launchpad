@@ -16,7 +16,7 @@ import { initInputPanel, onSessionChange as inputPanelSessionChange } from './in
 import { handleClaudeUsageData, startUsagePolling, onSessionChangeUsage, onAiChangeUsage } from './claude-usage.js';
 import { initActivityBar, getActivePanel } from './activity-bar.js';
 import { initExplorer, handleFileTreeData, onExplorerSessionChange, requestFileTree } from './explorer.js';
-import { initSourceControl, handleGitStatusData, onSourceControlSessionChange } from './source-control.js';
+import { initSourceControl, handleGitStatusData, handleGitDiffData, onSourceControlSessionChange } from './source-control.js';
 
 S.currentTheme = THEMES[0];
 
@@ -104,6 +104,8 @@ function handleMessage(msg) {
     handleFileTreeData(msg);
   } else if (msg.type === 'git_status_data') {
     handleGitStatusData(msg);
+  } else if (msg.type === 'git_diff_data') {
+    handleGitDiffData(msg);
   }
 }
 
@@ -266,5 +268,11 @@ setOnSessionChangeSidePanels(() => {
 
 // Explorer refresh button
 document.getElementById('explorer-refresh')?.addEventListener('click', requestFileTree);
+
+// Diff panel close button
+document.getElementById('sc-diff-close')?.addEventListener('click', () => {
+  const diffPanel = document.getElementById('sc-diff-panel');
+  if (diffPanel) diffPanel.style.display = 'none';
+});
 
 loadSettings().then(() => { connect(handleMessage); startUsagePolling(); });

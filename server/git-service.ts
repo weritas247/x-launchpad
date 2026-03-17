@@ -246,6 +246,56 @@ export function isGitRepo(cwd: string): boolean {
   }
 }
 
+export function getGitDiff(cwd: string, filePath?: string, staged = false): string {
+  try {
+    const args = ['diff'];
+    if (staged) args.push('--cached');
+    args.push('--no-color');
+    if (filePath) args.push('--', filePath);
+    return execFileSync('git', args, {
+      cwd, encoding: 'utf-8', timeout: 5000,
+    });
+  } catch {
+    return '';
+  }
+}
+
+export function gitStageFile(cwd: string, filePath: string): boolean {
+  try {
+    execFileSync('git', ['add', '--', filePath], { cwd, encoding: 'utf-8', timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function gitUnstageFile(cwd: string, filePath: string): boolean {
+  try {
+    execFileSync('git', ['reset', 'HEAD', '--', filePath], { cwd, encoding: 'utf-8', timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function gitStageAll(cwd: string): boolean {
+  try {
+    execFileSync('git', ['add', '-A'], { cwd, encoding: 'utf-8', timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function gitUnstageAll(cwd: string): boolean {
+  try {
+    execFileSync('git', ['reset', 'HEAD'], { cwd, encoding: 'utf-8', timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function getGitRoot(cwd: string): string | null {
   try {
     return execFileSync('git', ['rev-parse', '--show-toplevel'], {

@@ -91,6 +91,8 @@
       <div class="sidebar-header">
         <span class="sidebar-title-text">SOURCE CONTROL</span>
         <div class="sidebar-header-actions">
+          <span class="sc-badge" id="sc-change-count"></span>
+          <button class="btn-icon-sm" id="sc-view-toggle" title="Tree view">≡</button>
           <button class="btn-icon-sm" id="sc-refresh" title="Refresh">↻</button>
         </div>
       </div>
@@ -100,6 +102,13 @@
       </div>
       <div class="sc-empty" id="sc-empty">No changes detected</div>
       <div class="sc-file-list-container" id="sc-file-list"></div>
+      <div class="sc-diff-panel" id="sc-diff-panel" style="display:none">
+        <div class="sc-diff-header">
+          <span class="sc-diff-title">DIFF</span>
+          <button class="btn-icon-sm" id="sc-diff-close" title="Close">✕</button>
+        </div>
+        <div class="sc-diff-content" id="sc-diff-content"></div>
+      </div>
     </div>
   </aside>
 
