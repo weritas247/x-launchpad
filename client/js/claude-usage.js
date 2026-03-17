@@ -3,7 +3,6 @@ import { wsSend } from './websocket.js';
 
 const sbClaudeSep = document.getElementById('sb-claude-sep');
 const sbClaudeUsage = document.getElementById('sb-claude-usage');
-const sbClaudeCost = document.getElementById('sb-claude-cost');
 const sbClaudeTokens = document.getElementById('sb-claude-tokens');
 
 let pollTimer = null;
@@ -15,10 +14,6 @@ function formatTokens(n) {
   return String(n);
 }
 
-function formatCost(c) {
-  return '$' + c.toFixed(2);
-}
-
 export function handleClaudeUsageData(msg) {
   if (msg.sessionId !== S.activeSessionId) return;
   const u = msg.usage;
@@ -27,10 +22,10 @@ export function handleClaudeUsageData(msg) {
     return;
   }
   showUsage();
-  sbClaudeCost.textContent = formatCost(u.totalCost);
   const totalIn = u.inputTokens + u.cacheReadTokens + u.cacheCreateTokens;
-  sbClaudeTokens.textContent = `↑${formatTokens(totalIn)} ↓${formatTokens(u.outputTokens)}`;
-  sbClaudeUsage.title = `Claude Code Usage\nModel: ${u.model || '?'}\nInput: ${u.inputTokens.toLocaleString()}\nOutput: ${u.outputTokens.toLocaleString()}\nCache Read: ${u.cacheReadTokens.toLocaleString()}\nCache Create: ${u.cacheCreateTokens.toLocaleString()}\nCost: ${formatCost(u.totalCost)}`;
+  const pct = Math.min(u.totalCost / 200 * 100, 100).toFixed(1);
+  sbClaudeTokens.textContent = `${pct}% · ↑${formatTokens(totalIn)} ↓${formatTokens(u.outputTokens)}`;
+  sbClaudeUsage.title = `Claude Code Usage (Max $200 plan)\nUsage: ${pct}%\nModel: ${u.model || '?'}\nInput: ${u.inputTokens.toLocaleString()}\nOutput: ${u.outputTokens.toLocaleString()}\nCache Read: ${u.cacheReadTokens.toLocaleString()}\nCache Create: ${u.cacheCreateTokens.toLocaleString()}\nAPI Cost: $${u.totalCost.toFixed(2)}`;
 }
 
 function showUsage() {
