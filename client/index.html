@@ -1650,6 +1650,7 @@ function enterSplitMode(existingSessionId) {
     entry.div.classList.remove('active');
     splitRoot.appendChild(entry.div);
   }
+  tabBar.style.display = 'none';
 }
 
 function teardownSplitLayout() {
@@ -1669,6 +1670,7 @@ function teardownSplitLayout() {
     splitRoot.remove();
     splitRoot = null;
   }
+  tabBar.style.display = '';
 }
 
 function findPaneNode(node, sessionId) {
