@@ -1,0 +1,24 @@
+{
+  "name": "claude-web-terminal",
+  "version": "1.0.0",
+  "description": "Web terminal for Claude CLI using xterm.js + node-pty",
+  "main": "dist/server/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server/index.js",
+    "dev": "ts-node server/index.ts",
+    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper 2>/dev/null || true"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-pty": "^1.1.0",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.5",
+    "@types/ws": "^8.5.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

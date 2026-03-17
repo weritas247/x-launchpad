@@ -1,0 +1,5 @@
+node_modules/
+dist/
+sessions.json
+settings.json
+*.js.map
