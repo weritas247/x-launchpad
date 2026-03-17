@@ -12,6 +12,7 @@ import { createFolder, initFolderDnD } from './folder.js';
 import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, handleGitPullAck, requestBranch, handleGitGraphKeydown } from './git-graph.js';
 import { streamWrite, bypassStream, unbypassStream } from './stream-writer.js';
 import { registerAction, buildCombo, matchCombo, tryKeybinding } from './keyboard.js';
+import { initInputPanel, onSessionChange as inputPanelSessionChange } from './input-panel.js';
 
 S.currentTheme = THEMES[0];
 
@@ -233,5 +234,6 @@ initSettingsUI();
 initSplitDnD();
 initFolderDnD();
 initNotifications();
+initInputPanel();
 
 loadSettings().then(() => connect(handleMessage));

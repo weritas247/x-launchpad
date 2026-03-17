@@ -2,6 +2,7 @@ import { S, terminalMap, sessionMeta, sessionList, sessionEmpty, tabBar, tabAddB
 import { AI_REGISTRY } from './constants.js';
 import { wsSend } from './websocket.js';
 import { xtermKeyHandler } from './keyboard.js';
+import { trackInput } from './input-panel.js';
 import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session.js';
 import { removeSplitPane, teardownSplitLayout, showDropZoneOverlay, hideDropZoneOverlay } from './split-pane.js';
 import { resetTabStatus, tabStatusOnInput } from './tab-status.js';
@@ -211,6 +212,7 @@ export function attachTerminal(sessionId, name) {
     if (S.activeSessionId === sessionId) {
       // Enter pressed with pending images → upload, inject paths, then send Enter
       if (data === '\r' && hasPendingAttachments(sessionId)) {
+        trackInput(sessionId, data);
         uploadAndFlush(sessionId).then(paths => {
           if (paths) wsSend({ type: 'input', sessionId, data: ' ' + paths });
           wsSend({ type: 'input', sessionId, data: '\r' });
@@ -218,6 +220,7 @@ export function attachTerminal(sessionId, name) {
         tabStatusOnInput(sessionId);
         return;
       }
+      trackInput(sessionId, data);
       wsSend({ type: 'input', sessionId, data });
     }
     tabStatusOnInput(sessionId);

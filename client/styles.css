@@ -174,7 +174,33 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .tab-add-btn{height:28px;width:28px;background:none;border:1px solid var(--border);border-bottom:none;border-radius:4px 4px 0 0;color:var(--text-dim);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;font-family:var(--font-mono);line-height:1;flex-shrink:0;margin-left:4px}
 .tab-add-btn:hover{color:var(--accent);border-color:var(--border-lit);background:var(--accent-dim)}
 
+/* ═══ MAIN CONTENT (terminal + input panel) ═══ */
+#main-content{flex:1;display:flex;overflow:hidden;position:relative}
+
 #terminal-wrapper{flex:1;position:relative;overflow:hidden}
+
+/* ═══ INPUT HISTORY PANEL ═══ */
+.input-panel{display:flex;flex-shrink:0;position:relative;transition:width .2s ease}
+.input-panel.collapsed{width:24px}
+.input-panel:not(.collapsed){width:260px;border-left:1px solid var(--border)}
+.input-panel-toggle{position:absolute;left:0;top:0;bottom:0;width:24px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:var(--text-ghost);font-size:12px;z-index:1;background:var(--bg-panel);border-left:1px solid var(--border);transition:all .15s;writing-mode:vertical-rl}
+.input-panel-toggle:hover{color:var(--accent);background:var(--bg-hover)}
+.input-panel.collapsed .input-panel-toggle{writing-mode:vertical-rl}
+.input-panel:not(.collapsed) .input-panel-toggle{writing-mode:initial}
+.input-panel-content{display:none;flex-direction:column;margin-left:24px;width:calc(100% - 24px);background:var(--bg-panel);overflow:hidden}
+.input-panel:not(.collapsed) .input-panel-content{display:flex}
+.input-panel-header{padding:8px 10px;font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--accent);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.input-panel-clear{background:none;border:none;color:var(--text-ghost);cursor:pointer;font-size:11px;font-family:var(--font-mono);padding:2px 4px}
+.input-panel-clear:hover{color:var(--danger)}
+.input-panel-list{flex:1;overflow-y:auto;padding:4px 0}
+.input-panel-list::-webkit-scrollbar{width:3px}
+.input-panel-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.input-entry{padding:6px 10px;font-size:11px;color:var(--text-dim);cursor:pointer;border-bottom:1px solid var(--border);transition:all .12s;display:flex;gap:6px;align-items:flex-start}
+.input-entry:hover{background:var(--bg-hover);color:var(--text-main)}
+.input-entry-num{color:var(--text-ghost);font-size:10px;min-width:18px;text-align:right;flex-shrink:0}
+.input-entry-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono)}
+.input-entry-time{color:var(--text-ghost);font-size:9px;flex-shrink:0}
 .term-pane{position:absolute;inset:0;padding:6px 8px;display:none}
 .term-pane.active{display:block}
 .term-pane .xterm{height:100%}

@@ -92,6 +92,7 @@
       </div>
     </div>
 
+    <div id="main-content">
     <div id="terminal-wrapper">
       <div id="drop-zone-overlay">
         <div class="dz dz-top"    data-zone="top"></div>
@@ -114,6 +115,18 @@
         </div>
       </div>
     </div>
+    <!-- RIGHT PANEL: Input History -->
+    <div id="input-panel" class="input-panel collapsed">
+      <div class="input-panel-toggle" id="input-panel-toggle" title="Input History">▸</div>
+      <div class="input-panel-content">
+        <div class="input-panel-header">
+          <span class="input-panel-title">INPUT HISTORY</span>
+          <button class="input-panel-clear" id="input-panel-clear" title="Clear">✕</button>
+        </div>
+        <div class="input-panel-list" id="input-panel-list"></div>
+      </div>
+    </div>
+    </div><!-- /main-content -->
     <div id="statusbar">
       <span class="sb-item"><span class="sb-accent">●</span><span id="sb-active-name">—</span></span>
       <span class="sb-sep sb-branch-group" id="sb-branch-sep" style="display:none">│</span>

@@ -1,6 +1,7 @@
 import { S, terminalMap, sessionMeta, sbActiveName, sbCount, sbSize, hdrCount, sessionEmpty, emptyState } from './state.js';
 import { requestBranch } from './git-graph.js';
 import { collectPaneIds, teardownSplitLayout } from './split-pane.js';
+import { renderPanel as renderInputPanel } from './input-panel.js';
 
 export function activateSession(id) {
   if (!terminalMap.has(id)) return;
@@ -44,6 +45,7 @@ export function activateSession(id) {
     requestBranch(id);
   }
   updateStatusBar();
+  renderInputPanel();
 }
 
 export function updateStatusBar() {
