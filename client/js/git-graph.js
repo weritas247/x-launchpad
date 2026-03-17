@@ -9,6 +9,7 @@ let cachedCommits = [];
 let githubBaseUrl = null;
 let pendingCheckoutBranch = null;
 let dropdownAbort = null;
+let focusedRowIdx = -1;
 
 // ─── DOM REFS ────────────────────────────────────────
 const overlay   = document.getElementById('git-graph-overlay');
@@ -73,6 +74,7 @@ export function openGitGraph() {
   selectedHash = null;
   cachedCommits = [];
   githubBaseUrl = null;
+  focusedRowIdx = -1;
   restoreModalSize();
   overlay.classList.add('open');
   loading.style.display = 'flex';
@@ -112,6 +114,104 @@ export function closeGitGraph() {
 
 export function isGitGraphOpen() {
   return isOpen;
+}
+
+// ─── KEYBOARD NAVIGATION ─────────────────────────────
+function getRows() {
+  return commitBox.querySelectorAll('.gg-row');
+}
+
+function updateRowFocus(rows, newIdx) {
+  if (focusedRowIdx >= 0 && focusedRowIdx < rows.length) {
+    rows[focusedRowIdx].classList.remove('focused');
+  }
+  focusedRowIdx = newIdx;
+  if (focusedRowIdx >= 0 && focusedRowIdx < rows.length) {
+    const row = rows[focusedRowIdx];
+    row.classList.add('focused');
+    row.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+export function handleGitGraphKeydown(e) {
+  if (!isOpen) return false;
+
+  // Escape — always close modal
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeGitGraph();
+    return true;
+  }
+
+  // Confirm dialog is open — Enter confirms
+  if (confirmEl.style.display === 'flex') {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doCheckout(); return true; }
+    return false;
+  }
+
+  // Branch dropdown is open — arrow/enter navigate it
+  if (branchMenu.classList.contains('open')) {
+    const items = [...branchMenu.querySelectorAll('.gg-branch-item')];
+    if (!items.length) return false;
+    const cur = branchMenu.querySelector('.gg-branch-item.gg-branch-focused');
+    let idx = cur ? items.indexOf(cur) : -1;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (cur) cur.classList.remove('gg-branch-focused');
+      idx = idx < items.length - 1 ? idx + 1 : 0;
+      items[idx].classList.add('gg-branch-focused');
+      items[idx].scrollIntoView({ block: 'nearest' });
+      return true;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (cur) cur.classList.remove('gg-branch-focused');
+      idx = idx > 0 ? idx - 1 : items.length - 1;
+      items[idx].classList.add('gg-branch-focused');
+      items[idx].scrollIntoView({ block: 'nearest' });
+      return true;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (cur) {
+        branchMenu.classList.remove('open');
+        const branch = cur.dataset.branch;
+        if (branch && !cur.classList.contains('current')) {
+          showCheckoutConfirm(branch);
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // Arrow Up/Down — navigate commit rows
+  const rows = getRows();
+  if (!rows.length) return false;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    const newIdx = focusedRowIdx < rows.length - 1 ? focusedRowIdx + 1 : 0;
+    updateRowFocus(rows, newIdx);
+    return true;
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    const newIdx = focusedRowIdx > 0 ? focusedRowIdx - 1 : rows.length - 1;
+    updateRowFocus(rows, newIdx);
+    return true;
+  }
+
+  // Enter — select focused commit
+  if ((e.key === 'Enter' || e.key === ' ') && focusedRowIdx >= 0 && focusedRowIdx < rows.length) {
+    e.preventDefault();
+    const hash = rows[focusedRowIdx].dataset.hash;
+    if (hash) onCommitClick(hash);
+    return true;
+  }
+
+  return false;
 }
 
 // ─── HANDLERS ────────────────────────────────────────

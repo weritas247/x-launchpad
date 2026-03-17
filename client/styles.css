@@ -406,6 +406,8 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .gg-row{height:40px;display:flex;align-items:center;gap:10px;padding:0 14px;cursor:pointer;transition:background .1s;border-bottom:1px solid var(--border);font-size:12px}
 .gg-row:hover{background:var(--bg-hover)}
 .gg-row.selected{background:var(--bg-active);border-left:2px solid var(--accent)}
+.gg-row.focused{background:var(--bg-hover);outline:1px solid var(--accent);outline-offset:-1px}
+.gg-row.focused.selected{background:var(--bg-active)}
 .gg-hash{color:var(--accent);font-size:11px;flex-shrink:0;width:60px;font-weight:500}
 .gg-refs{display:flex;gap:4px;flex-shrink:0}
 .gg-ref{font-size:9px;padding:1px 6px;border-radius:8px;letter-spacing:.04em;font-weight:700;border:1px solid;white-space:nowrap}
@@ -442,7 +444,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .gg-branch-menu::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 .gg-branch-menu-label{padding:6px 12px;font-size:9px;color:var(--text-ghost);letter-spacing:.12em;font-weight:700}
 .gg-branch-item{padding:6px 12px;font-size:11px;cursor:pointer;color:var(--text-main);transition:background .1s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gg-branch-item:hover{background:var(--bg-hover)}
+.gg-branch-item:hover,.gg-branch-item.gg-branch-focused{background:var(--bg-hover)}
 .gg-branch-item.current{color:var(--accent)}
 .gg-branch-item.current::before{content:'● ';font-size:8px}
 .gg-branch-item-remote{color:var(--text-dim)}

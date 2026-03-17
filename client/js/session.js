@@ -1,5 +1,6 @@
 import { S, terminalMap, sessionMeta, sbActiveName, sbCount, sbSize, hdrCount, sessionEmpty, emptyState } from './state.js';
 import { requestBranch } from './git-graph.js';
+import { collectPaneIds, teardownSplitLayout } from './split-pane.js';
 
 export function activateSession(id) {
   if (!terminalMap.has(id)) return;
@@ -13,13 +14,24 @@ export function activateSession(id) {
       sidebarEl.classList.toggle('active', a);
     });
   } else {
-    terminalMap.forEach(({ div, tabEl, sidebarEl }, sid) => {
-      const a = sid === id;
-      div.classList.toggle('split-active', a);
-      div.classList.toggle('split-inactive', !a);
-      tabEl.classList.toggle('active', a);
-      sidebarEl.classList.toggle('active', a);
-    });
+    const paneIds = collectPaneIds(S.layoutTree);
+    if (!paneIds.includes(id)) {
+      teardownSplitLayout();
+      terminalMap.forEach(({ div, tabEl, sidebarEl }, sid) => {
+        const a = sid === id;
+        div.classList.toggle('active', a);
+        tabEl.classList.toggle('active', a);
+        sidebarEl.classList.toggle('active', a);
+      });
+    } else {
+      terminalMap.forEach(({ div, tabEl, sidebarEl }, sid) => {
+        const a = sid === id;
+        div.classList.toggle('split-active', a);
+        div.classList.toggle('split-inactive', !a);
+        tabEl.classList.toggle('active', a);
+        sidebarEl.classList.toggle('active', a);
+      });
+    }
   }
 
   const entry = terminalMap.get(id);

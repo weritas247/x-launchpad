@@ -8,7 +8,7 @@ import { newSession, closeSession, renameSession, syncSessionList, attachTermina
 import { loadSettings, applySettings, openSettings, closeSettings, initSettingsUI } from './settings.js';
 import { aiNotifyCheck, resetNotifyState, initNotifications } from './notifications.js';
 import { createFolder, initFolderDnD } from './folder.js';
-import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, requestBranch } from './git-graph.js';
+import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, requestBranch, handleGitGraphKeydown } from './git-graph.js';
 
 S.currentTheme = THEMES[0];
 
@@ -77,8 +77,10 @@ function handleMessage(msg) {
 document.addEventListener('keydown', e => {
   if (!S.settings) return;
 
+  // Git graph modal handles its own keys (arrows, enter, escape)
+  if (isGitGraphOpen() && handleGitGraphKeydown(e)) return;
+
   if (e.key === 'Escape') {
-    if (isGitGraphOpen()) { closeGitGraph(); return; }
     const picker = document.getElementById('session-picker');
     if (picker.style.display !== 'none') { hideSessionPicker(); return; }
     if (settingsOverlay.classList.contains('open')) { closeSettings(); return; }
