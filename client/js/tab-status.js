@@ -154,22 +154,20 @@ function getLastLine(buf) {
 function updateTabUI(sessionId, status, text) {
   const prev = tabStatusState.get(sessionId);
   if (prev === status) return;
-  console.log(`[tab-status] ${sessionId.slice(0,8)} ${prev} → ${status} (${text})`);
 
   tabStatusState.set(sessionId, status);
 
   const entry = terminalMap.get(sessionId);
   if (!entry) return;
 
-  // Update tab data-status attribute
+  // Update tab bar indicator (dot color only)
   entry.tabEl.dataset.status = status;
-
-  // Update tab-indicator aria-label
   const indicator = entry.tabEl.querySelector('.tab-indicator');
   if (indicator) indicator.setAttribute('aria-label', text);
 
-  // Update status text element
-  const statusTextEl = entry.tabEl.querySelector('.tab-status-text');
+  // Update sidebar item (icon color + status text)
+  entry.sidebarEl.dataset.status = status;
+  const statusTextEl = entry.sidebarEl.querySelector('.session-status-text');
   if (statusTextEl) statusTextEl.textContent = text;
 
   // Handle done → idle auto-transition

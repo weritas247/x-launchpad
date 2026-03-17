@@ -242,6 +242,7 @@ export function createSidebarItem(sessionId, name) {
   const el = document.createElement('div');
   el.className = 'session-item';
   el.dataset.sessionId = sessionId;
+  el.dataset.status = 'idle';
   el.innerHTML = `
     <span class="session-icon">❯</span>
     <div class="session-info">
@@ -249,6 +250,7 @@ export function createSidebarItem(sessionId, name) {
       <div class="session-meta">
         <div class="session-cwd" data-cwd>~</div>
       </div>
+      <div class="session-status-text">대기</div>
     </div>
     <button class="session-close">✕</button>
   `;
@@ -327,7 +329,6 @@ export function createTab(sessionId, name) {
   el.innerHTML = `
     <div class="tab-indicator" aria-label="대기"></div>
     <span class="tab-name">${escHtml(name)}</span>
-    <span class="tab-status-text">대기</span>
     <button class="tab-close-btn">✕</button>
   `;
   el.addEventListener('click', e => {

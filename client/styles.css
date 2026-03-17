@@ -156,9 +156,17 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 [data-status="tool"] .tab-indicator{background:var(--accent2);box-shadow:0 0 4px var(--accent2);opacity:1;animation:none}
 [data-status="question"] .tab-indicator{background:var(--danger);box-shadow:0 0 4px var(--danger);opacity:1;animation:blink 1s ease-in-out infinite}
 [data-status="done"] .tab-indicator{background:var(--ok);box-shadow:0 0 6px var(--ok);opacity:1;animation:none}
-.tab-status-text{font-size:.7em;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;color:var(--text-dim);display:none}
-.tab.active .tab-status-text,.tab.split-active .tab-status-text{display:inline}
-.tab.active,.tab.split-active{max-width:240px}
+/* sidebar session status text */
+.session-status-text{font-size:10px;color:var(--text-ghost);margin-top:2px;transition:color .3s}
+[data-status="thinking"] .session-status-text,[data-status="working"] .session-status-text{color:var(--warn)}
+[data-status="tool"] .session-status-text{color:var(--accent2)}
+[data-status="question"] .session-status-text{color:var(--danger)}
+[data-status="done"] .session-status-text{color:var(--ok)}
+/* sidebar icon color by status */
+.session-item[data-status="thinking"] .session-icon,.session-item[data-status="working"] .session-icon{color:var(--warn);animation:blink 1.5s ease-in-out infinite}
+.session-item[data-status="tool"] .session-icon{color:var(--accent2)}
+.session-item[data-status="question"] .session-icon{color:var(--danger);animation:blink 1s ease-in-out infinite}
+.session-item[data-status="done"] .session-icon{color:var(--ok)}
 .tab-name{overflow:hidden;text-overflow:ellipsis;flex:1}
 .tab-close-btn{background:none;border:none;color:var(--text-ghost);font-size:13px;cursor:pointer;padding:0 2px;font-family:var(--font-mono);line-height:1;flex-shrink:0;opacity:0;transition:opacity .12s}
 .tab:hover .tab-close-btn{opacity:1}
