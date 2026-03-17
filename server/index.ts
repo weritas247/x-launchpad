@@ -121,6 +121,39 @@ app.get('/api/settings/default', (_req, res) => {
   res.json(DEFAULT_SETTINGS);
 });
 
+// ─── IMAGE UPLOAD ─────────────────────────────────────────────────
+app.post('/api/upload-image',
+  express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], limit: '20mb' }),
+  (req, res) => {
+    const sessionId = req.query.sessionId as string;
+    const originalName = req.query.filename as string;
+    if (!sessionId || !originalName) {
+      return res.status(400).json({ ok: false, error: 'Missing sessionId or filename' });
+    }
+    const session = sessions.get(sessionId);
+    if (!session) {
+      return res.status(404).json({ ok: false, error: 'Session not found' });
+    }
+    const targetDir = (session.cwd && fs.existsSync(session.cwd))
+      ? session.cwd
+      : (currentSettings.shell.startDirectory || process.env.HOME || '/tmp');
+    const ext = path.extname(originalName).toLowerCase() || '.png';
+    const allowedExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+    if (!allowedExts.includes(ext)) {
+      return res.status(400).json({ ok: false, error: 'Unsupported image format' });
+    }
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const safeName = `pasted-image-${timestamp}${ext}`;
+    const fullPath = path.join(targetDir, safeName);
+    try {
+      fs.writeFileSync(fullPath, req.body);
+      res.json({ ok: true, filename: safeName, fullPath });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String(e) });
+    }
+  }
+);
+
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../../client/index.html'));
 });

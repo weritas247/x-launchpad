@@ -4,6 +4,7 @@ import { wsSend } from './websocket.js';
 import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session.js';
 import { removeSplitPane, teardownSplitLayout, showDropZoneOverlay, hideDropZoneOverlay } from './split-pane.js';
 import { resetTabStatus, tabStatusOnInput } from './tab-status.js';
+import { setupTerminalImageHandlers } from './image-attach.js';
 
 export function newSession() {
   showSessionPicker();
@@ -230,6 +231,8 @@ export function attachTerminal(sessionId, name) {
   div.addEventListener('mousedown', () => {
     if (S.layoutTree !== null) activateSession(sessionId);
   });
+
+  setupTerminalImageHandlers(div, sessionId);
 
   const sidebarEl = createSidebarItem(sessionId, name);
   const tabEl = createTab(sessionId, name);
