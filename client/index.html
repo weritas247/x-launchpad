@@ -304,6 +304,7 @@ body.theme-blood{--bg-void:#0a0505;--bg-deep:#100808;--bg-panel:#160a0a;--bg-sur
 body.theme-violet{--bg-void:#070510;--bg-deep:#0a0816;--bg-panel:#0d0b1e;--bg-surface:#100e26;--bg-hover:#16143a;--bg-active:#1a1840;--accent:#bf80ff;--accent-dim:#bf80ff20;--accent-glow:#bf80ff40;--accent2:#ff80bf;--border:#1e1840;--border-lit:#bf80ff30;--ok:#80ffbf;--text-bright:#f0e8ff;--text-main:#ddc8ff;--text-dim:#aa88dd}
 
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes crt-flicker{0%,97%,100%{opacity:1}98%{opacity:.92}99%{opacity:.98}}
 #terminal-wrapper{animation:crt-flicker 8s ease-in-out infinite}
   </style>
@@ -323,6 +324,7 @@ body.theme-violet{--bg-void:#070510;--bg-deep:#0a0816;--bg-panel:#0d0b1e;--bg-su
         <span id="conn-label">OFFLINE</span>
       </div>
       <div class="meta-item">SYN <span id="hdr-session-count" class="sb-accent">0</span></div>
+      <div class="meta-item" id="hdr-restore-badge" style="display:none;color:var(--accent);animation:pulse 1s infinite">⟳ RESTORING</div>
       <div class="meta-item" id="hdr-time"></div>
     </div>
     <button class="btn-icon" id="btn-settings" title="Settings (Ctrl+,)">⚙</button>
@@ -1091,15 +1093,38 @@ function renameSession(id, newName) {
 }
 
 function syncSessionList(sessions) {
+  const isInitialLoad = terminalMap.size === 0 && sessions.length > 0;
+
   sessions.forEach(s => {
     if (!sessionMeta.has(s.id)) {
       sessionMeta.set(s.id, { name: s.name, createdAt: s.createdAt });
       attachTerminal(s.id, s.name);
     }
   });
+
   if (!activeSessionId && terminalMap.size > 0) {
     const firstId = terminalMap.keys().next().value;
+    // Activate immediately (don't wait for server round-trip)
+    activateSession(firstId);
     wsSend({ type: 'session_attach', sessionId: firstId });
+    setTimeout(() => {
+      const e = terminalMap.get(firstId);
+      if (e) { e.fitAddon.fit(); wsSend({ type:'resize', sessionId:firstId, cols:e.term.cols, rows:e.term.rows }); }
+    }, 50);
+
+    if (isInitialLoad) {
+      // Show restoring badge in header
+      const badge = document.getElementById('hdr-restore-badge');
+      if (badge) {
+        badge.style.display = '';
+        setTimeout(() => { badge.style.display = 'none'; }, 2000);
+      }
+      // Show restoring message in terminal
+      const e = terminalMap.get(firstId);
+      if (e) {
+        e.term.write('\r\n\x1b[36m  ⟳ Restoring session...\x1b[0m\r\n\r\n');
+      }
+    }
   }
   updateStatusBar();
 }
