@@ -1,12 +1,16 @@
 // ─── STREAMING TERMINAL WRITER ───────────────────────
 // Breaks large chunks into smaller pieces for a gradual typing effect.
 // Small chunks (natural PTY streaming) pass through with minimal delay.
+// Hides cursor during streaming to avoid rapid cursor flickering.
 
 const CHUNK_SIZE = 80;       // chars per write tick
 const TICK_MS = 12;          // ms between ticks (~83 writes/sec)
 const INSTANT_THRESHOLD = 60; // chunks <= this size are written immediately
 
-const buffers = new Map();   // sessionId → { queue: string, timer: null, term: Terminal }
+const CURSOR_HIDE = '\x1b[?25l';
+const CURSOR_SHOW = '\x1b[?25h';
+
+const buffers = new Map();   // sessionId → { queue, timer, term, cursorHidden }
 const bypassed = new Set();  // sessionIds that skip streaming (e.g. session restore)
 
 export function bypassStream(sessionId) { bypassed.add(sessionId); }
@@ -16,7 +20,7 @@ export function streamWrite(sessionId, term, data) {
   if (bypassed.has(sessionId)) { term.write(data); return; }
   let buf = buffers.get(sessionId);
   if (!buf) {
-    buf = { queue: '', timer: null, term };
+    buf = { queue: '', timer: null, term, cursorHidden: false };
     buffers.set(sessionId, buf);
   }
   buf.term = term;
@@ -30,6 +34,12 @@ export function streamWrite(sessionId, term, data) {
     return;
   }
 
+  // Hide cursor when starting to stream
+  if (!buf.cursorHidden) {
+    buf.cursorHidden = true;
+    term.write(CURSOR_HIDE);
+  }
+
   // Start drain loop if not already running
   if (!buf.timer) {
     drain(sessionId);
@@ -39,7 +49,13 @@ export function streamWrite(sessionId, term, data) {
 function drain(sessionId) {
   const buf = buffers.get(sessionId);
   if (!buf || buf.queue.length === 0) {
-    if (buf) buf.timer = null;
+    if (buf) {
+      buf.timer = null;
+      if (buf.cursorHidden) {
+        buf.cursorHidden = false;
+        buf.term.write(CURSOR_SHOW);
+      }
+    }
     return;
   }
 
@@ -51,6 +67,10 @@ function drain(sessionId) {
     buf.timer = setTimeout(() => drain(sessionId), TICK_MS);
   } else {
     buf.timer = null;
+    if (buf.cursorHidden) {
+      buf.cursorHidden = false;
+      buf.term.write(CURSOR_SHOW);
+    }
   }
 }
 
@@ -61,6 +81,10 @@ export function flushStream(sessionId) {
   if (buf.queue.length > 0) {
     buf.term.write(buf.queue);
     buf.queue = '';
+  }
+  if (buf.cursorHidden) {
+    buf.cursorHidden = false;
+    buf.term.write(CURSOR_SHOW);
   }
 }
 
