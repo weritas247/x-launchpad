@@ -123,6 +123,33 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 
 .sidebar-footer{padding:8px 14px;border-top:1px solid var(--border);font-size:10px;color:var(--text-ghost);letter-spacing:.06em;display:flex;align-items:center;justify-content:space-between}
 
+/* ═══ FOLDER ═══ */
+.folder-item{border-left:2px solid transparent;animation:fadeIn .2s ease}
+.folder-header{padding:7px 14px 7px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .12s;color:var(--text-dim);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;user-select:none}
+.folder-header:hover{background:var(--bg-hover);color:var(--text-main)}
+.folder-arrow{font-size:9px;transition:transform .2s;flex-shrink:0;color:var(--text-ghost)}
+.folder-item.open .folder-arrow{transform:rotate(90deg)}
+.folder-icon{font-size:13px;flex-shrink:0}
+.folder-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder-count{font-size:10px;color:var(--text-ghost);font-weight:400}
+.folder-close-btn{background:none;border:none;color:var(--text-ghost);font-size:13px;cursor:pointer;padding:2px 4px;border-radius:2px;opacity:0;transition:opacity .12s;line-height:1;font-family:var(--font-mono)}
+.folder-header:hover .folder-close-btn{opacity:1}
+.folder-close-btn:hover{color:var(--danger)}
+.folder-children{display:none;padding-left:12px}
+.folder-item.open .folder-children{display:block}
+.folder-item.drag-over > .folder-header{background:var(--accent-dim);border-left:2px solid var(--accent)}
+.folder-name-input{background:none;border:none;border-bottom:1px solid var(--accent);color:var(--text-bright);font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;outline:none;width:100%;padding:0}
+/* Tab DnD */
+.tab.dragging{opacity:.4;cursor:grabbing}
+.tab.drag-over{border-left:2px solid var(--accent);background:var(--accent-dim)}
+.tab{cursor:grab}
+/* Sidebar new-folder btn */
+.btn-folder{background:none;border:1px solid var(--border);border-radius:3px;color:var(--text-dim);font-family:var(--font-mono);font-size:11px;width:22px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;line-height:1}
+.btn-folder:hover{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.sidebar-header-actions{display:flex;gap:4px}
+/* Session indent inside folder */
+.folder-children .session-item{padding-left:8px}
+
 /* ═══ MAIN ═══ */
 #main{grid-area:main;display:flex;flex-direction:column;background:var(--bg-deep);overflow:hidden}
 #tab-bar{height:36px;background:var(--bg-panel);border-bottom:1px solid var(--border);display:flex;align-items:flex-end;padding:0 0 0 4px;gap:2px;flex-shrink:0;overflow-x:auto}
@@ -341,7 +368,10 @@ body.theme-violet{--bg-void:#070510;--bg-deep:#0a0816;--bg-panel:#0d0b1e;--bg-su
   <aside id="sidebar">
     <div class="sidebar-header">
       <span class="sidebar-title-text">SESSIONS</span>
-      <button class="btn-new" id="btn-new-session" title="New session">+</button>
+      <div class="sidebar-header-actions">
+        <button class="btn-folder" id="btn-new-folder" title="New folder">▶</button>
+        <button class="btn-new" id="btn-new-session" title="New session">+</button>
+      </div>
     </div>
     <div class="session-list" id="session-list">
       <div class="session-empty" id="session-empty">No active sessions.<br/>Press <span style="color:var(--accent)">+</span> to start.</div>
@@ -1209,6 +1239,7 @@ function createSidebarItem(sessionId, name) {
     wsSend({ type:'session_attach', sessionId });
   });
   el.addEventListener('contextmenu', e => showCtxMenu(e, sessionId));
+  makeSidebarItemDraggable(el, sessionId);
   sessionEmpty.style.display = 'none';
   sessionList.appendChild(el);
   return el;
@@ -1267,6 +1298,7 @@ function updateSessionInfo(sessionId, cwd, ai) {
 function createTab(sessionId, name) {
   const el = document.createElement('div');
   el.className = 'tab';
+  el.draggable = true;
   el.dataset.sessionId = sessionId;
   el.innerHTML = `
     <div class="tab-indicator"></div>
@@ -1278,6 +1310,42 @@ function createTab(sessionId, name) {
     activateSession(sessionId);
     wsSend({ type:'session_attach', sessionId });
   });
+
+  // ── Tab DnD ──
+  el.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/tab-session', sessionId);
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => el.classList.add('dragging'), 0);
+  });
+  el.addEventListener('dragend', () => {
+    el.classList.remove('dragging');
+    document.querySelectorAll('.tab.drag-over').forEach(t => t.classList.remove('drag-over'));
+  });
+  el.addEventListener('dragover', e => {
+    e.preventDefault();
+    const src = e.dataTransfer.types.includes('text/tab-session');
+    if (src && e.currentTarget !== document.querySelector('.tab.dragging')) {
+      document.querySelectorAll('.tab.drag-over').forEach(t => t.classList.remove('drag-over'));
+      el.classList.add('drag-over');
+    }
+  });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+  el.addEventListener('drop', e => {
+    e.preventDefault();
+    const srcId = e.dataTransfer.getData('text/tab-session');
+    el.classList.remove('drag-over');
+    if (srcId && srcId !== sessionId) {
+      const srcEl = tabBar.querySelector(`[data-session-id="${srcId}"]`);
+      if (srcEl) {
+        const tabs = [...tabBar.querySelectorAll('.tab')];
+        const srcIdx = tabs.indexOf(srcEl);
+        const tgtIdx = tabs.indexOf(el);
+        if (srcIdx < tgtIdx) tabBar.insertBefore(srcEl, el.nextSibling);
+        else tabBar.insertBefore(srcEl, el);
+      }
+    }
+  });
+
   tabBar.insertBefore(el, tabAddBtn);
   return el;
 }
@@ -1761,6 +1829,157 @@ window.addEventListener('resize', () => {
 document.getElementById('btn-new-session').addEventListener('click', newSession);
 tabAddBtn.addEventListener('click', newSession);
 document.getElementById('btn-start-empty').addEventListener('click', newSession);
+document.getElementById('btn-new-folder').addEventListener('click', createFolder);
+
+// ═══════════════════════════════════════════════════
+//  FOLDER SYSTEM
+// ═══════════════════════════════════════════════════
+const folderMap = new Map(); // folderId → { el, name, open }
+let folderCounter = 0;
+
+function createFolder(name) {
+  const id = 'folder-' + (++folderCounter);
+  const folderName = (typeof name === 'string' && name) ? name : 'Folder ' + folderCounter;
+
+  const el = document.createElement('div');
+  el.className = 'folder-item open';
+  el.dataset.folderId = id;
+  el.innerHTML = `
+    <div class="folder-header">
+      <span class="folder-arrow">▶</span>
+      <span class="folder-icon">📁</span>
+      <span class="folder-name">${escHtml(folderName)}</span>
+      <span class="folder-count"></span>
+      <button class="folder-close-btn" title="Delete folder">✕</button>
+    </div>
+    <div class="folder-children"></div>
+  `;
+
+  const header = el.querySelector('.folder-header');
+  const children = el.querySelector('.folder-children');
+  const nameEl = el.querySelector('.folder-name');
+  const countEl = el.querySelector('.folder-count');
+  const closeBtn = el.querySelector('.folder-close-btn');
+
+  // Toggle open/close
+  header.addEventListener('click', e => {
+    if (e.target.closest('.folder-close-btn')) return;
+    el.classList.toggle('open');
+    el.querySelector('.folder-icon').textContent = el.classList.contains('open') ? '📂' : '📁';
+  });
+
+  // Double-click to rename
+  nameEl.addEventListener('dblclick', e => {
+    e.stopPropagation();
+    const input = document.createElement('input');
+    input.className = 'folder-name-input';
+    input.value = nameEl.textContent;
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+    const commit = () => {
+      const newName = input.value.trim() || folderName;
+      const span = document.createElement('span');
+      span.className = 'folder-name';
+      span.textContent = newName;
+      span.addEventListener('dblclick', arguments.callee = undefined);
+      input.replaceWith(span);
+      folderMap.get(id).name = newName;
+      // re-attach dblclick
+      span.addEventListener('dblclick', ev => { ev.stopPropagation(); nameEl.dispatchEvent(new Event('dblclick')); });
+    };
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', e => { if (e.key==='Enter') commit(); if (e.key==='Escape') { input.value=nameEl.textContent; commit(); } });
+  });
+
+  // Delete folder — move sessions out first
+  closeBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const sessionList = document.getElementById('session-list');
+    [...children.querySelectorAll('.session-item')].forEach(s => sessionList.appendChild(s));
+    el.remove();
+    folderMap.delete(id);
+  });
+
+  // Drag-over for dropping sessions into folder
+  el.addEventListener('dragover', e => {
+    if (e.dataTransfer.types.includes('text/sidebar-session')) {
+      e.preventDefault();
+      e.stopPropagation();
+      el.classList.add('drag-over');
+    }
+  });
+  el.addEventListener('dragleave', e => {
+    if (!el.contains(e.relatedTarget)) el.classList.remove('drag-over');
+  });
+  el.addEventListener('drop', e => {
+    const srcId = e.dataTransfer.getData('text/sidebar-session');
+    el.classList.remove('drag-over');
+    if (!srcId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const entry = terminalMap.get(srcId);
+    if (entry) {
+      children.appendChild(entry.sidebarEl);
+      el.classList.add('open');
+      el.querySelector('.folder-icon').textContent = '📂';
+      updateFolderCount(countEl, children);
+    }
+  });
+
+  document.getElementById('session-list').appendChild(el);
+  folderMap.set(id, { el, name: folderName, open: true });
+  updateFolderCount(countEl, children);
+  return el;
+}
+
+function updateFolderCount(countEl, children) {
+  const n = children.querySelectorAll('.session-item').length;
+  countEl.textContent = n > 0 ? `(${n})` : '';
+}
+
+// Make sidebar session items draggable for folder drops
+function makeSidebarItemDraggable(el, sessionId) {
+  el.draggable = true;
+  el.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/sidebar-session', sessionId);
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => el.style.opacity = '0.4', 0);
+  });
+  el.addEventListener('dragend', () => {
+    el.style.opacity = '';
+    document.querySelectorAll('.folder-item.drag-over').forEach(f => f.classList.remove('drag-over'));
+    // Also allow drop onto session-list (root) to ungroup
+    document.getElementById('session-list').classList.remove('drag-over-root');
+  });
+}
+
+// Allow dropping back to root session list
+const sessionListEl = document.getElementById('session-list');
+sessionListEl.addEventListener('dragover', e => {
+  if (e.dataTransfer.types.includes('text/sidebar-session') && e.target === sessionListEl) {
+    e.preventDefault();
+    sessionListEl.classList.add('drag-over-root');
+  }
+});
+sessionListEl.addEventListener('dragleave', e => {
+  if (!sessionListEl.contains(e.relatedTarget)) sessionListEl.classList.remove('drag-over-root');
+});
+sessionListEl.addEventListener('drop', e => {
+  const srcId = e.dataTransfer.getData('text/sidebar-session');
+  sessionListEl.classList.remove('drag-over-root');
+  if (!srcId) return;
+  const entry = terminalMap.get(srcId);
+  if (entry && entry.sidebarEl.closest('.folder-children')) {
+    e.preventDefault();
+    sessionListEl.insertBefore(entry.sidebarEl, document.getElementById('session-empty'));
+    // update folder counts
+    document.querySelectorAll('.folder-children').forEach(fc => {
+      const folder = fc.closest('.folder-item');
+      if (folder) updateFolderCount(folder.querySelector('.folder-count'), fc);
+    });
+  }
+});
 
 // ═══════════════════════════════════════════════════
 //  UTILS
