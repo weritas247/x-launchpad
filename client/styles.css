@@ -180,7 +180,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 #terminal-wrapper{flex:1;position:relative;overflow:hidden}
 
 /* ═══ INPUT HISTORY PANEL ═══ */
-.input-panel{display:flex;flex-shrink:0;position:relative;transition:width .2s ease}
+.input-panel{display:flex;position:absolute;right:0;top:0;bottom:0;z-index:10;transition:width .2s ease}
 .input-panel.collapsed{width:24px}
 .input-panel:not(.collapsed){width:260px;border-left:1px solid var(--border)}
 .input-panel-toggle{position:absolute;left:0;top:0;bottom:0;width:24px;display:flex;align-items:center;justify-content:center;
