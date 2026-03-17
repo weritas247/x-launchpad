@@ -228,6 +228,25 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   sessions.set(id, session);
 
   // PTY output → clients with this session active OR subscribed
+  // Batch rapid output chunks to avoid per-character streaming flicker
+  let outputBuf = '';
+  let flushTimer: ReturnType<typeof setTimeout> | null = null;
+  const FLUSH_DELAY = 16; // ms — batch within one animation frame
+
+  function flushOutput() {
+    flushTimer = null;
+    if (!outputBuf) return;
+    const msg = JSON.stringify({ type: 'output', sessionId: id, data: outputBuf });
+    outputBuf = '';
+    wss.clients.forEach(c => {
+      const cws = c as WebSocket;
+      if (cws.readyState !== WebSocket.OPEN) return;
+      const active = wsSession.get(cws) === id;
+      const subscribed = wsSubscriptions.get(cws)?.has(id) ?? false;
+      if (active || subscribed) cws.send(msg);
+    });
+  }
+
   ptyProcess.onData((chunk: string) => {
     // Strip inline image protocols that xterm.js cannot render:
     // - iTerm2 inline images: OSC 1337 ; File=... ST
@@ -236,14 +255,20 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
       .replace(/\x1b\]1337;[^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
       .replace(/\x1bP[pq][^\x1b]*\x1b\\/g, '');
     if (!filtered) return;
-    const msg = JSON.stringify({ type: 'output', sessionId: id, data: filtered });
-    wss.clients.forEach(c => {
-      const cws = c as WebSocket;
-      if (cws.readyState !== WebSocket.OPEN) return;
-      const active = wsSession.get(cws) === id;
-      const subscribed = wsSubscriptions.get(cws)?.has(id) ?? false;
-      if (active || subscribed) cws.send(msg);
-    });
+
+    outputBuf += filtered;
+
+    // Flush immediately if buffer is large (interactive responsiveness)
+    if (outputBuf.length > 64 * 1024) {
+      if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+      flushOutput();
+      return;
+    }
+
+    // Otherwise debounce — batch rapid small chunks together
+    if (!flushTimer) {
+      flushTimer = setTimeout(flushOutput, FLUSH_DELAY);
+    }
   });
 
   ptyProcess.onExit(({ exitCode }) => {
