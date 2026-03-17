@@ -761,6 +761,38 @@ wss.on('connection', (ws: WebSocket) => {
       session.pty.write('git pull\r');
       ws.send(JSON.stringify({ type: 'git_pull_ack', sessionId: id }));
 
+    } else if (parsed.type === 'file_tree') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const targetDir = (parsed.dir as string) || session.cwd;
+      try {
+        const tree = gitService.getFileTree(targetDir);
+        ws.send(JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree }));
+      } catch (e) {
+        ws.send(JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree: [], error: String(e) }));
+      }
+
+    } else if (parsed.type === 'git_status') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      try {
+        const isRepo = gitService.isGitRepo(session.cwd);
+        if (!isRepo) {
+          ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], isRepo: false }));
+          return;
+        }
+        const files = gitService.getGitStatus(session.cwd);
+        const branch = gitService.getCurrentBranch(session.cwd);
+        const root = gitService.getGitRoot(session.cwd);
+        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+      } catch (e) {
+        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], error: String(e), isRepo: false }));
+      }
+
     } else if (parsed.type === 'claude_usage') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
       if (!id) return;

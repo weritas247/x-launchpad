@@ -151,3 +151,107 @@ export function getRemoteUrl(cwd: string, remote = 'origin'): string | null {
     return null;
   }
 }
+
+// ─── FILE TREE ───────────────────────────────────────────────────
+export interface TreeEntry {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  children?: TreeEntry[];
+}
+
+export function getFileTree(dirPath: string, depth = 3): TreeEntry[] {
+  const fs = require('fs') as typeof import('fs');
+  const path = require('path') as typeof import('path');
+  const IGNORED = new Set(['.git', 'node_modules', '.next', '.nuxt', 'dist', '__pycache__', '.cache', '.DS_Store', 'Thumbs.db']);
+
+  function walk(dir: string, currentDepth: number): TreeEntry[] {
+    if (currentDepth > depth) return [];
+    let entries: string[];
+    try { entries = fs.readdirSync(dir); } catch { return []; }
+
+    const result: TreeEntry[] = [];
+    const dirs: TreeEntry[] = [];
+    const files: TreeEntry[] = [];
+
+    for (const name of entries) {
+      if (IGNORED.has(name)) continue;
+      const fullPath = path.join(dir, name);
+      const relativePath = path.relative(dirPath, fullPath);
+      let stat;
+      try { stat = fs.statSync(fullPath); } catch { continue; }
+
+      if (stat.isDirectory()) {
+        dirs.push({
+          name,
+          path: relativePath,
+          type: 'directory',
+          children: walk(fullPath, currentDepth + 1),
+        });
+      } else {
+        files.push({ name, path: relativePath, type: 'file' });
+      }
+    }
+
+    // Sort: directories first, then files, both alphabetically
+    dirs.sort((a, b) => a.name.localeCompare(b.name));
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    return [...dirs, ...files];
+  }
+
+  return walk(dirPath, 0);
+}
+
+// ─── GIT STATUS ──────────────────────────────────────────────────
+export interface GitStatusEntry {
+  status: string;   // 'M', 'A', 'D', '??', 'R', 'C', 'U', 'MM', etc.
+  path: string;
+  staged: boolean;
+}
+
+export function getGitStatus(cwd: string): GitStatusEntry[] {
+  try {
+    const raw = execFileSync('git', ['status', '--porcelain', '-u'], {
+      cwd, encoding: 'utf-8', timeout: 5000,
+    }).trim();
+    if (!raw) return [];
+
+    return raw.split('\n').filter(Boolean).map(line => {
+      const x = line[0]; // index status
+      const y = line[1]; // worktree status
+      const filePath = line.slice(3);
+
+      // Determine display status and staged flag
+      if (x === '?' && y === '?') {
+        return { status: 'U', path: filePath, staged: false }; // Untracked
+      }
+      if (x !== ' ' && x !== '?') {
+        return { status: x, path: filePath, staged: true }; // Staged change
+      }
+      return { status: y, path: filePath, staged: false }; // Unstaged change
+    });
+  } catch {
+    return [];
+  }
+}
+
+export function isGitRepo(cwd: string): boolean {
+  try {
+    execFileSync('git', ['rev-parse', '--is-inside-work-tree'], {
+      cwd, encoding: 'utf-8', timeout: 2000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function getGitRoot(cwd: string): string | null {
+  try {
+    return execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd, encoding: 'utf-8', timeout: 2000,
+    }).trim() || null;
+  } catch {
+    return null;
+  }
+}
