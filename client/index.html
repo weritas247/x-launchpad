@@ -117,6 +117,8 @@
     <div id="statusbar">
       <span class="sb-item"><span class="sb-accent">●</span><span id="sb-active-name">—</span></span>
       <span class="sb-sep">│</span>
+      <span class="sb-item sb-branch" id="sb-branch" style="display:none;cursor:pointer" title="Git Graph (Ctrl+G)"><span class="sb-accent">⎇</span> <span id="sb-branch-name"></span></span>
+      <span class="sb-sep">│</span>
       <span class="sb-item">SESS: <span id="sb-count" class="sb-accent">0</span></span>
       <span class="sb-spacer"></span>
       <span class="sb-item" id="sb-size">—</span>
@@ -126,6 +128,39 @@
       <span class="sb-item" id="sb-clock">00:00:00</span>
     </div>
   </main>
+</div>
+
+<!-- GIT GRAPH OVERLAY -->
+<div id="git-graph-overlay">
+  <div id="git-graph-modal">
+    <div class="gg-titlebar">
+      <span class="gg-title-icon">⎇</span>
+      <span class="gg-repo-name" id="gg-repo-name"></span>
+      <span class="gg-branch-badge" id="gg-branch-badge"></span>
+      <span style="flex:1"></span>
+      <button class="settings-close" id="gg-close">✕</button>
+    </div>
+    <div class="gg-body" id="gg-body">
+      <div class="gg-loading" id="gg-loading">
+        <div class="gg-spinner"></div>
+        <span>Loading git history...</span>
+      </div>
+      <div class="gg-error" id="gg-error" style="display:none"></div>
+      <div class="gg-content" id="gg-content" style="display:none">
+        <div class="gg-scroll" id="gg-scroll">
+          <svg class="gg-svg" id="gg-svg"></svg>
+          <div class="gg-commits" id="gg-commits"></div>
+        </div>
+        <div class="gg-file-panel" id="gg-file-panel" style="display:none">
+          <div class="gg-file-header">
+            <span class="gg-file-title" id="gg-file-title">Changed files</span>
+            <button class="gg-file-close" id="gg-file-close">✕</button>
+          </div>
+          <div class="gg-file-list" id="gg-file-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- CONTEXT MENU -->
