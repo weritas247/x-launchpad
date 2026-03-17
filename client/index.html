@@ -285,6 +285,18 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .theme-card-check{position:absolute;top:6px;right:8px;font-size:12px;color:var(--accent);display:none}
 .theme-card.active .theme-card-check{display:block}
 
+/* ═══ TOAST NOTIFICATIONS ═══ */
+#toast-container{position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:var(--bg-surface);border:1px solid var(--border-lit);border-left:3px solid var(--accent);border-radius:6px;padding:12px 36px 12px 14px;min-width:260px;max-width:340px;pointer-events:all;cursor:pointer;box-shadow:0 4px 24px rgba(0,0,0,.6),0 0 12px var(--accent-dim);animation:toast-in .25s cubic-bezier(.34,1.56,.64,1);position:relative}
+.toast:hover{border-color:var(--accent);box-shadow:0 4px 28px rgba(0,0,0,.7),0 0 18px var(--accent-dim)}
+.toast-title{font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin-bottom:4px}
+.toast-body{font-size:11px;color:var(--text-main);letter-spacing:.03em;line-height:1.5}
+.toast-close{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--text-ghost);font-size:13px;cursor:pointer;padding:2px 4px;border-radius:2px;font-family:var(--font-mono);line-height:1}
+.toast-close:hover{color:var(--danger)}
+.toast-hide{animation:toast-out .3s ease forwards}
+@keyframes toast-in{from{opacity:0;transform:translateX(20px) scale(.95)}to{opacity:1;transform:translateX(0) scale(1)}}
+@keyframes toast-out{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(24px)}}
+
 /* Font preview */
 .font-preview{margin-top:8px;padding:10px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:4px;font-size:13px;color:var(--text-main);line-height:1.5;transition:font-family .3s}
 
@@ -1066,7 +1078,10 @@ function connect() {
       updateSessionInfo(msg.sessionId, msg.cwd, msg.ai);
     } else if (msg.type === 'output') {
       const entry = terminalMap.get(msg.sessionId);
-      if (entry) entry.term.write(msg.data);
+      if (entry) {
+        entry.term.write(msg.data);
+        aiNotifyCheck(msg.sessionId, msg.data);
+      }
     }
   };
 
@@ -1086,6 +1101,7 @@ function setWsStatus(online) {
 }
 
 function wsSend(obj) {
+  if (obj.type === 'input' && obj.sessionId) resetNotifyState(obj.sessionId);
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
 }
 
@@ -1822,6 +1838,163 @@ function switchTabBy(dir) {
 window.addEventListener('resize', () => {
   terminalMap.forEach(({ fitAddon }) => fitAddon.fit());
 });
+
+// ═══════════════════════════════════════════════════
+//  AI NOTIFICATION SYSTEM
+// ═══════════════════════════════════════════════════
+
+// Request notification permission on load
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+
+// Strip ANSI escape codes from terminal output
+function stripAnsi(str) {
+  return str.replace(/\x1b\[[0-9;]*[mGKHFABCDJsuhl]/g, '')
+            .replace(/\x1b\][^\x07]*\x07/g, '')
+            .replace(/\x1b[()][AB012]/g, '')
+            .replace(/[\x00-\x09\x0b-\x1f]/g, '');
+}
+
+// Per-session output buffers and debounce timers
+const notifyBuffers = new Map();   // sessionId → string (rolling 2KB)
+const notifyTimers  = new Map();   // sessionId → setTimeout handle
+const notifyState   = new Map();   // sessionId → 'idle' | 'busy'
+const NOTIFY_DEBOUNCE = 1200;      // ms of silence before checking
+
+// AI completion/question patterns
+const AI_PATTERNS = [
+  // Claude Code
+  { re: />\s*$/m,                                      ai:'claude',   type:'question', msg:'Claude is waiting for your input' },
+  { re: /✓|✔|Task complete|Done\.|Completed\./i,       ai:'claude',   type:'done',     msg:'Claude finished the task' },
+
+  // opencode
+  { re: /\?\s*$/m,                                     ai:'opencode', type:'question', msg:'opencode is asking a question' },
+  { re: /Done|Completed|Finished/i,                    ai:'opencode', type:'done',     msg:'opencode finished the task' },
+
+  // Gemini
+  { re: /^>\s*$/m,                                     ai:'gemini',   type:'question', msg:'Gemini is waiting for input' },
+  { re: /Done\.|Task complete|Finished/i,              ai:'gemini',   type:'done',     msg:'Gemini finished the task' },
+
+  // Aider
+  { re: /^aider>\s*$/im,                               ai:'aider',    type:'question', msg:'Aider is waiting for input' },
+  { re: /^Tokens:|Applied edit/im,                     ai:'aider',    type:'done',     msg:'Aider finished editing' },
+
+  // Generic — prompt symbol after silence (catches most CLIs)
+  { re: /[\$❯›»]\s*$/m,                                ai:'any',      type:'question', msg:'Terminal is waiting for input' },
+];
+
+const AI_ICONS = {
+  claude:   '🤖', chatgpt: '🟢', gemini: '✨',
+  copilot:  '🛸', aider:   '🪄', cursor: '⚡',
+  opencode: '🔶', any:     '💻',
+};
+
+function aiNotifyCheck(sessionId, chunk) {
+  // Skip if this is the active (focused) tab and the page is visible
+  if (document.visibilityState === 'visible' && sessionId === activeSessionId) return;
+
+  const currentAi = sessionMeta.get(sessionId)?.ai || null;
+
+  // Accumulate output (keep last 4KB)
+  const prev = notifyBuffers.get(sessionId) || '';
+  const next = (prev + chunk).slice(-4096);
+  notifyBuffers.set(sessionId, next);
+
+  // Debounce: wait for silence
+  clearTimeout(notifyTimers.get(sessionId));
+  notifyTimers.set(sessionId, setTimeout(() => {
+    const buf = stripAnsi(notifyBuffers.get(sessionId) || '');
+    notifyBuffers.set(sessionId, ''); // clear after check
+
+    let matched = null;
+    for (const p of AI_PATTERNS) {
+      // If pattern is AI-specific, only fire when that AI is active
+      if (p.ai !== 'any' && currentAi && p.ai !== currentAi) continue;
+      if (p.re.test(buf)) { matched = p; break; }
+    }
+    if (!matched) return;
+
+    const prevState = notifyState.get(sessionId);
+    // Avoid repeated same-type notifications
+    if (prevState === matched.type) return;
+    notifyState.set(sessionId, matched.type);
+
+    const meta = sessionMeta.get(sessionId);
+    const sessName = meta?.name || sessionId;
+    const icon = AI_ICONS[currentAi || 'any'] || '💻';
+    const title = matched.type === 'done'
+      ? `${icon} Task Done — ${sessName}`
+      : `${icon} Needs Input — ${sessName}`;
+    const body = matched.msg;
+
+    sendNotification(title, body, sessionId);
+  }, NOTIFY_DEBOUNCE));
+}
+
+// Reset notify state when user interacts with a session
+function resetNotifyState(sessionId) {
+  notifyState.set(sessionId, 'idle');
+  notifyBuffers.set(sessionId, '');
+  clearTimeout(notifyTimers.get(sessionId));
+}
+
+function sendNotification(title, body, sessionId) {
+  // Browser Notification API
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const n = new Notification(title, {
+      body,
+      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="%2300ffe5" opacity=".15"/><polyline points="10,7 6,16 14,16 10,25 22,13 15,13 19,7" fill="%2300ffe5"/></svg>',
+      tag: `super-terminal-${sessionId}`,
+      silent: false,
+    });
+    n.onclick = () => {
+      window.focus();
+      if (terminalMap.has(sessionId)) {
+        activateSession(sessionId);
+        wsSend({ type:'session_attach', sessionId });
+      }
+      n.close();
+    };
+  }
+
+  // In-app toast (always shown regardless of permission)
+  showToast(title, body, sessionId);
+}
+
+// ── In-app Toast ──────────────────────────────────
+let toastContainer = null;
+function getToastContainer() {
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'toast-container';
+    document.body.appendChild(toastContainer);
+  }
+  return toastContainer;
+}
+
+function showToast(title, body, sessionId) {
+  const c = getToastContainer();
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `
+    <div class="toast-title">${escHtml(title)}</div>
+    <div class="toast-body">${escHtml(body)}</div>
+    <button class="toast-close">✕</button>
+  `;
+  t.addEventListener('click', e => {
+    if (e.target.closest('.toast-close')) { t.remove(); return; }
+    if (terminalMap.has(sessionId)) {
+      activateSession(sessionId);
+      wsSend({ type:'session_attach', sessionId });
+    }
+    t.remove();
+  });
+  c.appendChild(t);
+  // Auto-dismiss after 6s
+  setTimeout(() => t.classList.add('toast-hide'), 5500);
+  setTimeout(() => { if (t.parentNode) t.remove(); }, 6200);
+}
 
 // ═══════════════════════════════════════════════════
 //  BUTTONS
