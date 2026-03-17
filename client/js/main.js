@@ -1,5 +1,5 @@
 import { S, terminalMap, sessionMeta, sbClock, tabAddBtn, settingsOverlay } from './state.js';
-import { THEMES, normalizeKey } from './constants.js';
+import { THEMES } from './constants.js';
 import { connect, wsSend, setOnInputSend } from './websocket.js';
 import { initThemeSwatches } from './themes.js';
 import { activateSession, updateStatusBar } from './session.js';
@@ -11,6 +11,7 @@ import { tabStatusCheck, tabStatusOnAiChange, suppressTabStatus } from './tab-st
 import { createFolder, initFolderDnD } from './folder.js';
 import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, handleGitPullAck, requestBranch, handleGitGraphKeydown } from './git-graph.js';
 import { streamWrite, bypassStream, unbypassStream } from './stream-writer.js';
+import { registerAction, buildCombo, matchCombo, tryKeybinding } from './keyboard.js';
 
 S.currentTheme = THEMES[0];
 
@@ -87,6 +88,17 @@ function handleMessage(msg) {
   }
 }
 
+// ─── REGISTER KEYBINDING ACTIONS ─────────────────────
+registerAction('newSession',    () => newSession());
+registerAction('closeSession',  () => { if (S.activeSessionId) closeSession(S.activeSessionId); });
+registerAction('openSettings',  () => openSettings());
+registerAction('fullscreen',    () => toggleFullscreen());
+registerAction('nextTab',       () => switchTabBy(1));
+registerAction('prevTab',       () => switchTabBy(-1));
+registerAction('renameSession', () => { if (S.activeSessionId) promptRenameSession(S.activeSessionId); });
+registerAction('clearTerminal', () => clearActiveTerminal());
+registerAction('gitGraph',      () => { isGitGraphOpen() ? closeGitGraph() : openGitGraph(); });
+
 document.addEventListener('keydown', e => {
   if (!S.settings) return;
 
@@ -101,66 +113,24 @@ document.addEventListener('keydown', e => {
 
   if (settingsOverlay.classList.contains('open')) return;
 
+  // Split pane navigation: Ctrl+Shift+Arrow
   if (e.ctrlKey && e.shiftKey && S.layoutTree !== null) {
     const dirs = { ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down' };
     const dir = dirs[e.key];
     if (dir) {
       e.preventDefault();
-      const panes = [];
-      function collectPanes(node) {
-        if (!node) return;
-        if (node.type === 'pane') {
-          const rect = node.element.getBoundingClientRect();
-          panes.push({ sessionId: node.sessionId, cx: rect.left + rect.width/2, cy: rect.top + rect.height/2 });
-        } else { node.children.forEach(collectPanes); }
-      }
-      collectPanes(S.layoutTree);
-      const activeEntry = terminalMap.get(S.activeSessionId);
-      if (!activeEntry) return;
-      const ar = activeEntry.div.getBoundingClientRect();
-      const ax = ar.left + ar.width/2, ay = ar.top + ar.height/2;
-      const coneMap = { left: Math.PI, right: 0, up: -Math.PI/2, down: Math.PI/2 };
-      const targetAngle = coneMap[dir];
-      let best = null, bestDist = Infinity;
-      panes.forEach(p => {
-        if (p.sessionId === S.activeSessionId) return;
-        const dx = p.cx - ax, dy = p.cy - ay;
-        const angle = Math.atan2(dy, dx);
-        let diff = angle - targetAngle;
-        while (diff > Math.PI) diff -= 2*Math.PI;
-        while (diff < -Math.PI) diff += 2*Math.PI;
-        if (Math.abs(diff) <= Math.PI/4) {
-          const primaryDist = (dir === 'left' || dir === 'right') ? Math.abs(dx) : Math.abs(dy);
-          if (primaryDist < bestDist) { bestDist = primaryDist; best = p; }
-        }
-      });
-      if (best) activateSession(best.sessionId);
+      navigateSplitPane(dir);
       return;
     }
   }
 
-  const parts = [];
-  if (e.ctrlKey) parts.push('Ctrl');
-  if (e.shiftKey) parts.push('Shift');
-  if (e.altKey) parts.push('Alt');
-  if (e.metaKey) parts.push('Meta');
-  const nk = normalizeKey(e);
-  if (!['Control','Shift','Alt','Meta'].includes(e.key)) parts.push(nk);
-  const combo = parts.join('+');
+  // Centralized keybinding handling
+  if (tryKeybinding(e)) return;
 
-  const kb = S.settings.keybindings || {};
-  if (combo === kb.newSession)   { e.preventDefault(); newSession(); }
-  if (combo === kb.closeSession && S.activeSessionId) { e.preventDefault(); closeSession(S.activeSessionId); }
-  if (combo === kb.openSettings) { e.preventDefault(); openSettings(); }
-  if (combo === kb.fullscreen)   { e.preventDefault(); toggleFullscreen(); }
-  if (combo === kb.nextTab)      { e.preventDefault(); switchTabBy(1); }
-  if (combo === kb.prevTab)      { e.preventDefault(); switchTabBy(-1); }
-  if (combo === kb.renameSession && S.activeSessionId) { e.preventDefault(); promptRenameSession(S.activeSessionId); }
-  if (combo === kb.clearTerminal && S.activeSessionId) { e.preventDefault(); clearActiveTerminal(); }
-  if (combo === kb.gitGraph) { e.preventDefault(); isGitGraphOpen() ? closeGitGraph() : openGitGraph(); }
-
+  // Cmd+1~9: switch to Nth tab
   if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey) {
-    const n = parseInt(nk);
+    const combo = buildCombo(e);
+    const n = parseInt(combo.replace('Meta+', ''));
     if (n >= 1 && n <= 9) {
       const ids = Array.from(terminalMap.keys());
       if (ids[n - 1]) { e.preventDefault(); activateSession(ids[n - 1]); }
@@ -193,6 +163,38 @@ function switchTabBy(dir) {
   const next = ids[(idx + dir + ids.length) % ids.length];
   activateSession(next);
   wsSend({ type:'session_attach', sessionId: next });
+}
+
+function navigateSplitPane(dir) {
+  const panes = [];
+  function collectPanes(node) {
+    if (!node) return;
+    if (node.type === 'pane') {
+      const rect = node.element.getBoundingClientRect();
+      panes.push({ sessionId: node.sessionId, cx: rect.left + rect.width/2, cy: rect.top + rect.height/2 });
+    } else { node.children.forEach(collectPanes); }
+  }
+  collectPanes(S.layoutTree);
+  const activeEntry = terminalMap.get(S.activeSessionId);
+  if (!activeEntry) return;
+  const ar = activeEntry.div.getBoundingClientRect();
+  const ax = ar.left + ar.width/2, ay = ar.top + ar.height/2;
+  const coneMap = { left: Math.PI, right: 0, up: -Math.PI/2, down: Math.PI/2 };
+  const targetAngle = coneMap[dir];
+  let best = null, bestDist = Infinity;
+  panes.forEach(p => {
+    if (p.sessionId === S.activeSessionId) return;
+    const dx = p.cx - ax, dy = p.cy - ay;
+    const angle = Math.atan2(dy, dx);
+    let diff = angle - targetAngle;
+    while (diff > Math.PI) diff -= 2*Math.PI;
+    while (diff < -Math.PI) diff += 2*Math.PI;
+    if (Math.abs(diff) <= Math.PI/4) {
+      const primaryDist = (dir === 'left' || dir === 'right') ? Math.abs(dx) : Math.abs(dy);
+      if (primaryDist < bestDist) { bestDist = primaryDist; best = p; }
+    }
+  });
+  if (best) activateSession(best.sessionId);
 }
 
 window.addEventListener('resize', () => {

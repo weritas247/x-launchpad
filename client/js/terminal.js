@@ -1,6 +1,7 @@
 import { S, terminalMap, sessionMeta, sessionList, sessionEmpty, tabBar, tabAddBtn, termWrapper, sbActiveName, sbSize, ctxMenu, escHtml } from './state.js';
-import { AI_REGISTRY, normalizeKey } from './constants.js';
+import { AI_REGISTRY } from './constants.js';
 import { wsSend } from './websocket.js';
+import { xtermKeyHandler } from './keyboard.js';
 import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session.js';
 import { removeSplitPane, teardownSplitLayout, showDropZoneOverlay, hideDropZoneOverlay } from './split-pane.js';
 import { resetTabStatus, tabStatusOnInput } from './tab-status.js';
@@ -203,21 +204,8 @@ export function attachTerminal(sessionId, name) {
   term.open(div);
   fitAddon.fit();
 
-  // Let app-level keybindings override xterm
-  term.attachCustomKeyEventHandler(e => {
-    if (e.type !== 'keydown') return true;
-    const kb = S.settings?.keybindings || {};
-    const parts = [];
-    if (e.ctrlKey) parts.push('Ctrl');
-    if (e.shiftKey) parts.push('Shift');
-    if (e.altKey) parts.push('Alt');
-    if (e.metaKey) parts.push('Meta');
-    if (!['Control','Shift','Alt','Meta'].includes(e.key)) parts.push(normalizeKey(e));
-    const combo = parts.join('+');
-    const bindings = Object.values(kb);
-    if (bindings.includes(combo)) return false; // false = don't let xterm handle it
-    return true;
-  });
+  // Let app-level keybindings override xterm — execute action immediately
+  term.attachCustomKeyEventHandler(e => xtermKeyHandler(e));
 
   term.onData(data => {
     if (S.activeSessionId === sessionId) {
