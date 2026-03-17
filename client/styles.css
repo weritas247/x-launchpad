@@ -474,7 +474,9 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .gg-file-status-A{color:var(--ok)}
 .gg-file-status-D{color:var(--danger)}
 .gg-file-status-R{color:#61afef}
-.gg-file-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gg-file-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.gg-file-item{display:flex;align-items:center;gap:6px}
+.gg-file-stat{margin-left:auto;white-space:nowrap;font-size:11px;flex-shrink:0}
 /* Branch dropdown */
 .gg-branch-dropdown{position:relative}
 .gg-branch-trigger{background:var(--bg-deep);color:var(--text-dim);border:1px solid var(--border);border-radius:4px;font-size:11px;padding:3px 8px;font-family:var(--font-mono);cursor:pointer;letter-spacing:.04em}

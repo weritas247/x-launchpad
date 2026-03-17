@@ -256,9 +256,10 @@ export function handleGitFileListData(msg) {
   }
 
   fileTitle.textContent = `Changed files (${msg.files.length})`;
-  fileList.innerHTML = msg.files.map(f =>
-    `<div class="gg-file-item"><span class="gg-file-status gg-file-status-${escHtml(f.status)}">${escHtml(f.status)}</span><span class="gg-file-path">${escHtml(f.path)}</span></div>`
-  ).join('');
+  fileList.innerHTML = msg.files.map(f => {
+    const stat = fileStatBadge(f.additions, f.deletions);
+    return `<div class="gg-file-item"><span class="gg-file-status gg-file-status-${escHtml(f.status)}">${escHtml(f.status)}</span><span class="gg-file-path">${escHtml(f.path)}</span>${stat}</div>`;
+  }).join('');
 }
 
 export function handleGitBranchData(msg) {
@@ -412,6 +413,14 @@ function statBadge(add, del) {
   if (add) parts.push(`<span class="gg-stat-add">+${add}</span>`);
   if (del) parts.push(`<span class="gg-stat-del">-${del}</span>`);
   return parts.join(' ');
+}
+
+function fileStatBadge(add, del) {
+  if (!add && !del) return '';
+  const parts = [];
+  if (add) parts.push(`<span class="gg-stat-add">+${add}</span>`);
+  if (del) parts.push(`<span class="gg-stat-del">-${del}</span>`);
+  return `<span class="gg-file-stat">${parts.join(' ')}</span>`;
 }
 
 // ─── REF BADGE HTML ──────────────────────────────────

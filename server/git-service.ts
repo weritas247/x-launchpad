@@ -15,6 +15,8 @@ export interface CommitEntry {
 export interface FileEntry {
   status: string;
   path: string;
+  additions: number;
+  deletions: number;
 }
 
 export interface BranchEntry {
@@ -80,14 +82,39 @@ export function getGitLog(cwd: string, maxCount = 50): CommitEntry[] {
 }
 
 export function getFileList(cwd: string, hash: string): FileEntry[] {
+  // Get file status (M/A/D)
   const raw = execFileSync('git', [
     'diff-tree', '--no-commit-id', '--name-status', '-r', hash,
   ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
 
-  return raw.split('\n').filter(Boolean).map(line => {
+  const files = raw.split('\n').filter(Boolean).map(line => {
     const [status, ...pathParts] = line.split('\t');
-    return { status, path: pathParts.join('\t') };
+    return { status, path: pathParts.join('\t'), additions: 0, deletions: 0 };
   });
+
+  // Get per-file line stats
+  try {
+    const numstat = execFileSync('git', [
+      'diff-tree', '--no-commit-id', '--numstat', '-r', hash,
+    ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+
+    const statsMap = new Map<string, { additions: number; deletions: number }>();
+    for (const line of numstat.split('\n').filter(Boolean)) {
+      const [add, del, ...pathParts] = line.split('\t');
+      const filePath = pathParts.join('\t');
+      statsMap.set(filePath, {
+        additions: add === '-' ? 0 : parseInt(add) || 0,
+        deletions: del === '-' ? 0 : parseInt(del) || 0,
+      });
+    }
+
+    for (const f of files) {
+      const s = statsMap.get(f.path);
+      if (s) { f.additions = s.additions; f.deletions = s.deletions; }
+    }
+  } catch {}
+
+  return files;
 }
 
 export function getCurrentBranch(cwd: string): string | null {
