@@ -406,6 +406,25 @@ function relTime(iso) {
   return `${Math.floor(diff/604800)}w`;
 }
 
+// ─── CO-AUTHOR PARSING ───────────────────────────────
+function parseCoAuthors(body) {
+  if (!body) return [];
+  const regex = /Co-Authored-By:\s*(.+?)\s*<([^>]*)>/gi;
+  const authors = [];
+  let m;
+  while ((m = regex.exec(body)) !== null) {
+    authors.push({ name: m[1].trim(), email: m[2].trim() });
+  }
+  return authors;
+}
+
+function coAuthorBadge(coAuthors) {
+  if (!coAuthors.length) return '';
+  return coAuthors.map(a =>
+    `<span class="gg-coauthor" title="${escHtml(a.name)} &lt;${escHtml(a.email)}&gt;">${escHtml(a.name)}</span>`
+  ).join('');
+}
+
 // ─── STAT BADGE ──────────────────────────────────────
 function statBadge(add, del) {
   if (!add && !del) return '';
@@ -542,12 +561,14 @@ function renderGraph(commits) {
   commitBox.innerHTML = commits.map((c, i) => {
     const refs = c.refs.length > 0 ? `<span class="gg-refs">${c.refs.map(refBadge).join('')}</span>` : '';
     const hashClass = hasGithub ? 'gg-hash gg-hash-link' : 'gg-hash';
+    const coAuthors = parseCoAuthors(c.body);
+    const coAuthorHtml = coAuthorBadge(coAuthors);
     return `<div class="gg-row" data-hash="${escHtml(c.hash)}" style="height:${ROW_H}px">` +
       `<span class="${hashClass}" data-hash="${escHtml(c.hash)}">${escHtml(c.hash.slice(0,7))}</span>` +
       refs +
       `<span class="gg-msg">${escHtml(c.message)}</span>` +
       `<span class="gg-stat">${statBadge(c.additions, c.deletions)}</span>` +
-      `<span class="gg-author">${escHtml(c.author)}</span>` +
+      `<span class="gg-author">${escHtml(c.author)}${coAuthorHtml}</span>` +
       `<span class="gg-time">${relTime(c.date)}</span>` +
       `</div>`;
   }).join('');

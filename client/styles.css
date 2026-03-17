@@ -460,7 +460,8 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .gg-stat{flex-shrink:0;font-size:10px;display:flex;gap:4px;min-width:70px;justify-content:flex-end}
 .gg-stat-add{color:var(--ok)}
 .gg-stat-del{color:var(--danger)}
-.gg-author{flex-shrink:0;color:var(--text-dim);font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gg-author{flex-shrink:0;color:var(--text-dim);font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px}
+.gg-coauthor{color:var(--text-ghost);font-size:10px;padding:0 4px;border:1px solid var(--border);border-radius:3px;opacity:0.8}
 .gg-time{flex-shrink:0;color:var(--text-ghost);font-size:11px;width:60px;text-align:right}
 .gg-file-panel{border-left:1px solid var(--border);width:320px;flex-shrink:0;overflow-y:auto;background:var(--bg-deep)}
 .gg-file-panel::-webkit-scrollbar{width:4px}
