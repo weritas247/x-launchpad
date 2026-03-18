@@ -39,6 +39,15 @@ db.exec(`
     text TEXT NOT NULL,
     created_at INTEGER DEFAULT (strftime('%s','now'))
   );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    name TEXT DEFAULT '',
+    created_at INTEGER DEFAULT (strftime('%s','now')),
+    updated_at INTEGER DEFAULT (strftime('%s','now'))
+  );
 `);
 
 // ─── Settings ───────────────────────────────────────
@@ -137,6 +146,41 @@ export function addAnnotation(file: string, type: string, text: string): number 
 
 export function removeAnnotation(id: number): void {
   stmtDeleteAnnotation.run(id);
+}
+
+// ─── Users ─────────────────────────────────────────
+export interface UserRow {
+  id: number;
+  email: string;
+  password_hash: string;
+  name: string;
+  created_at: number;
+  updated_at: number;
+}
+
+const stmtCreateUser = db.prepare(
+  'INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)'
+);
+const stmtGetUserByEmail = db.prepare('SELECT * FROM users WHERE email = ?');
+const stmtGetUserById = db.prepare('SELECT * FROM users WHERE id = ?');
+const stmtGetUserCount = db.prepare('SELECT COUNT(*) as count FROM users');
+
+export function createUser(email: string, passwordHash: string, name: string): number {
+  const result = stmtCreateUser.run(email, passwordHash, name);
+  return result.lastInsertRowid as number;
+}
+
+export function getUserByEmail(email: string): UserRow | null {
+  return (stmtGetUserByEmail.get(email) as UserRow) || null;
+}
+
+export function getUserById(id: number): UserRow | null {
+  return (stmtGetUserById.get(id) as UserRow) || null;
+}
+
+export function getUserCount(): number {
+  const row = stmtGetUserCount.get() as { count: number };
+  return row.count;
 }
 
 // ─── Cleanup ────────────────────────────────────────
