@@ -41,6 +41,10 @@ const sbBranch  = document.getElementById('sb-branch');
 const sbBrSep   = document.getElementById('sb-branch-sep');
 const sbBrName  = document.getElementById('sb-branch-name');
 const loadMore   = document.getElementById('gg-load-more');
+const searchToggle = document.getElementById('gg-search-toggle');
+const searchBar    = document.getElementById('gg-search-bar');
+const searchInput  = document.getElementById('gg-search-input');
+const searchEmpty  = document.getElementById('gg-search-empty');
 
 // Branch dropdown
 const branchDropdown = document.getElementById('gg-branch-dropdown');
@@ -94,6 +98,11 @@ export function openGitGraph() {
   hasMore = false;
   currentSkip = 0;
   loadMore.style.display = 'none';
+  searchActive = false;
+  searchQuery = '';
+  searchBar.style.display = 'none';
+  searchToggle.classList.remove('active');
+  searchEmpty.style.display = 'none';
   restoreModalSize();
   overlay.classList.add('open');
   loading.style.display = 'flex';
@@ -161,9 +170,10 @@ function updateRowFocus(rows, newIdx) {
 export function handleGitGraphKeydown(e) {
   if (!isOpen) return false;
 
-  // Escape — always close modal
+  // Escape — close search first, then modal
   if (e.key === 'Escape') {
     e.preventDefault();
+    if (searchActive) { closeSearch(); return true; }
     closeGitGraph();
     return true;
   }
@@ -172,6 +182,23 @@ export function handleGitGraphKeydown(e) {
   if (confirmEl.style.display === 'flex') {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doCheckout(); return true; }
     return false;
+  }
+
+  // If search input is focused, ArrowDown moves to results
+  if (searchActive && document.activeElement === searchInput && e.key === 'ArrowDown') {
+    e.preventDefault();
+    const rows = getRows();
+    if (rows.length) {
+      updateRowFocus(rows, 0);
+      modal.focus();
+    }
+    return true;
+  }
+
+  // Typing while result list is focused → re-focus search input
+  if (searchActive && document.activeElement !== searchInput && e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
+    searchInput.focus();
+    return false; // let the keystroke pass through to the input
   }
 
   // Branch dropdown is open — arrow/enter navigate it
@@ -350,6 +377,7 @@ export function handleGitRemoteUrlData(msg) {
 
 export function handleGitCheckoutAck(msg) {
   confirmEl.style.display = 'none';
+  if (searchActive) closeSearch();
   if (msg.error) return;
   // Refresh graph and branch info after checkout
   if (S.activeSessionId) {
@@ -407,6 +435,34 @@ function finishPull(isError) {
 
 export function handleGitPullAck(msg) {
   finishPull(!!msg.error);
+}
+
+export function handleGitGraphSearchData(msg) {
+  // Discard stale responses
+  if (!searchActive || msg.query !== searchQuery) return;
+
+  const q = msg.query.toLowerCase();
+  const clientResults = cachedCommits.filter(c =>
+    c.message.toLowerCase().includes(q) ||
+    c.author.toLowerCase().includes(q) ||
+    c.hash.toLowerCase().startsWith(q)
+  );
+
+  // Merge server + client results, dedup by hash
+  const seen = new Set(clientResults.map(c => c.hash));
+  const merged = [...clientResults];
+  if (msg.commits) {
+    for (const c of msg.commits) {
+      if (!seen.has(c.hash)) {
+        seen.add(c.hash);
+        merged.push(c);
+      }
+    }
+  }
+
+  // Sort by date descending
+  merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  renderSearchResults(merged, msg.query);
 }
 
 // ─── GITHUB URL PARSING ─────────────────────────────
@@ -699,6 +755,91 @@ function onCommitClick(hash) {
   wsSend({ type: 'git_file_list', sessionId: S.activeSessionId, hash });
 }
 
+// ─── SEARCH ───────────────────────────────────────────
+function openSearch() {
+  searchActive = true;
+  searchBar.style.display = 'block';
+  searchToggle.classList.add('active');
+  searchInput.value = '';
+  searchQuery = '';
+  searchInput.focus();
+}
+
+function closeSearch() {
+  searchActive = false;
+  searchBar.style.display = 'none';
+  searchToggle.classList.remove('active');
+  searchInput.value = '';
+  searchQuery = '';
+  searchEmpty.style.display = 'none';
+  if (searchDebounce) { clearTimeout(searchDebounce); searchDebounce = null; }
+  // Restore full commit list
+  renderGraph(cachedCommits);
+  modal.focus();
+}
+
+function doSearch(query) {
+  searchQuery = query;
+  if (!query) {
+    renderGraph(cachedCommits);
+    searchEmpty.style.display = 'none';
+    return;
+  }
+
+  const q = query.toLowerCase();
+  // Client-side filter first
+  const clientResults = cachedCommits.filter(c =>
+    c.message.toLowerCase().includes(q) ||
+    c.author.toLowerCase().includes(q) ||
+    c.hash.toLowerCase().startsWith(q)
+  );
+
+  if (clientResults.length >= 10) {
+    renderSearchResults(clientResults, query);
+  } else {
+    // Show client results immediately, then request server
+    if (clientResults.length > 0) renderSearchResults(clientResults, query);
+    wsSend({ type: 'git_graph_search', sessionId: S.activeSessionId, query });
+  }
+}
+
+function renderSearchResults(commits, query) {
+  if (commits.length === 0) {
+    searchEmpty.textContent = "No commits matching '" + query + "'";
+    searchEmpty.style.display = 'flex';
+    svgEl.innerHTML = '';
+    svgEl.setAttribute('height', 0);
+    commitBox.innerHTML = '';
+    return;
+  }
+  searchEmpty.style.display = 'none';
+  renderGraph(commits);
+  // Highlight matching text
+  highlightMatches(query);
+}
+
+function highlightMatches(query) {
+  if (!query) return;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp('(' + escaped + ')', 'gi');
+  commitBox.querySelectorAll('.gg-msg').forEach(el => {
+    // Only highlight text nodes, preserve ref badges
+    const refs = el.querySelector('.gg-refs');
+    const refsHtml = refs ? refs.outerHTML : '';
+    const textOnly = el.textContent.replace(refs?.textContent || '', '');
+    const highlighted = escHtml(textOnly).replace(regex, '<span class="gg-highlight">$1</span>');
+    el.innerHTML = refsHtml + highlighted;
+  });
+  commitBox.querySelectorAll('.gg-author').forEach(el => {
+    // Preserve co-author badges
+    const imgs = el.querySelectorAll('.gg-coauthor-img, .gg-coauthor-initial');
+    const authorText = el.childNodes[0]?.textContent || '';
+    const highlighted = escHtml(authorText).replace(regex, '<span class="gg-highlight">$1</span>');
+    el.innerHTML = highlighted;
+    imgs.forEach(img => el.appendChild(img));
+  });
+}
+
 // ─── EVENT LISTENERS ─────────────────────────────────
 document.getElementById('gg-close').addEventListener('click', closeGitGraph);
 overlay.addEventListener('click', e => { if (e.target === overlay) closeGitGraph(); });
@@ -767,6 +908,29 @@ pullBtn.addEventListener('click', doPull);
 // Confirm dialog
 confirmOk.addEventListener('click', doCheckout);
 confirmCancel.addEventListener('click', hideCheckoutConfirm);
+
+// Search toggle
+searchToggle.addEventListener('click', () => {
+  if (searchActive) closeSearch();
+  else openSearch();
+});
+
+// Search input
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.trim();
+  if (searchDebounce) clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => doSearch(q), 300);
+});
+
+// Cmd/Ctrl+F to toggle search
+document.addEventListener('keydown', e => {
+  if (!isOpen) return;
+  if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+    e.preventDefault();
+    if (searchActive) searchInput.focus();
+    else openSearch();
+  }
+});
 
 // ─── RESIZE ──────────────────────────────────────────
 resizeHandle.addEventListener('mousedown', e => {
