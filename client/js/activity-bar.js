@@ -177,11 +177,12 @@ function openSidebarSplit(panel, droppedOnTop) {
     secondaryPanel = panel;
   }
 
-  // Update button active states
+  // Update button active states — hide secondary icon, show only primary
   document.querySelectorAll('.activity-btn').forEach(btn => {
     const p = btn.dataset.panel;
-    btn.classList.toggle('active', p === activePanel || p === secondaryPanel);
-    btn.classList.toggle('active-secondary', p === secondaryPanel);
+    btn.classList.toggle('active', p === activePanel);
+    btn.classList.remove('active-secondary');
+    btn.style.display = (p === secondaryPanel) ? 'none' : '';
   });
 
   // Show both panels
@@ -238,6 +239,7 @@ export function closeSidebarSplit() {
   document.querySelectorAll('.activity-btn').forEach(btn => {
     btn.classList.remove('active-secondary');
     btn.classList.toggle('active', btn.dataset.panel === activePanel);
+    btn.style.display = '';  // restore hidden secondary icon
   });
 
   // Remove close button and resize handle
@@ -252,11 +254,12 @@ function swapSidebarSplit() {
   activePanel = secondaryPanel;
   secondaryPanel = temp;
 
-  // Update button states
+  // Update button states — hide secondary icon, show only primary
   document.querySelectorAll('.activity-btn').forEach(btn => {
     const p = btn.dataset.panel;
-    btn.classList.toggle('active', p === activePanel || p === secondaryPanel);
-    btn.classList.toggle('active-secondary', p === secondaryPanel);
+    btn.classList.toggle('active', p === activePanel);
+    btn.classList.remove('active-secondary');
+    btn.style.display = (p === secondaryPanel) ? 'none' : '';
   });
 
   // Update panel classes
