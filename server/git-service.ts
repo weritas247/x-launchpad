@@ -27,13 +27,14 @@ export interface BranchEntry {
   isRemote: boolean;
 }
 
-export function getGitLog(cwd: string, maxCount = 50): CommitEntry[] {
+export function getGitLog(cwd: string, maxCount = 50, skip = 0): { commits: CommitEntry[]; hasMore: boolean } {
+  const fetchCount = maxCount + 1;
   const raw = execFileSync('git', [
     'log', '--format=%H%x00%P%x00%D%x00%an%x00%aI%x00%s%x00%b%x01',
-    `--max-count=${maxCount}`, '--all',
+    `--max-count=${fetchCount}`, `--skip=${skip}`, '--topo-order', '--all',
   ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
 
-  const commits = raw.split('\x01').filter(Boolean).map(record => {
+  const allCommits = raw.split('\x01').filter(Boolean).map(record => {
     const [hash, parentStr, refStr, author, date, message, ...bodyParts] = record.trim().split('\x00');
     return {
       hash,
@@ -48,10 +49,13 @@ export function getGitLog(cwd: string, maxCount = 50): CommitEntry[] {
     };
   });
 
+  const hasMore = allCommits.length > maxCount;
+  const commits = hasMore ? allCommits.slice(0, maxCount) : allCommits;
+
   // Fetch per-commit stats separately
   try {
     const statsRaw = execFileSync('git', [
-      'log', '--format=%H', '--shortstat', `--max-count=${maxCount}`, '--all',
+      'log', '--format=%H', '--shortstat', `--max-count=${fetchCount}`, `--skip=${skip}`, '--topo-order', '--all',
     ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
 
     const statsMap = new Map<string, { additions: number; deletions: number }>();
@@ -80,7 +84,7 @@ export function getGitLog(cwd: string, maxCount = 50): CommitEntry[] {
     // stats are optional — if this fails, commits still have 0/0
   }
 
-  return commits;
+  return { commits, hasMore };
 }
 
 export function getFileList(cwd: string, hash: string): FileEntry[] {

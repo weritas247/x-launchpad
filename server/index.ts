@@ -1339,10 +1339,12 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (!session) return;
       try {
-        const commits = gitService.getGitLog(session.cwd);
-        ws.send(JSON.stringify({ type: 'git_graph_data', sessionId: id, commits }));
+        const skip = typeof parsed.skip === 'number' ? parsed.skip : 0;
+        const { commits, hasMore } = gitService.getGitLog(session.cwd, 50, skip);
+        ws.send(JSON.stringify({ type: 'git_graph_data', sessionId: id, commits, hasMore, skip }));
       } catch (e) {
-        ws.send(JSON.stringify({ type: 'git_graph_data', sessionId: id, commits: [], error: String(e) }));
+        const skip = typeof parsed.skip === 'number' ? parsed.skip : 0;
+        ws.send(JSON.stringify({ type: 'git_graph_data', sessionId: id, commits: [], hasMore: false, skip, error: String(e) }));
       }
 
     } else if (parsed.type === 'git_file_list') {
