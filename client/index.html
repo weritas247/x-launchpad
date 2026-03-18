@@ -101,7 +101,10 @@
         <span class="sc-branch-label" id="sc-branch-name">—</span>
       </div>
       <div class="sc-commit-bar">
-        <input type="text" class="sc-commit-input" id="sc-commit-input" placeholder="Message (Enter to commit)"/>
+        <div class="sc-commit-input-wrap">
+          <input type="text" class="sc-commit-input" id="sc-commit-input" placeholder="Message (Enter to commit)"/>
+          <button class="sc-generate-btn" id="sc-generate-btn" title="Generate commit message">Generate ✦</button>
+        </div>
         <div class="sc-commit-group">
           <button class="sc-commit-btn" id="sc-commit-btn" title="Commit">✓ Commit</button>
           <button class="sc-commit-dropdown" id="sc-commit-dropdown" title="More actions">▾</button>

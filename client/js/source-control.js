@@ -43,6 +43,17 @@ export function initSourceControl() {
     if (e.key === 'Enter') { e.preventDefault(); doCommit(false); }
   });
 
+  // Generate commit message
+  const generateBtn = document.getElementById('sc-generate-btn');
+  if (generateBtn) {
+    generateBtn.addEventListener('click', () => {
+      if (!S.activeSessionId) return;
+      generateBtn.textContent = '...';
+      generateBtn.disabled = true;
+      wsSend({ type: 'git_generate_message', sessionId: S.activeSessionId });
+    });
+  }
+
   // Dropdown menu
   if (commitDropdown && commitMenu) {
     commitDropdown.addEventListener('click', (e) => {
@@ -71,6 +82,16 @@ export function handleGitCommitAck(msg) {
 
 export function handleGitPushAck(msg) {
   // handled silently, status refresh will follow
+}
+
+export function handleGitGenerateMessage(msg) {
+  const commitInput = document.getElementById('sc-commit-input');
+  const generateBtn = document.getElementById('sc-generate-btn');
+  if (generateBtn) { generateBtn.textContent = 'Generate ✦'; generateBtn.disabled = false; }
+  if (commitInput && msg.message) {
+    commitInput.value = msg.message;
+    commitInput.focus();
+  }
 }
 
 export function requestGitStatus() {
@@ -298,6 +319,19 @@ function createFileItem(file, isStaged, treeDepth) {
     dirSpan.className = 'sc-file-dir';
     dirSpan.textContent = dirPath;
     rightGroup.appendChild(dirSpan);
+  }
+
+  // Discard button (only for unstaged changes, not untracked)
+  if (!isStaged && file.status !== 'U' && file.status !== '?') {
+    const discardBtn = document.createElement('button');
+    discardBtn.className = 'sc-file-action sc-file-discard';
+    discardBtn.title = 'Discard changes';
+    discardBtn.textContent = '↩';
+    discardBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      wsSend({ type: 'git_discard', sessionId: S.activeSessionId, filePath: file.path });
+    });
+    rightGroup.appendChild(discardBtn);
   }
 
   // Stage/Unstage button

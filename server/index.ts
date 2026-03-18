@@ -863,6 +863,28 @@ wss.on('connection', (ws: WebSocket) => {
         }
       }
 
+    } else if (parsed.type === 'git_generate_message') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const message = gitService.generateCommitMessage(session.cwd);
+      ws.send(JSON.stringify({ type: 'git_generate_message_data', sessionId: id, message }));
+
+    } else if (parsed.type === 'git_discard') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const filePath = parsed.filePath as string;
+      const ok = gitService.gitDiscard(session.cwd, filePath);
+      if (ok) {
+        const files = gitService.getGitStatus(session.cwd);
+        const branch = gitService.getCurrentBranch(session.cwd);
+        const root = gitService.getGitRoot(session.cwd);
+        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+      }
+
     } else if (parsed.type === 'git_push') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
       if (!id) return;

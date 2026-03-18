@@ -296,6 +296,49 @@ export function gitUnstageAll(cwd: string): boolean {
   }
 }
 
+export function gitDiscard(cwd: string, filePath: string): boolean {
+  try {
+    execFileSync('git', ['checkout', '--', filePath], { cwd, encoding: 'utf-8', timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function generateCommitMessage(cwd: string): string {
+  try {
+    // Get staged diff, fallback to unstaged diff
+    let diff = '';
+    try {
+      diff = execFileSync('git', ['diff', '--cached', '--stat'], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+    } catch { /* ignore */ }
+    if (!diff) {
+      try {
+        diff = execFileSync('git', ['diff', '--stat'], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+      } catch { /* ignore */ }
+    }
+    if (!diff) return 'update files';
+
+    // Parse stat output to generate descriptive message
+    const lines = diff.split('\n').filter(l => l.includes('|'));
+    const files = lines.map(l => l.trim().split(/\s+\|/)[0].trim());
+
+    if (files.length === 0) return 'update files';
+    if (files.length === 1) {
+      const name = files[0].split('/').pop() || files[0];
+      return `update ${name}`;
+    }
+    // Find common directory or extension
+    const exts = [...new Set(files.map(f => f.split('.').pop()))];
+    if (exts.length === 1) return `update ${files.length} ${exts[0]} files`;
+    const dirs = [...new Set(files.map(f => f.split('/')[0]))];
+    if (dirs.length === 1) return `update ${dirs[0]} (${files.length} files)`;
+    return `update ${files.length} files`;
+  } catch {
+    return 'update files';
+  }
+}
+
 export function gitPush(cwd: string): { ok: boolean; error?: string } {
   try {
     execFileSync('git', ['push'], { cwd, encoding: 'utf-8', timeout: 30000 });
