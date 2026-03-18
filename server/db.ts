@@ -144,3 +144,8 @@ export function removeAnnotation(id: number): void {
 export function close(): void {
   db.close();
 }
+
+// Ensure database is properly closed on process exit
+process.on('exit', () => { try { db.close(); } catch {} });
+process.on('SIGINT', () => { try { db.close(); } catch {} process.exit(0); });
+process.on('SIGTERM', () => { try { db.close(); } catch {} process.exit(0); });

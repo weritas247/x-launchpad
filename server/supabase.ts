@@ -47,19 +47,19 @@ export async function createUser(email: string, passwordHash: string, name: stri
 export async function getUserByEmail(email: string): Promise<UserRow | null> {
   const { data, error } = await supabase
     .from('users')
-    .select('*')
+    .select('id, email, password_hash, name, created_at, updated_at')
     .eq('email', email)
     .single();
   if (error && error.code !== 'PGRST116') throw error;
   return data as UserRow | null;
 }
 
-export async function getUserById(id: number): Promise<UserRow | null> {
+export async function getUserById(id: number): Promise<Omit<UserRow, 'password_hash'> | null> {
   const { data, error } = await supabase
     .from('users')
-    .select('*')
+    .select('id, email, name, created_at, updated_at')
     .eq('id', id)
     .single();
   if (error && error.code !== 'PGRST116') throw error;
-  return data as UserRow | null;
+  return data as Omit<UserRow, 'password_hash'> | null;
 }
