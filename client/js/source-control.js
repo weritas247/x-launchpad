@@ -92,7 +92,11 @@ export function initSourceControl() {
     wtAddBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const form = document.getElementById('sc-worktree-add-form');
-      if (form) form.style.display = form.style.display === 'none' ? '' : 'none';
+      if (form) {
+        const showing = form.style.display === 'none';
+        form.style.display = showing ? '' : 'none';
+        if (showing) document.getElementById('sc-worktree-path')?.focus();
+      }
     });
   }
 
