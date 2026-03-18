@@ -265,21 +265,12 @@
     </div>
     </div><!-- /main-content -->
     <div id="statusbar">
-      <span class="sb-item"><span class="sb-accent">●</span><span id="sb-active-name">—</span></span>
-      <span class="sb-sep sb-branch-group" id="sb-branch-sep" style="display:none">│</span>
       <span class="sb-item sb-branch sb-branch-group" id="sb-branch" style="display:none;cursor:pointer" title="Git Graph (Ctrl+G)"><span class="sb-accent">⎇</span> <span id="sb-branch-name"></span></span>
-      <span class="sb-sep">│</span>
-      <span class="sb-item">SESS: <span id="sb-count" class="sb-accent">0</span></span>
       <span class="sb-sep sb-claude-group" id="sb-claude-sep" style="display:none">│</span>
       <span class="sb-item sb-claude-group" id="sb-claude-usage" style="display:none;cursor:pointer" title="Claude Code Usage">
         <span class="sb-accent">◆</span> <span id="sb-claude-tokens">—</span>
       </span>
       <span class="sb-spacer"></span>
-      <span class="sb-item" id="sb-size">—</span>
-      <span class="sb-sep">│</span>
-      <span class="sb-item sb-ok" id="sb-ws">WS OFFLINE</span>
-      <span class="sb-sep">│</span>
-      <span class="sb-item" id="sb-clock">00:00:00</span>
     </div>
   </main>
 
@@ -332,10 +323,18 @@
         <button class="gg-branch-trigger" id="gg-branch-trigger">⎇ <span id="gg-branch-trigger-label">branches</span> ▾</button>
         <div class="gg-branch-menu" id="gg-branch-menu"></div>
       </div>
+      <button class="gg-search-toggle" id="gg-search-toggle" title="Search commits (Ctrl+F)">⌕</button>
       <span style="flex:1"></span>
       <button class="gg-pull-btn" id="gg-pull-btn" title="Git Pull">⬇ Pull</button>
       <button class="gg-github-btn" id="gg-github-btn" style="display:none" title="Open on GitHub">GitHub ↗</button>
       <button class="gg-close-btn" id="gg-close">✕</button>
+    </div>
+    <div class="gg-search-bar" id="gg-search-bar" style="display:none">
+      <div class="gg-search-input-wrap">
+        <span class="gg-search-icon">⌕</span>
+        <input type="text" class="gg-search-input" id="gg-search-input" placeholder="Search by message, author, or hash..." spellcheck="false" autocomplete="off">
+        <span class="gg-search-hint">Esc</span>
+      </div>
     </div>
     <div class="gg-body" id="gg-body">
       <div class="gg-loading" id="gg-loading">
@@ -344,9 +343,13 @@
       </div>
       <div class="gg-error" id="gg-error" style="display:none"></div>
       <div class="gg-content" id="gg-content" style="display:none">
+        <div class="gg-search-empty" id="gg-search-empty" style="display:none"></div>
         <div class="gg-scroll" id="gg-scroll">
           <svg class="gg-svg" id="gg-svg"></svg>
           <div class="gg-commits" id="gg-commits"></div>
+          <div class="gg-load-more" id="gg-load-more" style="display:none">
+            <div class="gg-spinner"></div>
+          </div>
         </div>
         <div class="gg-file-panel" id="gg-file-panel" style="display:none">
           <div class="gg-file-header">
