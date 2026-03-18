@@ -19,6 +19,7 @@ import { initExplorer, handleFileTreeData, handleFileReadData, handleFileOpAck, 
 import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange } from './source-control.js';
 import { initSearch, handleSearchResults, handleReplaceAck, onSearchSessionChange } from './search.js';
 import { setActivateSessionFn } from './file-viewer.js';
+import { initChatEditor } from './chat-editor.js';
 
 S.currentTheme = THEMES[0];
 
@@ -289,6 +290,7 @@ initSidebarResize();
 initExplorer();
 initSourceControl();
 initSearch();
+initChatEditor();
 
 // Wire up file viewer's lazy dependency
 setActivateSessionFn(activateSession);

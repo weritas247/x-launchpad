@@ -235,6 +235,18 @@
         <div class="input-panel-list" id="input-panel-list"></div>
       </div>
     </div>
+    <!-- CHAT EDITOR BAR -->
+    <div id="chat-editor" class="chat-editor">
+      <div class="chat-editor-resize" id="chat-editor-resize"></div>
+      <div class="chat-editor-body">
+        <textarea id="chat-input" class="chat-input" placeholder="Type a message or /command... (Enter to send, Shift+Enter for newline)" rows="1" spellcheck="false"></textarea>
+        <div class="chat-actions">
+          <span class="chat-hint" id="chat-hint"></span>
+          <button class="chat-send-btn" id="chat-send" title="Send (Enter)">▸</button>
+        </div>
+      </div>
+      <div class="chat-slash-menu" id="chat-slash-menu" style="display:none"></div>
+    </div>
     </div><!-- /main-content -->
     <div id="statusbar">
       <span class="sb-item"><span class="sb-accent">●</span><span id="sb-active-name">—</span></span>
