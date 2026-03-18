@@ -108,6 +108,24 @@ export function initActivityBar() {
     openSidebarSplit(panel, isTop);
   });
 
+  // ─── Panel header drag (for split rearranging) ───
+  sidebar.addEventListener('dragstart', (e) => {
+    const header = e.target.closest('.sidebar-header');
+    if (!header || !secondaryPanel) return;
+    const panel = header.closest('.sidebar-panel');
+    if (!panel) return;
+    const panelId = panel.id.replace('panel-', '');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/sidebar-panel', panelId);
+    header.classList.add('dragging');
+  });
+
+  sidebar.addEventListener('dragend', (e) => {
+    const header = e.target.closest('.sidebar-header');
+    if (header) header.classList.remove('dragging');
+    clearSidebarDropZones();
+  });
+
   // ─── Sidebar split resize handle ───
   initSidebarSplitResize();
 }
@@ -160,6 +178,7 @@ function openSidebarSplit(panel, droppedOnTop) {
   resizeHandle.after(secondaryEl);
 
   ensureSplitCloseBtn();
+  setupSplitHeaderDrag();
 
   // Trigger data loading for both panels
   triggerPanelLoad(activePanel);
@@ -168,6 +187,9 @@ function openSidebarSplit(panel, droppedOnTop) {
 
 export function closeSidebarSplit() {
   const sidebar = document.getElementById('sidebar');
+  sidebar.querySelectorAll('.sidebar-header[draggable]').forEach(h => {
+    h.removeAttribute('draggable');
+  });
   sidebar.classList.remove('sidebar-split');
   // Reset split ratio
   sidebar.style.removeProperty('--sidebar-split-ratio');
@@ -228,6 +250,13 @@ function ensureSplitCloseBtn() {
   } else {
     header.appendChild(closeBtn);
   }
+}
+
+function setupSplitHeaderDrag() {
+  const sidebar = document.getElementById('sidebar');
+  sidebar.querySelectorAll('.sidebar-panel.active .sidebar-header').forEach(header => {
+    header.setAttribute('draggable', 'true');
+  });
 }
 
 function initSidebarSplitResize() {
