@@ -20,6 +20,11 @@ import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 
+/** Safe WebSocket send — no-ops if socket is not OPEN */
+function wsSend(ws: WebSocket, data: string): void {
+  if (ws.readyState === WebSocket.OPEN) ws.send(data);
+}
+
 const app = express();
 const server = http.createServer(app);
 // Control WS: session management, settings, git, file ops (JSON)
@@ -1238,8 +1243,8 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   const list = Array.from(sessions.values()).map(s => ({
     id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd,
   }));
-  ws.send(JSON.stringify({ type: 'session_list', sessions: list }));
-  ws.send(JSON.stringify({ type: 'settings', settings: currentSettings }));
+  wsSend(ws, JSON.stringify({ type: 'session_list', sessions: list }));
+  wsSend(ws, JSON.stringify({ type: 'settings', settings: currentSettings }));
   console.log(`${clientTag} Sent initial data (${list.length} sessions)`);
 
   ws.on('message', (message: Buffer | string) => {
@@ -1249,7 +1254,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
     // Heartbeat: respond to client pings immediately
     if (parsed.type === 'ping') {
-      ws.send(JSON.stringify({ type: 'pong', t: parsed.t }));
+      wsSend(ws, JSON.stringify({ type: 'pong', t: parsed.t }));
       return;
     }
 
@@ -1269,7 +1274,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         runCmdWhenReady(sess, sess.cmd);
       }
 
-      ws.send(JSON.stringify({ type: 'session_created', sessionId: id, name }));
+      wsSend(ws, JSON.stringify({ type: 'session_created', sessionId: id, name }));
       broadcastSessionList(); // calls persistSessions() — cmd is set above before this
 
     } else if (parsed.type === 'session_subscribe') {
@@ -1287,22 +1292,22 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const cwd = source?.cwd || currentSettings.shell.startDirectory || process.env.HOME || '/';
       createSession(id, name, cwd);
       wsSession.set(ws, id);
-      ws.send(JSON.stringify({ type: 'session_created', sessionId: id, name }));
+      wsSend(ws, JSON.stringify({ type: 'session_created', sessionId: id, name }));
       broadcastSessionList();
 
     } else if (parsed.type === 'session_attach') {
       const id = parsed.sessionId as string;
       if (!sessions.has(id)) {
-        ws.send(JSON.stringify({ type: 'error', message: `Session ${id} not found` }));
+        wsSend(ws, JSON.stringify({ type: 'error', message: `Session ${id} not found` }));
         return;
       }
       wsSession.set(ws, id);
       // Remove from subscriptions — active session gets output via wsSession
       wsSubscriptions.get(ws)?.delete(id);
-      ws.send(JSON.stringify({ type: 'session_attached', sessionId: id }));
+      wsSend(ws, JSON.stringify({ type: 'session_attached', sessionId: id }));
       // Replay current CWD/AI info immediately
       const sess = sessions.get(id)!;
-      ws.send(JSON.stringify({ type: 'session_info', sessionId: id, cwd: sess.cwd, ai: sess.ai }));
+      wsSend(ws, JSON.stringify({ type: 'session_info', sessionId: id, cwd: sess.cwd, ai: sess.ai }));
       // Scrollback is now handled by per-session data WS on connect
 
     // scrollback is now handled by per-session data WS on connect
@@ -1362,9 +1367,9 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const skip = typeof parsed.skip === 'number' ? parsed.skip : 0;
       try {
         const { commits, hasMore } = gitService.getGitLog(session.cwd, 50, skip);
-        ws.send(JSON.stringify({ type: 'git_graph_data', sessionId: id, commits, hasMore, skip }));
+        wsSend(ws, JSON.stringify({ type: 'git_graph_data', sessionId: id, commits, hasMore, skip }));
       } catch (e) {
-        ws.send(JSON.stringify({ type: 'git_graph_data', sessionId: id, commits: [], hasMore: false, skip, error: String(e) }));
+        wsSend(ws, JSON.stringify({ type: 'git_graph_data', sessionId: id, commits: [], hasMore: false, skip, error: String(e) }));
       }
 
     } else if (parsed.type === 'git_graph_search') {
@@ -1375,9 +1380,9 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const query = typeof parsed.query === 'string' ? parsed.query : '';
       try {
         const commits = gitService.searchGitLog(session.cwd, query);
-        ws.send(JSON.stringify({ type: 'git_graph_search_data', sessionId: id, commits, query }));
+        wsSend(ws, JSON.stringify({ type: 'git_graph_search_data', sessionId: id, commits, query }));
       } catch (e) {
-        ws.send(JSON.stringify({ type: 'git_graph_search_data', sessionId: id, commits: [], query, error: String(e) }));
+        wsSend(ws, JSON.stringify({ type: 'git_graph_search_data', sessionId: id, commits: [], query, error: String(e) }));
       }
 
     } else if (parsed.type === 'git_file_list') {
@@ -1387,14 +1392,14 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       if (!session) return;
       const hash = parsed.hash as string;
       if (!hash || !/^[0-9a-f]{4,40}$/i.test(hash)) {
-        ws.send(JSON.stringify({ type: 'git_file_list_data', hash, files: [], error: 'Invalid hash' }));
+        wsSend(ws, JSON.stringify({ type: 'git_file_list_data', hash, files: [], error: 'Invalid hash' }));
         return;
       }
       try {
         const files = gitService.getFileList(session.cwd, hash);
-        ws.send(JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files }));
+        wsSend(ws, JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files }));
       } catch (e) {
-        ws.send(JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files: [], error: String(e) }));
+        wsSend(ws, JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files: [], error: String(e) }));
       }
 
     } else if (parsed.type === 'git_branch') {
@@ -1404,9 +1409,9 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       if (!session) return;
       try {
         const branch = gitService.getCurrentBranch(session.cwd);
-        ws.send(JSON.stringify({ type: 'git_branch_data', sessionId: id, branch }));
+        wsSend(ws, JSON.stringify({ type: 'git_branch_data', sessionId: id, branch }));
       } catch {
-        ws.send(JSON.stringify({ type: 'git_branch_data', sessionId: id, branch: null }));
+        wsSend(ws, JSON.stringify({ type: 'git_branch_data', sessionId: id, branch: null }));
       }
 
     } else if (parsed.type === 'git_branch_list') {
@@ -1416,9 +1421,9 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       if (!session) return;
       try {
         const branches = gitService.getBranchList(session.cwd);
-        ws.send(JSON.stringify({ type: 'git_branch_list_data', sessionId: id, branches }));
+        wsSend(ws, JSON.stringify({ type: 'git_branch_list_data', sessionId: id, branches }));
       } catch (e) {
-        ws.send(JSON.stringify({ type: 'git_branch_list_data', sessionId: id, branches: [], error: String(e) }));
+        wsSend(ws, JSON.stringify({ type: 'git_branch_list_data', sessionId: id, branches: [], error: String(e) }));
       }
 
     } else if (parsed.type === 'git_remote_url') {
@@ -1427,7 +1432,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (!session) return;
       const url = gitService.getRemoteUrl(session.cwd);
-      ws.send(JSON.stringify({ type: 'git_remote_url_data', sessionId: id, url }));
+      wsSend(ws, JSON.stringify({ type: 'git_remote_url_data', sessionId: id, url }));
 
     } else if (parsed.type === 'git_checkout') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1436,7 +1441,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       if (!session) return;
       const branch = parsed.branch as string;
       if (!branch || !/^[a-zA-Z0-9][a-zA-Z0-9/_.\-]*$/.test(branch)) {
-        ws.send(JSON.stringify({ type: 'git_checkout_ack', sessionId: id, error: 'Invalid branch name' }));
+        wsSend(ws, JSON.stringify({ type: 'git_checkout_ack', sessionId: id, error: 'Invalid branch name' }));
         return;
       }
       // For remote branches like origin/feature, create a local tracking branch
@@ -1448,7 +1453,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         cmd = `git checkout ${branch}`;
       }
       session.pty.write(cmd + '\r');
-      ws.send(JSON.stringify({ type: 'git_checkout_ack', sessionId: id, branch }));
+      wsSend(ws, JSON.stringify({ type: 'git_checkout_ack', sessionId: id, branch }));
 
     } else if (parsed.type === 'git_pull') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1456,7 +1461,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (!session) return;
       session.pty.write('git pull\r');
-      ws.send(JSON.stringify({ type: 'git_pull_ack', sessionId: id }));
+      wsSend(ws, JSON.stringify({ type: 'git_pull_ack', sessionId: id }));
 
     } else if (parsed.type === 'file_tree') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1472,9 +1477,9 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
           const files = gitService.getGitStatus(targetDir);
           for (const f of files) { gitStatusMap[f.path] = f.status; }
         }
-        ws.send(JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree, gitStatus: gitStatusMap }));
+        wsSend(ws, JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree, gitStatus: gitStatusMap }));
       } catch (e) {
-        ws.send(JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree: [], error: String(e) }));
+        wsSend(ws, JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree: [], error: String(e) }));
       }
 
     } else if (parsed.type === 'git_status') {
@@ -1485,7 +1490,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       try {
         const isRepo = gitService.isGitRepo(session.cwd);
         if (!isRepo) {
-          ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], isRepo: false }));
+          wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], isRepo: false }));
           return;
         }
         const files = gitService.getGitStatus(session.cwd);
@@ -1504,9 +1509,9 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             mainBranchFileCount = mainFiles.length;
           } catch {}
         }
-        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true, upstream, worktrees, isInWorktree, mainBranchFileCount }));
+        wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true, upstream, worktrees, isInWorktree, mainBranchFileCount }));
       } catch (e) {
-        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], error: String(e), isRepo: false }));
+        wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], error: String(e), isRepo: false }));
       }
 
     } else if (parsed.type === 'git_diff') {
@@ -1517,7 +1522,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const filePath = parsed.filePath as string | undefined;
       const staged = parsed.staged as boolean || false;
       const diff = gitService.getGitDiff(session.cwd, filePath, staged);
-      ws.send(JSON.stringify({ type: 'git_diff_data', sessionId: id, filePath, staged, diff }));
+      wsSend(ws, JSON.stringify({ type: 'git_diff_data', sessionId: id, filePath, staged, diff }));
 
     } else if (parsed.type === 'git_stage') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1527,13 +1532,13 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const filePath = parsed.filePath as string;
       const all = parsed.all as boolean || false;
       const ok = all ? gitService.gitStageAll(session.cwd) : gitService.gitStageFile(session.cwd, filePath);
-      ws.send(JSON.stringify({ type: 'git_stage_ack', sessionId: id, ok }));
+      wsSend(ws, JSON.stringify({ type: 'git_stage_ack', sessionId: id, ok }));
       // Auto-refresh status after staging
       if (ok) {
         const files = gitService.getGitStatus(session.cwd);
         const branch = gitService.getCurrentBranch(session.cwd);
         const root = gitService.getGitRoot(session.cwd);
-        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+        wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
       }
 
     } else if (parsed.type === 'git_unstage') {
@@ -1544,12 +1549,12 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const filePath = parsed.filePath as string;
       const all = parsed.all as boolean || false;
       const ok = all ? gitService.gitUnstageAll(session.cwd) : gitService.gitUnstageFile(session.cwd, filePath);
-      ws.send(JSON.stringify({ type: 'git_unstage_ack', sessionId: id, ok }));
+      wsSend(ws, JSON.stringify({ type: 'git_unstage_ack', sessionId: id, ok }));
       if (ok) {
         const files = gitService.getGitStatus(session.cwd);
         const branch = gitService.getCurrentBranch(session.cwd);
         const root = gitService.getGitRoot(session.cwd);
-        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+        wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
       }
 
     } else if (parsed.type === 'git_commit') {
@@ -1559,17 +1564,17 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       if (!session) return;
       const message = parsed.message as string;
       const result = gitService.gitCommit(session.cwd, message);
-      ws.send(JSON.stringify({ type: 'git_commit_ack', sessionId: id, ...result }));
+      wsSend(ws, JSON.stringify({ type: 'git_commit_ack', sessionId: id, ...result }));
       if (result.ok) {
         // Auto-refresh status after commit
         const files = gitService.getGitStatus(session.cwd);
         const branch = gitService.getCurrentBranch(session.cwd);
         const root = gitService.getGitRoot(session.cwd);
-        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+        wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
         // Commit & Push
         if (parsed.push) {
           const pushResult = gitService.gitPush(session.cwd);
-          ws.send(JSON.stringify({ type: 'git_push_ack', sessionId: id, ...pushResult }));
+          wsSend(ws, JSON.stringify({ type: 'git_push_ack', sessionId: id, ...pushResult }));
         }
       }
 
@@ -1579,7 +1584,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (!session) return;
       const result = gitService.createFile(session.cwd, parsed.filePath as string, parsed.isDir as boolean);
-      ws.send(JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'create', ...result }));
+      wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'create', ...result }));
 
     } else if (parsed.type === 'file_rename') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1587,7 +1592,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (!session) return;
       const result = gitService.renameFile(session.cwd, parsed.oldPath as string, parsed.newPath as string);
-      ws.send(JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'rename', ...result }));
+      wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'rename', ...result }));
 
     } else if (parsed.type === 'file_delete') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1595,7 +1600,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (!session) return;
       const result = gitService.deleteFile(session.cwd, parsed.filePath as string);
-      ws.send(JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'delete', ...result }));
+      wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'delete', ...result }));
 
     } else if (parsed.type === 'file_duplicate') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1603,7 +1608,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (!session) return;
       const result = gitService.duplicateFile(session.cwd, parsed.filePath as string);
-      ws.send(JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'duplicate', ...result }));
+      wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'duplicate', ...result }));
 
     } else if (parsed.type === 'file_reveal') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1617,7 +1622,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       if (!fullPath.startsWith(resolvedCwd + path.sep) && fullPath !== resolvedCwd) return;
       execFile('open', ['-R', fullPath], (err) => {
         if (err) {
-          ws.send(JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'reveal', ok: false, error: err.message }));
+          wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'reveal', ok: false, error: err.message }));
         }
       });
 
@@ -1628,7 +1633,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       if (!session) return;
       const filePath = parsed.filePath as string;
       const result = gitService.readFileContent(session.cwd, filePath);
-      ws.send(JSON.stringify({ type: 'file_read_data', sessionId: id, filePath, ...result }));
+      wsSend(ws, JSON.stringify({ type: 'file_read_data', sessionId: id, filePath, ...result }));
 
     } else if (parsed.type === 'file_search') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1641,7 +1646,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         useRegex: parsed.useRegex as boolean,
         include: parsed.include as string,
       });
-      ws.send(JSON.stringify({ type: 'file_search_data', sessionId: id, results }));
+      wsSend(ws, JSON.stringify({ type: 'file_search_data', sessionId: id, results }));
 
     } else if (parsed.type === 'file_replace') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1652,7 +1657,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         caseSensitive: parsed.caseSensitive as boolean,
         useRegex: parsed.useRegex as boolean,
       });
-      ws.send(JSON.stringify({ type: 'file_replace_ack', sessionId: id, ...result }));
+      wsSend(ws, JSON.stringify({ type: 'file_replace_ack', sessionId: id, ...result }));
 
     } else if (parsed.type === 'file_replace_all') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1664,7 +1669,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         useRegex: parsed.useRegex as boolean,
         include: parsed.include as string,
       });
-      ws.send(JSON.stringify({ type: 'file_replace_ack', sessionId: id, ...result }));
+      wsSend(ws, JSON.stringify({ type: 'file_replace_ack', sessionId: id, ...result }));
 
     } else if (parsed.type === 'git_generate_message') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1672,7 +1677,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (!session) return;
       const message = gitService.generateCommitMessage(session.cwd);
-      ws.send(JSON.stringify({ type: 'git_generate_message_data', sessionId: id, message }));
+      wsSend(ws, JSON.stringify({ type: 'git_generate_message_data', sessionId: id, message }));
 
     } else if (parsed.type === 'git_discard') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1685,7 +1690,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         const files = gitService.getGitStatus(session.cwd);
         const branch = gitService.getCurrentBranch(session.cwd);
         const root = gitService.getGitRoot(session.cwd);
-        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+        wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
       }
 
     } else if (parsed.type === 'git_push') {
@@ -1694,7 +1699,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (!session) return;
       const result = gitService.gitPush(session.cwd);
-      ws.send(JSON.stringify({ type: 'git_push_ack', sessionId: id, ...result }));
+      wsSend(ws, JSON.stringify({ type: 'git_push_ack', sessionId: id, ...result }));
 
     } else if (parsed.type === 'git_worktree_list') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1703,9 +1708,9 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       if (!session) return;
       try {
         const worktrees = gitService.getWorktreeList(session.cwd);
-        ws.send(JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
+        wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
       } catch (e) {
-        ws.send(JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees: [], error: String(e) }));
+        wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees: [], error: String(e) }));
       }
 
     } else if (parsed.type === 'git_worktree_add') {
@@ -1720,10 +1725,10 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const gitRoot = gitService.getGitRoot(session.cwd);
       const addCwd = gitRoot || session.cwd;
       const wtResult = gitService.addWorktree(addCwd, wtPath, branch, createBranch);
-      ws.send(JSON.stringify({ type: 'git_worktree_add_ack', sessionId: id, ...wtResult }));
+      wsSend(ws, JSON.stringify({ type: 'git_worktree_add_ack', sessionId: id, ...wtResult }));
       if (wtResult.ok) {
         const worktrees = gitService.getWorktreeList(session.cwd);
-        ws.send(JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
+        wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
       }
 
     } else if (parsed.type === 'git_worktree_remove') {
@@ -1734,10 +1739,10 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const wtPath = parsed.path as string;
       const force = parsed.force as boolean || false;
       const wtResult = gitService.removeWorktree(session.cwd, wtPath, force);
-      ws.send(JSON.stringify({ type: 'git_worktree_remove_ack', sessionId: id, ...wtResult }));
+      wsSend(ws, JSON.stringify({ type: 'git_worktree_remove_ack', sessionId: id, ...wtResult }));
       if (wtResult.ok) {
         const worktrees = gitService.getWorktreeList(session.cwd);
-        ws.send(JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
+        wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
       }
 
     } else if (parsed.type === 'git_worktree_switch') {
@@ -1748,7 +1753,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const wtPath = parsed.path as string;
       const fs = require('fs');
       if (!fs.existsSync(wtPath)) {
-        ws.send(JSON.stringify({ type: 'git_worktree_switch_ack', sessionId: id, ok: false, error: 'Path does not exist' }));
+        wsSend(ws, JSON.stringify({ type: 'git_worktree_switch_ack', sessionId: id, ok: false, error: 'Path does not exist' }));
         return;
       }
       session.cwd = wtPath;
@@ -1757,7 +1762,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         const escaped = wtPath.replace(/'/g, "'\\''");
         session.pty.write(`cd '${escaped}'\r`);
       }
-      ws.send(JSON.stringify({ type: 'git_worktree_switch_ack', sessionId: id, ok: true, path: wtPath }));
+      wsSend(ws, JSON.stringify({ type: 'git_worktree_switch_ack', sessionId: id, ok: true, path: wtPath }));
       // Broadcast session_info so tabs/statusbar/sidebar update
       const infoMsg = JSON.stringify({ type: 'session_info', sessionId: id, cwd: wtPath, ai: session.ai });
       wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(infoMsg); });
@@ -1768,11 +1773,11 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
           const branch = gitService.getCurrentBranch(session.cwd);
           const root = gitService.getGitRoot(session.cwd);
           const upstream = gitService.getUpstreamStatus(session.cwd);
-          ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true, upstream }));
+          wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true, upstream }));
         }
       } catch {}
       const worktrees = gitService.getWorktreeList(session.cwd);
-      ws.send(JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
+      wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
 
     } else if (parsed.type === 'claude_usage') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1780,7 +1785,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (!session) return;
       const usage = getClaudeUsage(session.cwd);
-      ws.send(JSON.stringify({ type: 'claude_usage_data', sessionId: id, usage }));
+      wsSend(ws, JSON.stringify({ type: 'claude_usage_data', sessionId: id, usage }));
 
     } else if (parsed.type === 'claude_prompts') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1790,7 +1795,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       console.log(`[claude_prompts] cwd=${session.cwd} aiPid=${session.aiPid}`);
       const prompts = getClaudePrompts(session.cwd, session.aiPid);
       console.log(`[claude_prompts] found ${prompts.length} prompts`);
-      ws.send(JSON.stringify({ type: 'claude_prompts_data', sessionId: id, prompts }));
+      wsSend(ws, JSON.stringify({ type: 'claude_prompts_data', sessionId: id, prompts }));
     }
   });
 
