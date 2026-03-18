@@ -102,7 +102,14 @@
       </div>
       <div class="sc-commit-bar">
         <input type="text" class="sc-commit-input" id="sc-commit-input" placeholder="Message (Enter to commit)"/>
-        <button class="sc-commit-btn" id="sc-commit-btn" title="Commit">✓ Commit</button>
+        <div class="sc-commit-group">
+          <button class="sc-commit-btn" id="sc-commit-btn" title="Commit">✓ Commit</button>
+          <button class="sc-commit-dropdown" id="sc-commit-dropdown" title="More actions">▾</button>
+          <div class="sc-commit-menu" id="sc-commit-menu">
+            <div class="sc-commit-menu-item" data-action="commit-push">Commit & Push</div>
+            <div class="sc-commit-menu-item" data-action="push">Push</div>
+          </div>
+        </div>
       </div>
       <div class="sc-empty" id="sc-empty">No changes detected</div>
       <div class="sc-file-list-container" id="sc-file-list"></div>

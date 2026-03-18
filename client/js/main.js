@@ -16,7 +16,7 @@ import { initInputPanel, onSessionChange as inputPanelSessionChange } from './in
 import { handleClaudeUsageData, startUsagePolling, onSessionChangeUsage, onAiChangeUsage } from './claude-usage.js';
 import { initActivityBar, getActivePanel } from './activity-bar.js';
 import { initExplorer, handleFileTreeData, onExplorerSessionChange, requestFileTree } from './explorer.js';
-import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, onSourceControlSessionChange } from './source-control.js';
+import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, onSourceControlSessionChange } from './source-control.js';
 
 S.currentTheme = THEMES[0];
 
@@ -108,6 +108,8 @@ function handleMessage(msg) {
     handleGitDiffData(msg);
   } else if (msg.type === 'git_commit_ack') {
     handleGitCommitAck(msg);
+  } else if (msg.type === 'git_push_ack') {
+    handleGitPushAck(msg);
   }
 }
 

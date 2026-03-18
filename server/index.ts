@@ -856,7 +856,20 @@ wss.on('connection', (ws: WebSocket) => {
         const branch = gitService.getCurrentBranch(session.cwd);
         const root = gitService.getGitRoot(session.cwd);
         ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+        // Commit & Push
+        if (parsed.push) {
+          const pushResult = gitService.gitPush(session.cwd);
+          ws.send(JSON.stringify({ type: 'git_push_ack', sessionId: id, ...pushResult }));
+        }
       }
+
+    } else if (parsed.type === 'git_push') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const result = gitService.gitPush(session.cwd);
+      ws.send(JSON.stringify({ type: 'git_push_ack', sessionId: id, ...result }));
 
     } else if (parsed.type === 'claude_usage') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);

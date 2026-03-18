@@ -296,6 +296,15 @@ export function gitUnstageAll(cwd: string): boolean {
   }
 }
 
+export function gitPush(cwd: string): { ok: boolean; error?: string } {
+  try {
+    execFileSync('git', ['push'], { cwd, encoding: 'utf-8', timeout: 30000 });
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.stderr || e.message || String(e) };
+  }
+}
+
 export function gitCommit(cwd: string, message: string): { ok: boolean; error?: string } {
   if (!message.trim()) return { ok: false, error: 'Empty commit message' };
   try {

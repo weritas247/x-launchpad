@@ -27,23 +27,50 @@ export function initSourceControl() {
   // Commit functionality
   const commitInput = document.getElementById('sc-commit-input');
   const commitBtn = document.getElementById('sc-commit-btn');
-  const doCommit = () => {
+  const commitDropdown = document.getElementById('sc-commit-dropdown');
+  const commitMenu = document.getElementById('sc-commit-menu');
+
+  const doCommit = (andPush = false) => {
     if (!commitInput || !S.activeSessionId) return;
     const message = commitInput.value.trim();
     if (!message) return;
-    wsSend({ type: 'git_commit', sessionId: S.activeSessionId, message });
+    wsSend({ type: 'git_commit', sessionId: S.activeSessionId, message, push: andPush });
     commitInput.value = '';
   };
-  if (commitBtn) commitBtn.addEventListener('click', doCommit);
+
+  if (commitBtn) commitBtn.addEventListener('click', () => doCommit(false));
   if (commitInput) commitInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); doCommit(); }
+    if (e.key === 'Enter') { e.preventDefault(); doCommit(false); }
   });
+
+  // Dropdown menu
+  if (commitDropdown && commitMenu) {
+    commitDropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
+      commitMenu.classList.toggle('show');
+    });
+    document.addEventListener('click', () => commitMenu.classList.remove('show'));
+
+    commitMenu.addEventListener('click', (e) => {
+      const action = e.target.dataset?.action;
+      if (action === 'commit-push') doCommit(true);
+      else if (action === 'push') wsSend({ type: 'git_push', sessionId: S.activeSessionId });
+      commitMenu.classList.remove('show');
+    });
+  }
 }
 
 export function handleGitCommitAck(msg) {
+  const commitInput = document.getElementById('sc-commit-input');
   if (!msg.ok) {
     console.error('Commit failed:', msg.error);
+    if (commitInput) commitInput.style.borderColor = 'var(--danger)';
+    setTimeout(() => { if (commitInput) commitInput.style.borderColor = ''; }, 2000);
   }
+}
+
+export function handleGitPushAck(msg) {
+  // handled silently, status refresh will follow
 }
 
 export function requestGitStatus() {
@@ -97,6 +124,12 @@ function renderSourceControl() {
 
   if (branchEl) branchEl.textContent = gitBranch || '—';
   if (countEl) countEl.textContent = gitStatusFiles.length > 0 ? gitStatusFiles.length : '';
+
+  // Update commit input placeholder with branch name
+  const commitInput = document.getElementById('sc-commit-input');
+  if (commitInput) {
+    commitInput.placeholder = gitBranch ? `Message (Enter to commit on "${gitBranch}")` : 'Message (Enter to commit)';
+  }
 
   if (!isGitRepo) {
     container.innerHTML = '';

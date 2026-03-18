@@ -630,6 +630,17 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
   font-family:var(--font-mono);font-size:10px;font-weight:700;padding:5px 10px;cursor:pointer;
   white-space:nowrap;transition:all .15s;letter-spacing:.04em}
 .sc-commit-btn:hover{filter:brightness(1.2);box-shadow:0 0 8px var(--accent-glow)}
+.sc-commit-group{display:flex;position:relative;flex-shrink:0}
+.sc-commit-group .sc-commit-btn{border-radius:3px 0 0 3px}
+.sc-commit-dropdown{background:var(--accent);color:var(--bg-void);border:none;border-left:1px solid rgba(0,0,0,.2);
+  border-radius:0 3px 3px 0;font-size:9px;padding:0 5px;cursor:pointer;transition:all .15s}
+.sc-commit-dropdown:hover{filter:brightness(1.2)}
+.sc-commit-menu{display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--bg-panel);
+  border:1px solid var(--border-lit);border-radius:4px;min-width:130px;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.4);overflow:hidden}
+.sc-commit-menu.show{display:block}
+.sc-commit-menu-item{padding:6px 12px;font-size:11px;color:var(--text-main);cursor:pointer;transition:background .1s;
+  font-family:var(--font-mono);letter-spacing:.02em}
+.sc-commit-menu-item:hover{background:var(--bg-hover);color:var(--accent)}
 .sc-empty{padding:16px;font-size:11px;color:var(--text-ghost);text-align:center}
 .sc-file-list-container{flex:1;overflow-y:auto;padding:4px 0}
 .sc-file-list-container::-webkit-scrollbar{width:3px}
