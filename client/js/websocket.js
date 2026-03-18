@@ -1,6 +1,10 @@
 import { S, connDot, connLabel, sbWs } from './state.js';
 import { showToast } from './toast.js';
 
+// ─── Latency UI elements ────────────────────────────
+const _signalBars = document.querySelector('.signal-bars');
+const _latencyValue = document.getElementById('latency-value');
+
 let _onInputSend = null;
 export function setOnInputSend(fn) { _onInputSend = fn; }
 
@@ -23,11 +27,28 @@ let _disconnectTime = 0;
 const HEARTBEAT_INTERVAL = 5000;   // ping every 5s
 const PONG_TIMEOUT = 8000;         // no pong within 8s = dead
 
+function updateLatencyUI(rtt) {
+  if (!_signalBars || !_latencyValue) return;
+  let level;
+  if (rtt < 50)       level = 4;  // excellent
+  else if (rtt < 150) level = 3;  // good
+  else if (rtt < 300) level = 2;  // fair
+  else                 level = 1;  // poor
+  _signalBars.className = 'signal-bars level-' + level;
+  _latencyValue.textContent = rtt + 'ms';
+}
+
+function resetLatencyUI() {
+  if (_signalBars) _signalBars.className = 'signal-bars';
+  if (_latencyValue) _latencyValue.textContent = '—';
+}
+
 export function setWsStatus(online) {
   connDot.className = 'meta-dot' + (online ? ' live' : ' dead');
   connLabel.textContent = online ? 'ONLINE' : 'OFFLINE';
   sbWs.textContent = online ? 'WS LIVE' : 'WS OFFLINE';
   sbWs.className = 'sb-item' + (online ? ' sb-ok' : ' sb-warn');
+  if (!online) resetLatencyUI();
 }
 
 function alertDisconnect(reason) {
@@ -147,9 +168,13 @@ export function connect(messageHandler) {
   S.ws.onmessage = (event) => {
     let msg;
     try { msg = JSON.parse(event.data); } catch { return; }
-    // Handle pong from server
+    // Handle pong from server — measure RTT
     if (msg.type === 'pong') {
       _lastPong = Date.now();
+      if (msg.t) {
+        const rtt = Date.now() - msg.t;
+        updateLatencyUI(rtt);
+      }
       return;
     }
     messageHandler(msg);
