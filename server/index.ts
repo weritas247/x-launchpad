@@ -1030,19 +1030,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       ws.send(JSON.stringify({ type: 'session_info', sessionId: id, cwd: sess.cwd, ai: sess.ai }));
       // Scrollback is now handled by per-session data WS on connect
 
-    } else if (parsed.type === 'scrollback_request') {
-      const id = parsed.sessionId as string;
-      const session = sessions.get(id);
-      if (session && session.scrollback) {
-        // Send scrollback via binary frame (same format as output)
-        const sidBuf = Buffer.from(id, 'utf-8');
-        const hdr = Buffer.alloc(1 + 2 + sidBuf.length);
-        hdr[0] = 0x02; // type: scrollback replay
-        hdr.writeUInt16BE(sidBuf.length, 1);
-        sidBuf.copy(hdr, 3);
-        const dataBuf = Buffer.from(session.scrollback, 'utf-8');
-        ws.send(Buffer.concat([hdr, dataBuf]));
-      }
+    // scrollback is now handled by per-session data WS on connect
 
     } else if (parsed.type === 'session_rename') {
       const id = parsed.sessionId as string;
@@ -1209,7 +1197,19 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         const branch = gitService.getCurrentBranch(session.cwd);
         const root = gitService.getGitRoot(session.cwd);
         const upstream = gitService.getUpstreamStatus(session.cwd);
-        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true, upstream }));
+        const worktrees = gitService.getWorktreeList(session.cwd);
+        // Detect if current session is in a worktree (not main)
+        const normalizedCwd = session.cwd.replace(/\/+$/, '');
+        const mainWt = worktrees.find(w => w.isMain);
+        const isInWorktree = mainWt ? normalizedCwd !== mainWt.path.replace(/\/+$/, '') : false;
+        let mainBranchFileCount: number | undefined;
+        if (isInWorktree && mainWt) {
+          try {
+            const mainFiles = gitService.getGitStatus(mainWt.path);
+            mainBranchFileCount = mainFiles.length;
+          } catch {}
+        }
+        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true, upstream, worktrees, isInWorktree, mainBranchFileCount }));
       } catch (e) {
         ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], error: String(e), isRepo: false }));
       }

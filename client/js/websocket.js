@@ -172,7 +172,6 @@ export function connect(messageHandler) {
     ? `${proto}//${location.host}?token=${encodeURIComponent(token)}`
     : `${proto}//${location.host}`;
   S.ws = new WebSocket(wsUrl);
-  S.ws.binaryType = 'arraybuffer';
 
   S.ws.onopen = () => {
     setWsStatus(true);
@@ -190,21 +189,8 @@ export function connect(messageHandler) {
   };
 
   S.ws.onmessage = (event) => {
-    // Binary frame: [type:u8][sidLen:u16][sessionId][data]
-    if (event.data instanceof ArrayBuffer) {
-      const view = new DataView(event.data);
-      const type = view.getUint8(0);
-      const sidLen = view.getUint16(1);
-      const sessionId = _textDecoder.decode(new Uint8Array(event.data, 3, sidLen));
-      const data = _textDecoder.decode(new Uint8Array(event.data, 3 + sidLen));
-      if (type === 0x01) {
-        messageHandler({ type: 'output', sessionId, data });
-      } else if (type === 0x02) {
-        messageHandler({ type: 'scrollback', sessionId, data });
-      }
-      return;
-    }
-    // JSON text frame: all other messages
+    // Control WS only receives JSON — terminal I/O goes through per-session data WS
+    if (event.data instanceof ArrayBuffer) return; // ignore binary on control WS
     let msg;
     try { msg = JSON.parse(event.data); } catch { return; }
     // Handle pong from server — measure RTT
