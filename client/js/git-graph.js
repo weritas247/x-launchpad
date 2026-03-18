@@ -414,12 +414,18 @@ function isWithinOneHour(iso) {
 
 function absTime(iso) {
   const d = new Date(iso);
+  const now = new Date();
   const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const h = d.getHours();
   const ampm = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 || 12;
   const min = String(d.getMinutes()).padStart(2, '0');
-  return `${mon[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} at ${h12}:${min}\u202F${ampm}`;
+  const timeStr = `${h12}:${min}\u202F${ampm}`;
+  const isToday = d.getFullYear() === now.getFullYear() &&
+                  d.getMonth() === now.getMonth() &&
+                  d.getDate() === now.getDate();
+  if (isToday) return `Today at ${timeStr}`;
+  return `${mon[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} at ${timeStr}`;
 }
 
 // ─── CO-AUTHOR PARSING ───────────────────────────────
