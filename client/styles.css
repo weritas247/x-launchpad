@@ -602,11 +602,34 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .explorer-item.is-dir .explorer-name{color:var(--text-dim);font-weight:500}
 .explorer-empty{padding:16px;font-size:11px;color:var(--text-ghost);text-align:center}
 
+/* Explorer: git status badges */
+.explorer-git-badge{font-size:9px;font-weight:700;letter-spacing:.05em;padding:0 4px;border-radius:3px;margin-left:auto;flex-shrink:0}
+.explorer-git-modified{color:#e2b93d;background:#e2b93d18}
+.explorer-git-added{color:var(--ok);background:#39ff7818}
+.explorer-git-deleted{color:var(--danger);background:#ff336618}
+.explorer-git-renamed{color:var(--accent2);background:#7b5cfa18}
+.explorer-git-untracked{color:var(--ok);background:#39ff7818}
+.explorer-git-modified-name{color:#e2b93d}
+.explorer-git-added-name{color:var(--ok)}
+.explorer-git-deleted-name{color:var(--danger);text-decoration:line-through}
+.explorer-git-renamed-name{color:var(--accent2)}
+.explorer-git-untracked-name{color:var(--ok)}
+.explorer-git-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:auto;flex-shrink:0}
+
 /* ═══ SOURCE CONTROL PANEL ═══ */
 .sc-branch-bar{padding:8px 12px;font-size:11px;display:flex;align-items:center;gap:6px;
   border-bottom:1px solid var(--border);color:var(--text-dim)}
 .sc-branch-icon{color:var(--accent);font-size:12px}
 .sc-branch-label{color:var(--accent);font-weight:500}
+.sc-commit-bar{padding:8px 10px;display:flex;gap:6px;border-bottom:1px solid var(--border)}
+.sc-commit-input{flex:1;background:var(--bg-void);border:1px solid var(--border);border-radius:3px;
+  color:var(--text-main);font-family:var(--font-mono);font-size:11px;padding:5px 8px;outline:none;transition:border-color .15s}
+.sc-commit-input:focus{border-color:var(--accent)}
+.sc-commit-input::placeholder{color:var(--text-ghost)}
+.sc-commit-btn{background:var(--accent);color:var(--bg-void);border:none;border-radius:3px;
+  font-family:var(--font-mono);font-size:10px;font-weight:700;padding:5px 10px;cursor:pointer;
+  white-space:nowrap;transition:all .15s;letter-spacing:.04em}
+.sc-commit-btn:hover{filter:brightness(1.2);box-shadow:0 0 8px var(--accent-glow)}
 .sc-empty{padding:16px;font-size:11px;color:var(--text-ghost);text-align:center}
 .sc-file-list-container{flex:1;overflow-y:auto;padding:4px 0}
 .sc-file-list-container::-webkit-scrollbar{width:3px}

@@ -769,7 +769,13 @@ wss.on('connection', (ws: WebSocket) => {
       const targetDir = (parsed.dir as string) || session.cwd;
       try {
         const tree = gitService.getFileTree(targetDir);
-        ws.send(JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree }));
+        // Include git status for explorer badges
+        let gitStatusMap: Record<string, string> = {};
+        if (gitService.isGitRepo(targetDir)) {
+          const files = gitService.getGitStatus(targetDir);
+          for (const f of files) { gitStatusMap[f.path] = f.status; }
+        }
+        ws.send(JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree, gitStatus: gitStatusMap }));
       } catch (e) {
         ws.send(JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree: [], error: String(e) }));
       }
@@ -830,6 +836,22 @@ wss.on('connection', (ws: WebSocket) => {
       const ok = all ? gitService.gitUnstageAll(session.cwd) : gitService.gitUnstageFile(session.cwd, filePath);
       ws.send(JSON.stringify({ type: 'git_unstage_ack', sessionId: id, ok }));
       if (ok) {
+        const files = gitService.getGitStatus(session.cwd);
+        const branch = gitService.getCurrentBranch(session.cwd);
+        const root = gitService.getGitRoot(session.cwd);
+        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+      }
+
+    } else if (parsed.type === 'git_commit') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const message = parsed.message as string;
+      const result = gitService.gitCommit(session.cwd, message);
+      ws.send(JSON.stringify({ type: 'git_commit_ack', sessionId: id, ...result }));
+      if (result.ok) {
+        // Auto-refresh status after commit
         const files = gitService.getGitStatus(session.cwd);
         const branch = gitService.getCurrentBranch(session.cwd);
         const root = gitService.getGitRoot(session.cwd);

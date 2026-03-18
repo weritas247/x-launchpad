@@ -23,6 +23,27 @@ export function initSourceControl() {
       renderSourceControl();
     });
   }
+
+  // Commit functionality
+  const commitInput = document.getElementById('sc-commit-input');
+  const commitBtn = document.getElementById('sc-commit-btn');
+  const doCommit = () => {
+    if (!commitInput || !S.activeSessionId) return;
+    const message = commitInput.value.trim();
+    if (!message) return;
+    wsSend({ type: 'git_commit', sessionId: S.activeSessionId, message });
+    commitInput.value = '';
+  };
+  if (commitBtn) commitBtn.addEventListener('click', doCommit);
+  if (commitInput) commitInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); doCommit(); }
+  });
+}
+
+export function handleGitCommitAck(msg) {
+  if (!msg.ok) {
+    console.error('Commit failed:', msg.error);
+  }
 }
 
 export function requestGitStatus() {
