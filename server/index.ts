@@ -12,6 +12,9 @@ import { execSync } from 'child_process';
 const execFileAsync = promisify(execFile);
 import * as gitService from './git-service';
 import * as db from './db';
+import * as jwt from 'jsonwebtoken';
+import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 
 const app = express();
 const server = http.createServer(app);
@@ -207,7 +210,40 @@ let currentSettings = loadSettings();
 // ─── AUTHENTICATION ──────────────────────────────────────────────
 import { timingSafeEqual } from 'crypto';
 const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
-const authEnabled = AUTH_TOKEN.length > 0;
+const tokenAuthEnabled = AUTH_TOKEN.length > 0;
+
+function isAuthEnabled(): boolean {
+  return tokenAuthEnabled || db.getUserCount() > 0;
+}
+
+function isRegistrationAllowed(): boolean {
+  if (ALLOW_REGISTRATION) return true;
+  return db.getUserCount() === 0;
+}
+
+function getAuthMode(): 'email' | 'token' | 'none' {
+  const hasUsers = db.getUserCount() > 0;
+  if (hasUsers) return 'email';
+  if (tokenAuthEnabled) return 'token';
+  return 'none';
+}
+
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const BCRYPT_ROUNDS = 12;
+const ALLOW_REGISTRATION = process.env.ALLOW_REGISTRATION === '1';
+
+function getJwtSecret(): string {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  let secret = db.getSetting('jwt_secret');
+  if (!secret) {
+    secret = crypto.randomBytes(64).toString('hex');
+    db.setSetting('jwt_secret', secret);
+    console.log('[auth] Generated and persisted new JWT secret');
+  }
+  return secret;
+}
+
+const JWT_SECRET = getJwtSecret();
 
 // Rate limiting for auth failures
 const authFailures = new Map<string, { count: number; resetAt: number }>();
@@ -230,13 +266,34 @@ function recordAuthFailure(ip: string): void {
 }
 
 function verifyToken(token: string): boolean {
-  if (!authEnabled) return true;
-  if (!token || token.length !== AUTH_TOKEN.length) return false;
+  if (!token) return false;
+  // 1) Try JWT verification
   try {
-    return timingSafeEqual(Buffer.from(token), Buffer.from(AUTH_TOKEN));
-  } catch {
-    return false;
+    jwt.verify(token, JWT_SECRET);
+    return true;
+  } catch {}
+  // 2) Fall back to legacy AUTH_TOKEN
+  if (tokenAuthEnabled && AUTH_TOKEN) {
+    try {
+      return timingSafeEqual(Buffer.from(token), Buffer.from(AUTH_TOKEN));
+    } catch {}
   }
+  return false;
+}
+
+function getTokenPayload(token: string): { userId: number; email: string } | null {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as unknown as { sub: number; email: string };
+    return { userId: payload.sub, email: payload.email };
+  } catch {
+    return null;
+  }
+}
+
+function issueJwt(user: { id: number; email: string }): string {
+  return jwt.sign({ sub: user.id, email: user.email }, JWT_SECRET, {
+    expiresIn: JWT_EXPIRES_IN as string | number,
+  } as jwt.SignOptions);
 }
 
 function extractToken(req: express.Request): string {
@@ -247,29 +304,26 @@ function extractToken(req: express.Request): string {
 
 // Auth middleware — skip for login page and static assets
 function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
-  if (!authEnabled) return next();
-  // Allow login endpoint and static assets without auth
-  if (req.path === '/api/auth/login' || req.path === '/api/auth/check') return next();
-  // Allow the login page itself
+  if (!isAuthEnabled()) return next();
+  if (['/api/auth/login', '/api/auth/check', '/api/auth/register'].includes(req.path)) return next();
   if (req.path === '/login' || req.path === '/login.html') return next();
 
   const token = extractToken(req);
-  if (verifyToken(token)) return next();
+  if (token && verifyToken(token)) return next();
 
-  // For API calls, return 401; for page loads, redirect to login
   if (req.path.startsWith('/api/')) {
     res.status(401).json({ error: 'Unauthorized' });
   } else if (req.path === '/' || req.path === '/index.html') {
     res.redirect('/login');
   } else {
-    // Allow static assets (CSS, JS, icons) without auth so login page works
     next();
   }
 }
 
-if (authEnabled) {
-  console.log('[auth] Token authentication enabled');
+if (tokenAuthEnabled) {
+  console.log('[auth] Legacy token authentication enabled');
 }
+console.log(`[auth] Email auth: ${db.getUserCount()} registered user(s), registration ${isRegistrationAllowed() ? 'allowed' : 'locked'}`);
 
 // ─── HTTP ─────────────────────────────────────────────────────────
 app.use(express.json());
@@ -277,24 +331,114 @@ app.use(authMiddleware);
 app.use(express.static(path.join(__dirname, '../../client')));
 
 // Auth endpoints
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const ip = req.ip || 'unknown';
   if (!checkRateLimit(ip)) {
     return res.status(429).json({ ok: false, error: 'Too many attempts. Try again later.' });
   }
-  const token = req.body?.token as string;
-  if (verifyToken(token)) {
-    res.json({ ok: true });
-  } else {
+
+  const { email, password, token } = req.body || {};
+
+  // Legacy token login
+  if (token && !email) {
+    if (tokenAuthEnabled && verifyToken(token)) {
+      return res.json({ ok: true });
+    }
     recordAuthFailure(ip);
-    res.status(401).json({ ok: false, error: 'Invalid token' });
+    return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+  }
+
+  // Email login
+  if (!email || !password) {
+    return res.status(400).json({ ok: false, error: 'Email and password required' });
+  }
+
+  const user = db.getUserByEmail(email);
+  if (!user) {
+    recordAuthFailure(ip);
+    return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+  }
+
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) {
+    recordAuthFailure(ip);
+    return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+  }
+
+  const jwtToken = issueJwt(user);
+  res.json({
+    ok: true,
+    token: jwtToken,
+    user: { id: user.id, email: user.email, name: user.name },
+  });
+});
+
+app.post('/api/auth/register', async (req, res) => {
+  const ip = req.ip || 'unknown';
+  if (!checkRateLimit(ip)) {
+    return res.status(429).json({ ok: false, error: 'Too many attempts. Try again later.' });
+  }
+
+  if (!isRegistrationAllowed()) {
+    return res.status(403).json({ ok: false, error: 'Registration is not allowed' });
+  }
+
+  const { email, password, name } = req.body || {};
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ ok: false, error: 'Valid email is required' });
+  }
+
+  if (!password || password.length < 8) {
+    return res.status(400).json({ ok: false, error: 'Password must be at least 8 characters' });
+  }
+  if (password.length > 128) {
+    return res.status(400).json({ ok: false, error: 'Password must be at most 128 characters' });
+  }
+
+  try {
+    const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const userId = db.createUser(email, hash, name || '');
+    const user = db.getUserById(userId)!;
+    const jwtToken = issueJwt(user);
+    console.log(`[auth] New user registered: ${email} (id: ${userId})`);
+    res.json({
+      ok: true,
+      token: jwtToken,
+      user: { id: user.id, email: user.email, name: user.name },
+    });
+  } catch (err: any) {
+    recordAuthFailure(ip);
+    res.status(400).json({ ok: false, error: 'Registration failed' });
   }
 });
 
 app.get('/api/auth/check', (req, res) => {
-  if (!authEnabled) return res.json({ ok: true, authEnabled: false });
+  const authOn = isAuthEnabled();
+  if (!authOn) return res.json({ ok: true, authEnabled: false, authMode: 'none', registrationAllowed: false });
+
   const token = extractToken(req);
-  res.json({ ok: verifyToken(token), authEnabled: true });
+  const valid = token ? verifyToken(token) : false;
+
+  const result: any = {
+    ok: valid,
+    authEnabled: true,
+    authMode: getAuthMode(),
+    registrationAllowed: isRegistrationAllowed(),
+    tokenAuthEnabled,
+  };
+
+  if (valid && token) {
+    const payload = getTokenPayload(token);
+    if (payload) {
+      const user = db.getUserById(payload.userId);
+      if (user) {
+        result.user = { id: user.id, email: user.email, name: user.name };
+      }
+    }
+  }
+
+  res.json(result);
 });
 
 app.get('/login', (_req, res) => {
@@ -907,7 +1051,7 @@ wssData.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   const sessionId = url.searchParams.get('sid') || '';
 
   // Auth check
-  if (authEnabled) {
+  if (isAuthEnabled()) {
     const token = url.searchParams.get('token') || '';
     if (!verifyToken(token)) { ws.close(4001, 'Unauthorized'); return; }
   }
@@ -946,7 +1090,7 @@ let clientCounter = 0;
 
 wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   // Authenticate WebSocket connections
-  if (authEnabled) {
+  if (isAuthEnabled()) {
     const url = new URL(req.url || '', `http://${req.headers.host}`);
     const token = url.searchParams.get('token') || '';
     if (!verifyToken(token)) {
