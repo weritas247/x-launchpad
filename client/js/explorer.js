@@ -2,6 +2,7 @@
 import { S, sessionMeta, escHtml } from './state.js';
 import { wsSend } from './websocket.js';
 import { showToast } from './toast.js';
+import { openFileTab } from './file-viewer.js';
 
 let explorerTree = [];
 let expandedDirs = new Set();
@@ -12,12 +13,6 @@ let ctxTargetPath = '';
 let ctxTargetType = ''; // 'file' | 'directory'
 
 export function initExplorer() {
-  const closeBtn = document.getElementById('explorer-preview-close');
-  if (closeBtn) closeBtn.addEventListener('click', () => {
-    const panel = document.getElementById('explorer-preview-panel');
-    if (panel) panel.style.display = 'none';
-  });
-
   // Explorer context menu
   const ctxMenu = document.getElementById('explorer-ctx-menu');
   document.addEventListener('click', () => { if (ctxMenu) ctxMenu.style.display = 'none'; });
@@ -186,37 +181,10 @@ export function handleFileOpAck(msg) {
 }
 
 export function handleFileReadData(msg) {
-  const panel = document.getElementById('explorer-preview-panel');
-  const title = document.getElementById('explorer-preview-title');
-  const content = document.getElementById('explorer-preview-content');
-  if (!panel || !content) return;
-
-  panel.style.display = '';
-  if (title) title.textContent = msg.filePath || 'File';
-
-  if (msg.error) {
-    content.innerHTML = `<div class="explorer-preview-error">${escHtml(msg.error)}</div>`;
-    return;
-  }
-
-  const text = msg.content || '';
-  const ext = (msg.filePath || '').split('.').pop()?.toLowerCase();
-  const isBinary = msg.binary;
-
-  if (isBinary) {
-    content.innerHTML = '<div class="explorer-preview-error">Binary file — cannot preview</div>';
-    return;
-  }
-
-  // Render with line numbers
-  const lines = text.split('\n');
-  const maxLines = 200;
-  const truncated = lines.length > maxLines;
-  const displayLines = truncated ? lines.slice(0, maxLines) : lines;
-
-  content.innerHTML = displayLines.map((line, i) =>
-    `<div class="preview-line"><span class="preview-ln">${i + 1}</span><span class="preview-code">${escHtml(line)}</span></div>`
-  ).join('') + (truncated ? `<div class="preview-line"><span class="preview-ln">…</span><span class="preview-code" style="color:var(--text-ghost)">(${lines.length - maxLines} more lines)</span></div>` : '');
+  openFileTab(msg.filePath || 'unknown', msg.content || '', {
+    binary: msg.binary,
+    error: msg.error,
+  });
 }
 
 export function onExplorerSessionChange() {

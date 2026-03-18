@@ -18,6 +18,7 @@ import { initActivityBar, getActivePanel, switchPanel, toggleSidebarExport, init
 import { initExplorer, handleFileTreeData, handleFileReadData, handleFileOpAck, onExplorerSessionChange, requestFileTree } from './explorer.js';
 import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange } from './source-control.js';
 import { initSearch, handleSearchResults, handleReplaceAck, onSearchSessionChange } from './search.js';
+import { setActivateSessionFn } from './file-viewer.js';
 
 S.currentTheme = THEMES[0];
 
@@ -279,6 +280,9 @@ initSidebarResize();
 initExplorer();
 initSourceControl();
 initSearch();
+
+// Wire up file viewer's lazy dependency
+setActivateSessionFn(activateSession);
 
 // Register side panel refresh on session change
 setOnSessionChangeSidePanels(() => {

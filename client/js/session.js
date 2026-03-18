@@ -2,6 +2,7 @@ import { S, terminalMap, sessionMeta, sbActiveName, sbCount, sbSize, hdrCount, s
 import { requestBranch } from './git-graph.js';
 import { collectPaneIds, teardownSplitLayout } from './split-pane.js';
 import { renderPanel as renderInputPanel } from './input-panel.js';
+import { deactivateAllFileTabs } from './file-viewer.js';
 
 // Lazy-loaded callbacks to avoid circular imports
 let _onSessionChangeSidePanels = null;
@@ -10,6 +11,9 @@ export function setOnSessionChangeSidePanels(fn) { _onSessionChangeSidePanels = 
 export function activateSession(id) {
   if (!terminalMap.has(id)) return;
   S.activeSessionId = id;
+
+  // Deactivate any open file tabs
+  deactivateAllFileTabs();
 
   if (S.layoutTree === null) {
     terminalMap.forEach(({ div, tabEl, sidebarEl }, sid) => {

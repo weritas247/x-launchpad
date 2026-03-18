@@ -90,8 +90,10 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .activity-btn.drag-over-bottom{box-shadow:0 2px 0 0 var(--accent)}
 
 /* ═══ SIDEBAR ═══ */
-#sidebar{grid-area:sidebar;background:var(--bg-panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:outline .15s}
-#sidebar.drag-target{outline:2px solid var(--accent);outline-offset:-2px;background:var(--accent-dim)}
+#sidebar{grid-area:sidebar;background:var(--bg-panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:outline .15s;--sidebar-split-ratio:0.5;position:relative}
+#sidebar.drag-target{outline:2px solid var(--accent);outline-offset:-2px}
+#sidebar.drag-zone-top{background:linear-gradient(to bottom,var(--accent-dim) 0%,var(--accent-dim) 50%,transparent 50%)}
+#sidebar.drag-zone-bottom{background:linear-gradient(to bottom,transparent 0%,transparent 50%,var(--accent-dim) 50%)}
 #sidebar.collapsed{display:none}
 #sidebar.collapsed+.sidebar-resize{display:none}
 .sidebar-resize{grid-area:resize;cursor:col-resize;background:transparent;position:relative;z-index:10}
@@ -99,6 +101,18 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .sidebar-resize::after{content:'';position:absolute;inset:-2px -4px -2px -4px}
 .sidebar-panel{display:none;flex-direction:column;flex:1;overflow:hidden}
 .sidebar-panel.active{display:flex}
+/* ─── Sidebar Split ─── */
+#sidebar.sidebar-split{overflow:hidden}
+#sidebar.sidebar-split .sidebar-panel.active{flex:none}
+#sidebar.sidebar-split .sidebar-panel.active:not(.sidebar-panel-secondary){flex-basis:calc(var(--sidebar-split-ratio) * 100%);overflow:hidden;display:flex;flex-direction:column}
+#sidebar.sidebar-split .sidebar-panel.sidebar-panel-secondary{flex:1 1 0;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.sidebar-split-resize{height:4px;cursor:row-resize;background:transparent;flex-shrink:0;position:relative;z-index:5}
+.sidebar-split-resize:hover,.sidebar-split-resize.dragging{background:var(--accent);opacity:.5}
+.sidebar-split-resize::after{content:'';position:absolute;inset:-3px 0}
+.sidebar-split-close{font-size:12px;cursor:pointer;color:var(--text-ghost);transition:color .12s}
+.sidebar-split-close:hover{color:var(--danger)}
+.activity-btn.active-secondary{color:var(--accent);opacity:.6}
+.activity-btn.active-secondary::before{top:4px;bottom:4px;opacity:.4}
 .sidebar-header{padding:12px 14px 8px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .sidebar-title-text{color:var(--accent)}
 .btn-new{background:none;border:1px solid var(--border-lit);border-radius:3px;color:var(--accent);font-family:var(--font-mono);font-size:16px;width:22px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;line-height:1}
@@ -233,6 +247,22 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .term-pane .xterm{height:100%}
 .term-pane .xterm-viewport::-webkit-scrollbar{width:4px}
 .term-pane .xterm-viewport::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ═══ FILE VIEWER PANE ═══ */
+.file-pane{position:absolute;inset:0;display:none;flex-direction:column;background:var(--bg-void)}
+.file-pane.active{display:flex}
+.file-pane-header{padding:6px 14px;font-size:11px;color:var(--text-dim);border-bottom:1px solid var(--border);letter-spacing:.04em;flex-shrink:0;background:var(--bg-deep)}
+.file-pane-path{color:var(--text-ghost)}
+.file-pane-content{flex:1;overflow:auto;padding:4px 0;font-family:var(--font-mono);font-size:var(--font-size,13px);line-height:1.6}
+.file-pane-content::-webkit-scrollbar{width:4px}
+.file-pane-content::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.fl{display:flex;padding:0 14px 0 0;min-height:1.6em}
+.fl:hover{background:var(--bg-hover)}
+.fl-ln{color:var(--text-ghost);text-align:right;padding:0 12px 0 14px;user-select:none;flex-shrink:0;font-size:12px}
+.fl-code{white-space:pre;color:var(--text-main);flex:1;min-width:0}
+.file-pane-error{padding:20px;color:var(--text-ghost);text-align:center;font-size:12px}
+.tab.file-tab .tab-file-icon{font-size:12px;flex-shrink:0}
+.tab.preview-tab .tab-name{font-style:italic}
 
 /* ═══ SPLIT PANE ═══ */
 #split-root{position:absolute;inset:0;overflow:hidden}

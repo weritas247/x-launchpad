@@ -574,8 +574,12 @@ function restoreSessions() {
 }
 
 // ─── WEBSOCKET ────────────────────────────────────────────────────
+let clientCounter = 0;
+
 wss.on('connection', (ws: WebSocket) => {
-  console.log('[ws] Client connected');
+  const clientId = ++clientCounter;
+  const clientTag = `[ws:client-${clientId}]`;
+  console.log(`${clientTag} Client connected (total: ${wss.clients.size})`);
 
   // Send initial data
   const list = Array.from(sessions.values()).map(s => ({
@@ -583,11 +587,23 @@ wss.on('connection', (ws: WebSocket) => {
   }));
   ws.send(JSON.stringify({ type: 'session_list', sessions: list }));
   ws.send(JSON.stringify({ type: 'settings', settings: currentSettings }));
+  console.log(`${clientTag} Sent initial data (${list.length} sessions)`);
 
   ws.on('message', (message: Buffer | string) => {
     const data = message.toString();
     let parsed: Record<string, unknown>;
     try { parsed = JSON.parse(data); } catch { return; }
+
+    // Heartbeat: respond to client pings immediately
+    if (parsed.type === 'ping') {
+      ws.send(JSON.stringify({ type: 'pong', t: parsed.t }));
+      return;
+    }
+
+    // Log non-trivial messages (skip input/resize for noise reduction)
+    if (parsed.type !== 'input' && parsed.type !== 'resize') {
+      console.log(`${clientTag} ← ${parsed.type}${parsed.sessionId ? ` [${(parsed.sessionId as string).slice(-6)}]` : ''}`);
+    }
 
     if (parsed.type === 'session_create') {
       const id = `session-${Date.now()}`;
@@ -977,8 +993,14 @@ wss.on('connection', (ws: WebSocket) => {
     }
   });
 
-  ws.on('close', () => { wsSession.delete(ws); wsSubscriptions.delete(ws); });
-  ws.on('error', (err) => { console.error('[ws] Error:', err.message); });
+  ws.on('close', (code, reason) => {
+    console.log(`${clientTag} Disconnected (code: ${code}, reason: ${reason || 'none'}) — remaining clients: ${wss.clients.size - 1}`);
+    wsSession.delete(ws);
+    wsSubscriptions.delete(ws);
+  });
+  ws.on('error', (err) => {
+    console.error(`${clientTag} Error: ${err.message}`);
+  });
 });
 
 server.listen(PORT, () => {

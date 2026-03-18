@@ -22,6 +22,7 @@ export function applyTheme(t) {
 
 export function initThemeSwatches() {
   const swatchContainer = document.getElementById('theme-swatches');
+  if (!swatchContainer) return;
   THEMES.forEach(t => {
     const sw = document.createElement('div');
     sw.className = 'theme-swatch' + (t.id === 'cyber' ? ' active' : '');
