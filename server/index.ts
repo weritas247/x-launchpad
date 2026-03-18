@@ -863,6 +863,15 @@ wss.on('connection', (ws: WebSocket) => {
         }
       }
 
+    } else if (parsed.type === 'file_read') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const filePath = parsed.filePath as string;
+      const result = gitService.readFileContent(session.cwd, filePath);
+      ws.send(JSON.stringify({ type: 'file_read_data', sessionId: id, filePath, ...result }));
+
     } else if (parsed.type === 'file_search') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
       if (!id) return;

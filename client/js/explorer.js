@@ -8,7 +8,11 @@ let currentDir = '';
 let gitStatusMap = {}; // { relativePath: status }
 
 export function initExplorer() {
-  // Request file tree when panel becomes visible
+  const closeBtn = document.getElementById('explorer-preview-close');
+  if (closeBtn) closeBtn.addEventListener('click', () => {
+    const panel = document.getElementById('explorer-preview-panel');
+    if (panel) panel.style.display = 'none';
+  });
 }
 
 export function requestFileTree() {
@@ -82,6 +86,11 @@ function renderTreeLevel(parent, entries, depth) {
         `<span class="explorer-icon">${icon}</span>` +
         `<span class="explorer-name${status ? ' explorer-git-' + getGitClass(status) + '-name' : ''}">${escHtml(entry.name)}</span>` +
         statusBadge;
+      item.addEventListener('click', () => {
+        // Request file content preview
+        if (!S.activeSessionId) return;
+        wsSend({ type: 'file_read', sessionId: S.activeSessionId, filePath: entry.path });
+      });
       parent.appendChild(item);
     }
   }
@@ -113,6 +122,40 @@ function getGitLabel(status) {
 function hasDirChanges(dirPath) {
   const prefix = dirPath + '/';
   return Object.keys(gitStatusMap).some(p => p === dirPath || p.startsWith(prefix));
+}
+
+export function handleFileReadData(msg) {
+  const panel = document.getElementById('explorer-preview-panel');
+  const title = document.getElementById('explorer-preview-title');
+  const content = document.getElementById('explorer-preview-content');
+  if (!panel || !content) return;
+
+  panel.style.display = '';
+  if (title) title.textContent = msg.filePath || 'File';
+
+  if (msg.error) {
+    content.innerHTML = `<div class="explorer-preview-error">${escHtml(msg.error)}</div>`;
+    return;
+  }
+
+  const text = msg.content || '';
+  const ext = (msg.filePath || '').split('.').pop()?.toLowerCase();
+  const isBinary = msg.binary;
+
+  if (isBinary) {
+    content.innerHTML = '<div class="explorer-preview-error">Binary file — cannot preview</div>';
+    return;
+  }
+
+  // Render with line numbers
+  const lines = text.split('\n');
+  const maxLines = 200;
+  const truncated = lines.length > maxLines;
+  const displayLines = truncated ? lines.slice(0, maxLines) : lines;
+
+  content.innerHTML = displayLines.map((line, i) =>
+    `<div class="preview-line"><span class="preview-ln">${i + 1}</span><span class="preview-code">${escHtml(line)}</span></div>`
+  ).join('') + (truncated ? `<div class="preview-line"><span class="preview-ln">…</span><span class="preview-code" style="color:var(--text-ghost)">(${lines.length - maxLines} more lines)</span></div>` : '');
 }
 
 export function onExplorerSessionChange() {

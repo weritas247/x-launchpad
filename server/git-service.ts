@@ -358,6 +358,32 @@ export function gitCommit(cwd: string, message: string): { ok: boolean; error?: 
   }
 }
 
+// ─── FILE READ ───────────────────────────────────────────────────
+export function readFileContent(cwd: string, filePath: string): { content?: string; binary?: boolean; error?: string } {
+  const path = require('path') as typeof import('path');
+  const fs = require('fs') as typeof import('fs');
+  const fullPath = path.resolve(cwd, filePath);
+
+  // Security: ensure path is within cwd
+  if (!fullPath.startsWith(path.resolve(cwd))) {
+    return { error: 'Access denied' };
+  }
+
+  try {
+    const stat = fs.statSync(fullPath);
+    if (stat.size > 512 * 1024) return { error: 'File too large (>512KB)' };
+
+    const buf = fs.readFileSync(fullPath);
+    // Check if binary
+    const isBinary = buf.slice(0, 8000).some((b: number) => b === 0);
+    if (isBinary) return { binary: true };
+
+    return { content: buf.toString('utf-8') };
+  } catch (e: any) {
+    return { error: e.message || String(e) };
+  }
+}
+
 // ─── FILE SEARCH (grep) ──────────────────────────────────────────
 export interface SearchResult {
   file: string;

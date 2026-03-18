@@ -15,7 +15,7 @@ import { registerAction, buildCombo, matchCombo, tryKeybinding } from './keyboar
 import { initInputPanel, onSessionChange as inputPanelSessionChange } from './input-panel.js';
 import { handleClaudeUsageData, startUsagePolling, onSessionChangeUsage, onAiChangeUsage } from './claude-usage.js';
 import { initActivityBar, getActivePanel } from './activity-bar.js';
-import { initExplorer, handleFileTreeData, onExplorerSessionChange, requestFileTree } from './explorer.js';
+import { initExplorer, handleFileTreeData, handleFileReadData, onExplorerSessionChange, requestFileTree } from './explorer.js';
 import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange } from './source-control.js';
 import { initSearch, handleSearchResults, onSearchSessionChange } from './search.js';
 
@@ -115,6 +115,8 @@ function handleMessage(msg) {
     handleGitGenerateMessage(msg);
   } else if (msg.type === 'file_search_data') {
     handleSearchResults(msg);
+  } else if (msg.type === 'file_read_data') {
+    handleFileReadData(msg);
   }
 }
 
