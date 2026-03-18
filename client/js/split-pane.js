@@ -11,8 +11,10 @@ export function updateSplitPaneTitle(el, sessionId) {
     el.insertBefore(titleEl, el.firstChild);
   }
   const meta = sessionMeta.get(sessionId) || {};
-  titleEl.querySelector('.spt-name').textContent = meta.name || sessionId;
   const cwd = meta.cwd || '';
+  const wtMatch = cwd.match(/\.claude\/worktrees\/([^/]+)/);
+  const wtTag = wtMatch ? ` [${wtMatch[1]}]` : '';
+  titleEl.querySelector('.spt-name').textContent = (meta.name || sessionId) + wtTag;
   titleEl.querySelector('.spt-path').textContent = cwd ? cwd.replace(/^\/Users\/[^/]+/, '~') : '';
 }
 
@@ -224,7 +226,8 @@ export function createSplitSession() {
     let resolved = false;
     const wrappedResolve = (id) => { resolved = true; resolve(id); };
     S.pendingSplitQueue.push({ resolve: wrappedResolve });
-    wsSend({ type: 'session_create', name: 'split', cmd: S.settings?.shell?.defaultShell || '' });
+    const currentMeta = S.activeSessionId ? sessionMeta.get(S.activeSessionId) : null;
+    wsSend({ type: 'session_create', name: 'split', cmd: S.settings?.shell?.defaultShell || '', cwd: currentMeta?.cwd });
     setTimeout(() => {
       if (!resolved) {
         S.pendingSplitQueue = S.pendingSplitQueue.filter(p => p.resolve !== wrappedResolve);

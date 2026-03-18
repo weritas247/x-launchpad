@@ -283,6 +283,12 @@ export function createSidebarItem(sessionId, name) {
   return el;
 }
 
+function detectWorktreeName(cwdPath) {
+  if (!cwdPath) return '';
+  const match = cwdPath.match(/\.claude\/worktrees\/([^/]+)/);
+  return match ? match[1] : '';
+}
+
 export function updateSessionInfo(sessionId, cwd, ai) {
   const entry = terminalMap.get(sessionId);
   if (!entry) return;
@@ -291,8 +297,10 @@ export function updateSessionInfo(sessionId, cwd, ai) {
   const parts = shortCwd.replace(/\/$/, '').split('/');
   if (parts.length > 3) shortCwd = '…/' + parts.slice(-2).join('/');
 
+  const wtName = detectWorktreeName(cwd);
+
   const cwdEl = entry.sidebarEl.querySelector('[data-cwd]');
-  if (cwdEl) cwdEl.textContent = shortCwd;
+  if (cwdEl) cwdEl.textContent = wtName ? `⌥${wtName}  ${shortCwd}` : shortCwd;
 
   let badgeEl = entry.sidebarEl.querySelector('.session-ai-badge');
   const metaEl = entry.sidebarEl.querySelector('.session-meta');
@@ -319,10 +327,11 @@ export function updateSessionInfo(sessionId, cwd, ai) {
   const tabNameEl = entry.tabEl.querySelector('.tab-name');
   const meta = sessionMeta.get(sessionId);
   const baseName = meta ? meta.name : sessionId;
-  tabNameEl.textContent = `${baseName}  ${shortCwd}`;
+  const wtTag = wtName ? ` [${wtName}]` : '';
+  tabNameEl.textContent = `${baseName}${wtTag}  ${shortCwd}`;
 
   if (S.activeSessionId === sessionId) {
-    sbActiveName.textContent = `${baseName}  ${shortCwd}${ai ? `  [${ai}]` : ''}`;
+    sbActiveName.textContent = `${baseName}${wtTag}  ${shortCwd}${ai ? `  [${ai}]` : ''}`;
     updateBreadcrumb(cwd);
   }
 
@@ -332,7 +341,7 @@ export function updateSessionInfo(sessionId, cwd, ai) {
   if (S.layoutTree !== null) {
     const titleEl = entry.div.querySelector('.split-pane-title');
     if (titleEl) {
-      titleEl.querySelector('.spt-name').textContent = baseName;
+      titleEl.querySelector('.spt-name').textContent = `${baseName}${wtTag}`;
       titleEl.querySelector('.spt-path').textContent = shortCwd;
     }
   }

@@ -273,12 +273,18 @@ document.getElementById('sp-close').addEventListener('click', hideSessionPicker)
 document.getElementById('session-picker').addEventListener('click', e => {
   if (e.target === e.currentTarget) hideSessionPicker();
 });
+function getCurrentSessionCwd() {
+  if (!S.activeSessionId) return undefined;
+  const meta = sessionMeta.get(S.activeSessionId);
+  return meta?.cwd || undefined;
+}
+
 document.querySelectorAll('.sp-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const label = btn.dataset.label || 'Shell';
     const cmd   = btn.dataset.cmd || null;
     hideSessionPicker();
-    wsSend({ type: 'session_create', name: label, cmd });
+    wsSend({ type: 'session_create', name: label, cmd, cwd: getCurrentSessionCwd() });
   });
 });
 
@@ -286,7 +292,7 @@ document.querySelectorAll('.btn-ai-quick').forEach(btn => {
   btn.addEventListener('click', () => {
     const label = btn.dataset.label || btn.dataset.ai;
     const cmd   = btn.dataset.cmd;
-    wsSend({ type: 'session_create', name: label, cmd });
+    wsSend({ type: 'session_create', name: label, cmd, cwd: getCurrentSessionCwd() });
   });
 });
 
