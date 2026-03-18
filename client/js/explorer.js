@@ -1,6 +1,7 @@
 // ─── FILE EXPLORER PANEL ─────────────────────────────────────────
 import { S, sessionMeta, escHtml } from './state.js';
 import { wsSend } from './websocket.js';
+import { showToast } from './toast.js';
 
 let explorerTree = [];
 let expandedDirs = new Set();
@@ -176,7 +177,12 @@ function hasDirChanges(dirPath) {
 }
 
 export function handleFileOpAck(msg) {
-  if (msg.ok) requestFileTree(); // Refresh tree after file operation
+  if (msg.ok) {
+    requestFileTree();
+    showToast(`File ${msg.op} successful`, 'success');
+  } else {
+    showToast(`File ${msg.op} failed: ${msg.error}`, 'error', 4000);
+  }
 }
 
 export function handleFileReadData(msg) {

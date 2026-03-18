@@ -134,6 +134,8 @@ registerAction('clearTerminal', () => clearActiveTerminal());
 registerAction('gitGraph',      () => { isGitGraphOpen() ? closeGitGraph() : openGitGraph(); });
 registerAction('toggleSidebar', () => toggleSidebarExport());
 registerAction('focusSearch',   () => switchPanel('search'));
+registerAction('focusExplorer', () => switchPanel('explorer'));
+registerAction('focusSourceControl', () => switchPanel('source-control'));
 
 document.addEventListener('keydown', e => {
   if (!S.settings) return;

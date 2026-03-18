@@ -1,6 +1,7 @@
 // ─── SOURCE CONTROL PANEL ────────────────────────────────────────
 import { S, sessionMeta, escHtml } from './state.js';
 import { wsSend } from './websocket.js';
+import { showToast } from './toast.js';
 
 let gitStatusFiles = [];
 let gitBranch = '';
@@ -73,15 +74,21 @@ export function initSourceControl() {
 
 export function handleGitCommitAck(msg) {
   const commitInput = document.getElementById('sc-commit-input');
-  if (!msg.ok) {
-    console.error('Commit failed:', msg.error);
+  if (msg.ok) {
+    showToast('Commit successful', 'success');
+  } else {
+    showToast('Commit failed: ' + (msg.error || 'unknown error'), 'error', 5000);
     if (commitInput) commitInput.style.borderColor = 'var(--danger)';
     setTimeout(() => { if (commitInput) commitInput.style.borderColor = ''; }, 2000);
   }
 }
 
 export function handleGitPushAck(msg) {
-  // handled silently, status refresh will follow
+  if (msg.ok) {
+    showToast('Push successful', 'success');
+  } else {
+    showToast('Push failed: ' + (msg.error || 'unknown error'), 'error', 5000);
+  }
 }
 
 export function handleGitGenerateMessage(msg) {

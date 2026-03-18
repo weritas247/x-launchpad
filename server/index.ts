@@ -63,6 +63,8 @@ const DEFAULT_SETTINGS = {
     gitGraph: 'Ctrl+g',
     toggleSidebar: 'Ctrl+b',
     focusSearch: 'Ctrl+Shift+f',
+    focusExplorer: 'Ctrl+Shift+e',
+    focusSourceControl: 'Ctrl+Shift+g',
   },
   advanced: {
     customCss: '',
