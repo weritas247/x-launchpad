@@ -1035,7 +1035,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .breadcrumb-wt{color:var(--accent2);font-weight:600;font-size:10px;white-space:nowrap}
 
 /* ═══ TOAST NOTIFICATIONS ═══ */
-#toast-container{position:fixed;bottom:48px;right:16px;z-index:9999;display:flex;flex-direction:column-reverse;gap:6px;pointer-events:none}
+#toast-container{position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:6px;pointer-events:none}
 .toast{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:4px;font-family:var(--font-mono);
   font-size:11px;letter-spacing:.03em;pointer-events:auto;transform:translateX(120%);transition:transform .25s ease;
   box-shadow:0 4px 12px rgba(0,0,0,.5);max-width:320px}
