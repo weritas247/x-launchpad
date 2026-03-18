@@ -54,6 +54,11 @@ export function initExplorer() {
     downloadFile(ctxTargetPath);
   });
 
+  document.getElementById('ectx-reveal')?.addEventListener('click', () => {
+    if (!ctxTargetPath || !S.activeSessionId) return;
+    wsSend({ type: 'file_reveal', sessionId: S.activeSessionId, filePath: ctxTargetPath });
+  });
+
   // Upload button
   const uploadBtn = document.getElementById('explorer-upload');
   const uploadInput = document.getElementById('explorer-upload-input');
