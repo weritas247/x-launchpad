@@ -1,6 +1,16 @@
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.dev' });
 
+// Suppress unhandled rejections from supabase background operations (e.g. schema cache fetch when table doesn't exist yet)
+process.on('unhandledRejection', (reason) => {
+  const code = (reason as any)?.code;
+  if (code === 'PGRST205' || code === 'PGRST116') {
+    console.warn('[supabase] Background query failed (table may not exist yet):', (reason as any)?.message);
+    return;
+  }
+  console.error('[UnhandledRejection]', reason);
+});
+
 import express from 'express';
 import * as http from 'http';
 import * as path from 'path';

@@ -25,7 +25,8 @@ export async function initUserCount(): Promise<void> {
   const { count, error } = await supabase
     .from('users')
     .select('*', { count: 'exact', head: true });
-  if (error) throw error;
+  // PGRST205: table not found — supabase not set up yet, skip gracefully
+  if (error && error.code !== 'PGRST205') throw error;
   cachedUserCount = count ?? 0;
 }
 
