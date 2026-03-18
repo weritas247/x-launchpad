@@ -139,6 +139,23 @@
         <span class="sc-branch-icon">⎇</span>
         <span class="sc-branch-label" id="sc-branch-name">—</span>
       </div>
+      <div class="sc-worktree-section" id="sc-worktree-section" style="display:none">
+        <div class="sc-worktree-header" id="sc-worktree-header">
+          <span class="sc-worktree-toggle">▾</span>
+          <span class="sc-worktree-title">WORKTREES</span>
+          <span class="sc-worktree-count" id="sc-worktree-count"></span>
+          <button class="btn-icon-sm" id="sc-worktree-add-btn" title="Add worktree">+</button>
+        </div>
+        <div class="sc-worktree-list" id="sc-worktree-list"></div>
+        <div class="sc-worktree-add-form" id="sc-worktree-add-form" style="display:none">
+          <input type="text" class="sc-worktree-input" id="sc-worktree-path" placeholder="Branch name or path"/>
+          <div class="sc-worktree-form-actions">
+            <label class="sc-worktree-label"><input type="checkbox" id="sc-worktree-new-branch"/> New branch</label>
+            <button class="sc-worktree-form-btn" id="sc-worktree-create">Create</button>
+            <button class="sc-worktree-form-btn sc-worktree-cancel-btn" id="sc-worktree-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
       <div class="sc-commit-bar">
         <div class="sc-commit-input-wrap">
           <input type="text" class="sc-commit-input" id="sc-commit-input" placeholder="Message (Enter to commit)"/>

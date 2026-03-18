@@ -16,7 +16,7 @@ import { initInputPanel, onSessionChange as inputPanelSessionChange } from './in
 import { handleClaudeUsageData, startUsagePolling, onSessionChangeUsage, onAiChangeUsage } from './claude-usage.js';
 import { initActivityBar, getActivePanel, switchPanel, toggleSidebarExport, initSidebarResize } from './activity-bar.js';
 import { initExplorer, handleFileTreeData, handleFileReadData, handleFileOpAck, onExplorerSessionChange, requestFileTree } from './explorer.js';
-import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange } from './source-control.js';
+import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange, handleWorktreeListData, handleWorktreeAddAck, handleWorktreeRemoveAck, handleWorktreeSwitchAck } from './source-control.js';
 import { initSearch, handleSearchResults, handleReplaceAck, onSearchSessionChange } from './search.js';
 import { setActivateSessionFn } from './file-viewer.js';
 import { initPlanPanel, handlePlanFileData, onPlanSessionChange } from './plan-panel.js';
@@ -124,6 +124,14 @@ function handleMessage(msg) {
     handleGitPushAck(msg);
   } else if (msg.type === 'git_generate_message_data') {
     handleGitGenerateMessage(msg);
+  } else if (msg.type === 'git_worktree_list_data') {
+    handleWorktreeListData(msg);
+  } else if (msg.type === 'git_worktree_add_ack') {
+    handleWorktreeAddAck(msg);
+  } else if (msg.type === 'git_worktree_remove_ack') {
+    handleWorktreeRemoveAck(msg);
+  } else if (msg.type === 'git_worktree_switch_ack') {
+    handleWorktreeSwitchAck(msg);
   } else if (msg.type === 'file_search_data') {
     handleSearchResults(msg);
   } else if (msg.type === 'file_replace_ack') {

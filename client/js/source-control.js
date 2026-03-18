@@ -12,6 +12,9 @@ let upstream = { ahead: 0, behind: 0 };
 let viewMode = 'list'; // 'list' | 'tree'
 let expandedTreeDirs = new Set();
 let selectedFile = null;
+let worktrees = [];
+let currentWorktreePath = '';
+let worktreeCollapsed = false;
 
 export function initSourceControl() {
   const refreshBtn = document.getElementById('sc-refresh');
@@ -72,6 +75,56 @@ export function initSourceControl() {
       commitMenu.classList.remove('show');
     });
   }
+
+  // Worktree section
+  const wtHeader = document.getElementById('sc-worktree-header');
+  if (wtHeader) {
+    wtHeader.addEventListener('click', (e) => {
+      if (e.target.closest('#sc-worktree-add-btn')) return;
+      worktreeCollapsed = !worktreeCollapsed;
+      const section = document.getElementById('sc-worktree-section');
+      if (section) section.classList.toggle('collapsed', worktreeCollapsed);
+    });
+  }
+
+  const wtAddBtn = document.getElementById('sc-worktree-add-btn');
+  if (wtAddBtn) {
+    wtAddBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const form = document.getElementById('sc-worktree-add-form');
+      if (form) form.style.display = form.style.display === 'none' ? '' : 'none';
+    });
+  }
+
+  const wtCreateBtn = document.getElementById('sc-worktree-create');
+  if (wtCreateBtn) {
+    wtCreateBtn.addEventListener('click', () => {
+      const pathInput = document.getElementById('sc-worktree-path');
+      const newBranchCb = document.getElementById('sc-worktree-new-branch');
+      if (!pathInput || !S.activeSessionId) return;
+      const value = pathInput.value.trim();
+      if (!value) return;
+      const isNewBranch = newBranchCb?.checked || false;
+      const path = `.claude/worktrees/${value}`;
+      wsSend({
+        type: 'git_worktree_add',
+        sessionId: S.activeSessionId,
+        path,
+        branch: value,
+        createBranch: isNewBranch
+      });
+      pathInput.value = '';
+      if (newBranchCb) newBranchCb.checked = false;
+      document.getElementById('sc-worktree-add-form').style.display = 'none';
+    });
+  }
+
+  const wtCancelBtn = document.getElementById('sc-worktree-cancel');
+  if (wtCancelBtn) {
+    wtCancelBtn.addEventListener('click', () => {
+      document.getElementById('sc-worktree-add-form').style.display = 'none';
+    });
+  }
 }
 
 export function handleGitCommitAck(msg) {
@@ -103,9 +156,40 @@ export function handleGitGenerateMessage(msg) {
   }
 }
 
+export function handleWorktreeListData(msg) {
+  worktrees = msg.worktrees || [];
+  currentWorktreePath = msg.currentPath || '';
+  renderWorktrees();
+}
+
+export function handleWorktreeAddAck(msg) {
+  if (msg.ok) {
+    showToast('Worktree created', 'success');
+  } else {
+    showToast('Worktree creation failed: ' + (msg.error || 'unknown'), 'error', 5000);
+  }
+}
+
+export function handleWorktreeRemoveAck(msg) {
+  if (msg.ok) {
+    showToast('Worktree removed', 'success');
+  } else {
+    showToast('Worktree removal failed: ' + (msg.error || 'unknown'), 'error', 5000);
+  }
+}
+
+export function handleWorktreeSwitchAck(msg) {
+  if (msg.ok) {
+    showToast(`Switched to worktree`, 'success');
+  } else {
+    showToast('Switch failed: ' + (msg.error || 'unknown'), 'error', 5000);
+  }
+}
+
 export function requestGitStatus() {
   if (!S.activeSessionId) return;
   wsSend({ type: 'git_status', sessionId: S.activeSessionId });
+  wsSend({ type: 'git_worktree_list', sessionId: S.activeSessionId });
 }
 
 export function handleGitStatusData(msg) {
@@ -398,4 +482,80 @@ function getStatusLabel(status) {
 
 export function onSourceControlSessionChange() {
   requestGitStatus();
+}
+
+function renderWorktrees() {
+  const section = document.getElementById('sc-worktree-section');
+  const list = document.getElementById('sc-worktree-list');
+  const countEl = document.getElementById('sc-worktree-count');
+  if (!section || !list) return;
+
+  if (worktrees.length <= 1) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = '';
+  if (countEl) countEl.textContent = worktrees.length;
+
+  list.innerHTML = '';
+  for (const wt of worktrees) {
+    const item = document.createElement('div');
+    item.className = 'sc-worktree-item';
+
+    const isCurrent = normalizePath(wt.path) === normalizePath(currentWorktreePath);
+    if (isCurrent) item.classList.add('active');
+
+    const marker = document.createElement('span');
+    marker.className = 'sc-worktree-marker';
+    marker.textContent = isCurrent ? '●' : '';
+
+    const info = document.createElement('div');
+    info.className = 'sc-worktree-info';
+
+    const branchSpan = document.createElement('span');
+    branchSpan.className = 'sc-worktree-branch';
+    branchSpan.textContent = wt.branch || '(no branch)';
+
+    const pathSpan = document.createElement('span');
+    pathSpan.className = 'sc-worktree-path';
+    const shortPath = wt.path.split('/').slice(-2).join('/');
+    pathSpan.textContent = shortPath;
+    pathSpan.title = wt.path;
+
+    info.appendChild(branchSpan);
+    info.appendChild(pathSpan);
+
+    const head = document.createElement('span');
+    head.className = 'sc-worktree-head';
+    head.textContent = wt.head || '';
+
+    item.appendChild(marker);
+    item.appendChild(info);
+    item.appendChild(head);
+
+    if (!wt.isMain && !isCurrent) {
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'sc-worktree-remove';
+      removeBtn.title = 'Remove worktree';
+      removeBtn.textContent = '✕';
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        wsSend({ type: 'git_worktree_remove', sessionId: S.activeSessionId, path: wt.path });
+      });
+      item.appendChild(removeBtn);
+    }
+
+    if (!isCurrent) {
+      item.addEventListener('click', () => {
+        wsSend({ type: 'git_worktree_switch', sessionId: S.activeSessionId, path: wt.path });
+      });
+    }
+
+    list.appendChild(item);
+  }
+}
+
+function normalizePath(p) {
+  return (p || '').replace(/\/+$/, '');
 }
