@@ -1,4 +1,5 @@
 import { S, terminalMap, customCssTag, settingsOverlay, escHtml } from './state.js';
+import { confirmModal } from './confirm-modal.js';
 import { THEMES, KB_DEFS, normalizeKey } from './constants.js';
 import { applyTheme, updateSwatches } from './themes.js';
 
@@ -373,7 +374,7 @@ export function initSettingsUI() {
   settingsOverlay.addEventListener('click', e => { if (e.target === settingsOverlay) closeSettings(); });
 
   document.getElementById('btn-reset-settings').addEventListener('click', async () => {
-    if (!confirm('Reset ALL settings to defaults? This cannot be undone.')) return;
+    if (!await confirmModal('Reset ALL settings to defaults? This cannot be undone.', 'Reset')) return;
     const r = await fetch('/api/settings/default');
     const def = await r.json();
     S.pendingSettings = def;

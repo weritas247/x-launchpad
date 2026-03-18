@@ -227,7 +227,8 @@ export function createSplitSession() {
     const wrappedResolve = (id) => { resolved = true; resolve(id); };
     S.pendingSplitQueue.push({ resolve: wrappedResolve });
     const currentMeta = S.activeSessionId ? sessionMeta.get(S.activeSessionId) : null;
-    wsSend({ type: 'session_create', name: 'split', cmd: S.settings?.shell?.defaultShell || '', cwd: currentMeta?.cwd });
+    const baseName = currentMeta?.name || 'shell';
+    wsSend({ type: 'session_create', name: baseName, cmd: S.settings?.shell?.defaultShell || '', cwd: currentMeta?.cwd });
     setTimeout(() => {
       if (!resolved) {
         S.pendingSplitQueue = S.pendingSplitQueue.filter(p => p.resolve !== wrappedResolve);

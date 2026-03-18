@@ -2,6 +2,7 @@
 import { S, sessionMeta, escHtml } from './state.js';
 import { wsSend } from './websocket.js';
 import { showToast } from './toast.js';
+import { confirmModal } from './confirm-modal.js';
 import { setActivityBadge } from './activity-bar.js';
 
 let gitStatusFiles = [];
@@ -229,10 +230,27 @@ export function handleGitStatusData(msg) {
   gitRoot = msg.root || '';
   isGitRepo = msg.isRepo || false;
   upstream = msg.upstream || { ahead: 0, behind: 0 };
-  setActivityBadge('source-control', gitStatusFiles.length, {
-    isInWorktree: msg.isInWorktree || false,
-    mainCount: msg.mainBranchFileCount != null ? msg.mainBranchFileCount : null,
-  });
+  const isInWorktree = msg.isInWorktree || false;
+  if (isInWorktree) {
+    // In worktree session: server provides mainBranchFileCount
+    setActivityBadge('source-control', gitStatusFiles.length, {
+      isInWorktree: true,
+      mainCount: msg.mainBranchFileCount != null ? msg.mainBranchFileCount : null,
+    });
+  } else {
+    // On main branch: split worktree-tracking files from real changes client-side
+    const isWtFile = (f) => f.path && (f.path.startsWith('.claude/worktrees/') || f.path.startsWith('.claude/worktrees\\'));
+    const mainFiles = gitStatusFiles.filter(f => !isWtFile(f));
+    const wtFiles = gitStatusFiles.filter(f => isWtFile(f));
+    if (wtFiles.length > 0) {
+      setActivityBadge('source-control', wtFiles.length, {
+        isInWorktree: true,
+        mainCount: mainFiles.length,
+      });
+    } else {
+      setActivityBadge('source-control', mainFiles.length);
+    }
+  }
   renderSourceControl();
   // Hide worktree section if not a git repo
   if (!isGitRepo) {
@@ -932,7 +950,7 @@ function initScContextMenu() {
     clearSelection();
   });
 
-  document.getElementById('sctx-delete')?.addEventListener('click', () => {
+  document.getElementById('sctx-delete')?.addEventListener('click', async () => {
     if (!S.activeSessionId) return;
     const sel = getSelectedFileInfos();
     const paths = sel.length > 0 ? sel.map(s => s.path) : (ctxTarget ? [ctxTarget.path] : []);
@@ -940,7 +958,7 @@ function initScContextMenu() {
     const msg = paths.length === 1
       ? `Delete "${paths[0]}"?`
       : `Delete ${paths.length} files?\n${paths.join('\n')}`;
-    if (!confirm(msg)) return;
+    if (!await confirmModal(msg, 'Delete')) return;
     for (const p of paths) {
       wsSend({ type: 'file_delete', sessionId: S.activeSessionId, filePath: p });
     }

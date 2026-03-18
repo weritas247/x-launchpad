@@ -1,6 +1,7 @@
 // ─── SEARCH PANEL ────────────────────────────────────────────────
 import { S, sessionMeta, escHtml } from './state.js';
 import { wsSend } from './websocket.js';
+import { confirmModal } from './confirm-modal.js';
 import { setActivityBadge } from './activity-bar.js';
 import { showToast } from './toast.js';
 
@@ -84,10 +85,10 @@ export function initSearch() {
       wsSend({ type: 'file_replace', sessionId: S.activeSessionId, query: lastQuery, replacement, filePath: file, caseSensitive, useRegex });
     }
   });
-  if (replaceAllBtn) replaceAllBtn.addEventListener('click', () => {
+  if (replaceAllBtn) replaceAllBtn.addEventListener('click', async () => {
     if (!lastQuery || !replaceInput || !S.activeSessionId) return;
     const replacement = replaceInput.value;
-    if (!confirm(`Replace all occurrences of "${lastQuery}" with "${replacement}"?`)) return;
+    if (!await confirmModal(`Replace all occurrences of "${lastQuery}" with "${replacement}"?`, 'Replace All')) return;
     const includeVal = includeInput?.value.trim() || '';
     wsSend({ type: 'file_replace_all', sessionId: S.activeSessionId, query: lastQuery, replacement, caseSensitive, useRegex, include: includeVal });
   });
