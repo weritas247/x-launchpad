@@ -1,4 +1,4 @@
-import { S, terminalMap, sessionMeta, sbClock, tabAddBtn, settingsOverlay } from './state.js';
+import { S, terminalMap, sessionMeta, tabAddBtn, settingsOverlay } from './state.js';
 import { THEMES } from './constants.js';
 import { connect, wsSend, setOnInputSend, requestScrollback } from './websocket.js';
 import { initThemeSwatches } from './themes.js';
@@ -9,7 +9,7 @@ import { loadSettings, applySettings, openSettings, closeSettings, initSettingsU
 import { aiNotifyCheck, resetNotifyState, initNotifications } from './notifications.js';
 import { tabStatusCheck, tabStatusOnAiChange, suppressTabStatus } from './tab-status.js';
 import { initFolderDnD } from './folder.js';
-import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, handleGitPullAck, requestBranch, handleGitGraphKeydown } from './git-graph.js';
+import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, handleGitPullAck, handleGitGraphSearchData, requestBranch, handleGitGraphKeydown } from './git-graph.js';
 import { streamWrite, bypassStream, unbypassStream } from './stream-writer.js';
 import { registerAction, buildCombo, matchCombo, tryKeybinding } from './keyboard.js';
 import { initInputPanel, toggleInputPanel, onSessionChange as inputPanelSessionChange, handleClaudePrompts } from './prompt-history.js';
@@ -29,7 +29,6 @@ setOnInputSend(resetNotifyState);
 const hdrTime = document.getElementById('hdr-time');
 setInterval(() => {
   const t = new Date().toTimeString().slice(0,8);
-  sbClock.textContent = t;
   hdrTime.textContent = t;
 }, 1000);
 
@@ -100,6 +99,8 @@ function handleMessage(msg) {
     handleGitCheckoutAck(msg);
   } else if (msg.type === 'git_pull_ack') {
     handleGitPullAck(msg);
+  } else if (msg.type === 'git_graph_search_data') {
+    handleGitGraphSearchData(msg);
   } else if (msg.type === 'claude_usage_data') {
     handleClaudeUsageData(msg);
   } else if (msg.type === 'claude_prompts_data') {
