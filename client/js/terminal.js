@@ -212,10 +212,9 @@ export function attachTerminal(sessionId, name) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const token = getAuthToken();
   const dataWsUrl = `${proto}//${location.host}/pty?sid=${encodeURIComponent(sessionId)}${token ? '&token=' + encodeURIComponent(token) : ''}`;
-  let dataWs = new WebSocket(dataWsUrl);
+  let dataWs = null;
 
-  function connectDataWs() {
-    dataWs = new WebSocket(dataWsUrl);
+  function setupDataWsHandlers() {
     dataWs.onopen = () => console.log(`[data-ws] Connected: ${sessionId.slice(-6)}`);
     dataWs.onmessage = (event) => {
       // Output from server → terminal (plain text, no framing)
@@ -230,16 +229,14 @@ export function attachTerminal(sessionId, name) {
       }
     };
   }
-  // Initial connection already sends scrollback on connect
-  dataWs.onopen = () => console.log(`[data-ws] Connected: ${sessionId.slice(-6)}`);
-  dataWs.onmessage = (event) => {
-    streamWrite(sessionId, term, event.data);
-    aiNotifyCheck(sessionId, event.data);
-    tabStatusCheck(sessionId, event.data);
-  };
-  dataWs.onclose = () => {
-    if (terminalMap.has(sessionId)) setTimeout(connectDataWs, 2000);
-  };
+
+  function connectDataWs() {
+    dataWs = new WebSocket(dataWsUrl);
+    setupDataWsHandlers();
+  }
+
+  // Initial connection
+  connectDataWs();
 
   // Send input via data WS (bypass control WS batching)
   function dataSend(text) {

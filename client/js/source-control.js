@@ -8,6 +8,7 @@ import { setActivityBadge } from './activity-bar.js';
 let gitStatusFiles = [];
 let gitBranch = '';
 let gitRoot = '';
+let scInitialized = false;
 let isGitRepo = false;
 let upstream = { ahead: 0, behind: 0 };
 let viewMode = 'list'; // 'list' | 'tree'
@@ -77,13 +78,14 @@ export function initSourceControl() {
     });
   }
 
-  // Dropdown menu
-  if (commitDropdown && commitMenu) {
+  // Dropdown menu (guard against duplicate listeners on re-init)
+  if (commitDropdown && commitMenu && !scInitialized) {
     commitDropdown.addEventListener('click', (e) => {
       e.stopPropagation();
       commitMenu.classList.toggle('show');
     });
     document.addEventListener('click', () => commitMenu.classList.remove('show'));
+    scInitialized = true;
 
     commitMenu.addEventListener('click', (e) => {
       const action = e.target.dataset?.action;

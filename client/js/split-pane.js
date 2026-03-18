@@ -272,10 +272,13 @@ export function initSplitDnD() {
             createSplitSession(), createSplitSession(), createSplitSession()
           ]);
           const existingEntry = terminalMap.get(existingId);
+          if (!existingEntry) return;
           const existingPane = { type: 'pane', sessionId: existingId, element: existingEntry.div };
-          const pane1 = { type: 'pane', sessionId: id1, element: terminalMap.get(id1).div };
-          const pane2 = { type: 'pane', sessionId: id2, element: terminalMap.get(id2).div };
-          const pane3 = { type: 'pane', sessionId: id3, element: terminalMap.get(id3).div };
+          const e1 = terminalMap.get(id1), e2 = terminalMap.get(id2), e3 = terminalMap.get(id3);
+          if (!e1 || !e2 || !e3) return;
+          const pane1 = { type: 'pane', sessionId: id1, element: e1.div };
+          const pane2 = { type: 'pane', sessionId: id2, element: e2.div };
+          const pane3 = { type: 'pane', sessionId: id3, element: e3.div };
           enterSplitMode(existingId);
           [pane1, pane2, pane3].forEach(p => S.splitRoot.appendChild(p.element));
           S.layoutTree = {
@@ -298,6 +301,7 @@ export function initSplitDnD() {
       try {
         const newId = await createSplitSession();
         const newEntry = terminalMap.get(newId);
+        if (!newEntry) return;
         const newPane = { type: 'pane', sessionId: newId, element: newEntry.div };
         newPane.element.classList.add('split-inactive');
 
@@ -306,6 +310,7 @@ export function initSplitDnD() {
         if (!S.layoutTree) {
           enterSplitMode(existingId);
           const existingEntry = terminalMap.get(existingId);
+          if (!existingEntry) return;
           const existingPane = { type: 'pane', sessionId: existingId, element: existingEntry.div };
           S.layoutTree = {
             type: 'split', direction, ratio: 0.5,
