@@ -392,9 +392,10 @@ export function switchPanel(panel) {
 
   activePanel = panel;
 
-  // Update active button
+  // Update active button (also restore any hidden icons from split)
   document.querySelectorAll('.activity-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.panel === panel);
+    btn.style.display = '';
   });
 
   // Update visible panel
