@@ -8,14 +8,18 @@ const attachments = new Map();
 function handlePaste(e, sessionId) {
   const items = e.clipboardData?.items;
   if (!items) return;
-  let hasImage = false;
+  const files = [];
   for (const item of items) {
     if (item.type.startsWith('image/')) {
       const file = item.getAsFile();
-      if (file) { hasImage = true; addAttachment(file, sessionId); }
+      if (file) files.push(file);
     }
   }
-  if (hasImage) { e.preventDefault(); e.stopPropagation(); }
+  if (files.length === 0) return;
+  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+  files.forEach(f => addAttachment(f, sessionId));
+  e.preventDefault();
+  e.stopPropagation();
 }
 
 // ─── DRAG & DROP ─────────────────────────────────────────────────
@@ -37,13 +41,12 @@ function handleDrop(e, sessionId) {
   if (!e.dataTransfer?.files.length) return;
 
   const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-  for (const file of e.dataTransfer.files) {
-    if (imageTypes.includes(file.type)) {
-      e.preventDefault();
-      e.stopPropagation();
-      addAttachment(file, sessionId);
-    }
-  }
+  const files = Array.from(e.dataTransfer.files).filter(f => imageTypes.includes(f.type));
+  if (files.length === 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+  files.forEach(f => addAttachment(f, sessionId));
 }
 
 // ─── ATTACHMENT MANAGEMENT ───────────────────────────────────────
