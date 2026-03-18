@@ -157,6 +157,14 @@ export function getAuthToken() {
   return urlParams.get('token') || localStorage.getItem('super-terminal-token') || '';
 }
 
+export function apiFetch(url, options = {}) {
+  const token = getAuthToken();
+  if (token) {
+    options.headers = { Authorization: `Bearer ${token}`, ...options.headers };
+  }
+  return fetch(url, options);
+}
+
 export function requestScrollback(sessionId) {
   if (S.ws && S.ws.readyState === WebSocket.OPEN) {
     S.ws.send(JSON.stringify({ type: 'scrollback_request', sessionId }));
