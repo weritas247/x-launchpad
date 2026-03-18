@@ -74,7 +74,9 @@ export function initActivityBar() {
   const sidebar = document.getElementById('sidebar');
 
   sidebar.addEventListener('dragover', (e) => {
-    if (!e.dataTransfer.types.includes('text/activity-panel')) return;
+    const isActivityDrag = e.dataTransfer.types.includes('text/activity-panel');
+    const isHeaderDrag = e.dataTransfer.types.includes('text/sidebar-panel');
+    if (!isActivityDrag && !isHeaderDrag) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
 
@@ -95,17 +97,27 @@ export function initActivityBar() {
 
   sidebar.addEventListener('drop', (e) => {
     e.preventDefault();
-    const panel = e.dataTransfer.getData('text/activity-panel');
     const isTop = sidebar.classList.contains('drag-zone-top');
     clearSidebarDropZones();
 
+    // Case 1: Header drag → swap split panels
+    const headerPanel = e.dataTransfer.getData('text/sidebar-panel');
+    if (headerPanel && secondaryPanel) {
+      swapSidebarSplit();
+      return;
+    }
+
+    // Case 2: Activity bar icon drag
+    const panel = e.dataTransfer.getData('text/activity-panel');
     if (!panel || panel === activePanel) return;
 
-    // If already split and dropping the same secondary panel, ignore
-    if (panel === secondaryPanel) return;
-
-    // Split the sidebar
-    openSidebarSplit(panel, isTop);
+    if (secondaryPanel) {
+      // Already split → replace secondary with new panel
+      replaceSplitSecondary(panel, isTop);
+    } else {
+      // Not split → create split
+      openSidebarSplit(panel, isTop);
+    }
   });
 
   // ─── Panel header drag (for split rearranging) ───
@@ -212,6 +224,52 @@ export function closeSidebarSplit() {
   if (closeBtn) closeBtn.remove();
   const resizeHandle = sidebar.querySelector('.sidebar-split-resize');
   if (resizeHandle) resizeHandle.remove();
+}
+
+function swapSidebarSplit() {
+  const temp = activePanel;
+  activePanel = secondaryPanel;
+  secondaryPanel = temp;
+
+  // Update button states
+  document.querySelectorAll('.activity-btn').forEach(btn => {
+    const p = btn.dataset.panel;
+    btn.classList.toggle('active', p === activePanel || p === secondaryPanel);
+    btn.classList.toggle('active-secondary', p === secondaryPanel);
+  });
+
+  // Update panel classes
+  document.querySelectorAll('.sidebar-panel').forEach(p => {
+    const id = p.id.replace('panel-', '');
+    if (id === activePanel) {
+      p.classList.add('active');
+      p.classList.remove('sidebar-panel-secondary');
+    } else if (id === secondaryPanel) {
+      p.classList.add('active');
+      p.classList.add('sidebar-panel-secondary');
+    } else {
+      p.classList.remove('active', 'sidebar-panel-secondary');
+    }
+  });
+
+  // Reorder DOM
+  const sidebar = document.getElementById('sidebar');
+  const primaryEl = document.getElementById(`panel-${activePanel}`);
+  const secondaryEl = document.getElementById(`panel-${secondaryPanel}`);
+  const resizeHandle = sidebar.querySelector('.sidebar-split-resize');
+  sidebar.insertBefore(primaryEl, sidebar.firstChild);
+  primaryEl.after(resizeHandle);
+  resizeHandle.after(secondaryEl);
+
+  // Move close button to new secondary
+  const oldClose = sidebar.querySelector('.sidebar-split-close');
+  if (oldClose) oldClose.remove();
+  ensureSplitCloseBtn();
+}
+
+function replaceSplitSecondary(newPanel, droppedOnTop) {
+  closeSidebarSplit();
+  openSidebarSplit(newPanel, droppedOnTop);
 }
 
 function ensureSplitResizeHandle() {
