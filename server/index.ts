@@ -892,7 +892,7 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     });
   }
 
-  ptyProcess.onData((chunk: string) => {
+  const ptyDataSub = ptyProcess.onData((chunk: string) => {
     // Strip inline image protocols that xterm.js cannot render:
     // - iTerm2 inline images: OSC 1337 ; File=... ST
     // - Sixel graphics: DCS ... ST
@@ -919,6 +919,14 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   ptyProcess.onExit(({ exitCode }) => {
     console.log(`[session] ${id} exited: ${exitCode}`);
     if (session.cwdTimer) clearInterval(session.cwdTimer);
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    ptyDataSub.dispose();
+    // Clean up data WebSocket connections for this session
+    const dataClients = dataWsMap.get(id);
+    if (dataClients) {
+      dataClients.forEach(ws => ws.close(1000, 'Session ended'));
+      dataWsMap.delete(id);
+    }
     // For tmux sessions, only remove if tmux session itself is gone
     // (PTY exit just means detach — the shell survives)
     if (session.tmuxName && tmuxSessionExists(session.tmuxName)) {
@@ -1202,6 +1210,10 @@ wssData.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     }
     console.log(`[data-ws] Disconnected for ${sessionId.slice(-6)}`);
   });
+
+  ws.on('error', (err) => {
+    console.error(`[data-ws] Error for ${sessionId.slice(-6)}:`, err.message);
+  });
 });
 
 // ─── CONTROL WEBSOCKET (session mgmt, settings, git, files) ─────
@@ -1310,6 +1322,12 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         if (session.cwdTimer) clearInterval(session.cwdTimer);
         session.pty.kill();
         if (session.tmuxName) tmuxKillSession(session.tmuxName);
+        // Clean up data WebSocket connections
+        const dataClients = dataWsMap.get(id);
+        if (dataClients) {
+          dataClients.forEach(dws => dws.close(1000, 'Session closed'));
+          dataWsMap.delete(id);
+        }
         sessions.delete(id);
         broadcastSessionList();
       }
