@@ -4,6 +4,16 @@ import { showToast } from './toast.js';
 let _onInputSend = null;
 export function setOnInputSend(fn) { _onInputSend = fn; }
 
+// ─── Input batching ─────────────────────────────────
+// Accumulate keystrokes within BATCH_WINDOW ms and send as a single frame
+const INPUT_BATCH_WINDOW = 10; // ms
+const _inputBatch = new Map();   // sessionId → { data: string, timer: number }
+
+// ─── Input buffering (offline queue) ────────────────
+// Queue input while disconnected, flush on reconnect
+const _inputQueue = [];          // { type, sessionId, data }
+const INPUT_QUEUE_MAX = 200;     // prevent unbounded growth
+
 // ─── Connection health tracking ─────────────────────
 let _heartbeatTimer = null;
 let _pongTimer = null;
@@ -52,11 +62,65 @@ function stopHeartbeat() {
   if (_pongTimer) { clearTimeout(_pongTimer); _pongTimer = null; }
 }
 
-export function wsSend(obj) {
-  if (obj.type === 'input' && obj.sessionId && _onInputSend) _onInputSend(obj.sessionId);
+function _rawSend(obj) {
   if (S.ws && S.ws.readyState === WebSocket.OPEN) {
     S.ws.send(JSON.stringify(obj));
-  } else {
+    return true;
+  }
+  return false;
+}
+
+function _flushBatch(sessionId) {
+  const batch = _inputBatch.get(sessionId);
+  if (!batch) return;
+  _inputBatch.delete(sessionId);
+  const msg = { type: 'input', sessionId, data: batch.data };
+  if (!_rawSend(msg)) {
+    _enqueueInput(msg);
+  }
+}
+
+function _enqueueInput(msg) {
+  if (_inputQueue.length >= INPUT_QUEUE_MAX) {
+    _inputQueue.shift(); // drop oldest to stay bounded
+  }
+  _inputQueue.push(msg);
+}
+
+function _flushInputQueue() {
+  while (_inputQueue.length > 0) {
+    const msg = _inputQueue.shift();
+    if (!_rawSend(msg)) {
+      _inputQueue.unshift(msg); // put it back, still offline
+      break;
+    }
+  }
+}
+
+export function wsSend(obj) {
+  if (obj.type === 'input' && obj.sessionId && _onInputSend) _onInputSend(obj.sessionId);
+
+  // Input messages: batch + buffer
+  if (obj.type === 'input' && obj.sessionId) {
+    if (S.ws && S.ws.readyState === WebSocket.OPEN) {
+      const existing = _inputBatch.get(obj.sessionId);
+      if (existing) {
+        existing.data += obj.data;
+        // Timer already running — will flush accumulated data
+      } else {
+        _inputBatch.set(obj.sessionId, { data: obj.data });
+        setTimeout(() => _flushBatch(obj.sessionId), INPUT_BATCH_WINDOW);
+      }
+    } else {
+      // Offline: queue for later
+      _enqueueInput(obj);
+      console.warn(`[WS] 입력 버퍼링 (연결 안됨, 큐: ${_inputQueue.length})`);
+    }
+    return;
+  }
+
+  // Non-input messages: send directly
+  if (!_rawSend(obj)) {
     console.warn(`[WS] 메시지 전송 실패 (연결 안됨): ${obj.type}`);
   }
 }
@@ -68,7 +132,14 @@ export function connect(messageHandler) {
   S.ws.onopen = () => {
     setWsStatus(true);
     S.wsJustReconnected = true;
-    if (_wasConnected) alertReconnect();
+    if (_wasConnected) {
+      alertReconnect();
+      // Flush any input that was queued while disconnected
+      if (_inputQueue.length > 0) {
+        console.log(`[WS] 재연결 — 버퍼된 입력 ${_inputQueue.length}건 전송`);
+        setTimeout(() => _flushInputQueue(), 100); // slight delay to let session reattach
+      }
+    }
     _wasConnected = true;
     startHeartbeat();
   };
