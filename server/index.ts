@@ -432,6 +432,7 @@ app.post('/api/auth/register', async (req, res) => {
       user: { id: user.id, email: user.email, name: user.name },
     });
   } catch (err: any) {
+    console.error('[auth] Registration error:', err?.message || err?.code || err);
     recordAuthFailure(ip);
     res.status(400).json({ ok: false, error: 'Registration failed' });
   }

@@ -25,8 +25,6 @@ create trigger users_updated_at
   before update on public.users
   for each row execute function public.set_updated_at();
 
--- RLS 활성화 (anon key 사용 시 보안 필수)
-alter table public.users enable row level security;
-
--- 서버(service_role)만 접근 허용 — 클라이언트 직접 접근 차단
--- anon / authenticated 역할에 대한 정책은 의도적으로 추가하지 않음
+-- 서버에서 anon key 사용 시 RLS가 모든 쿼리를 차단하므로 비활성화
+-- (이 앱은 서버 전용으로 Supabase에 접근하며, 클라이언트가 직접 접근하지 않음)
+alter table public.users disable row level security;
