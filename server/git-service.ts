@@ -87,6 +87,68 @@ export function getGitLog(cwd: string, maxCount = 50, skip = 0): { commits: Comm
   return { commits, hasMore };
 }
 
+export function searchGitLog(cwd: string, query: string, maxCount = 50): CommitEntry[] {
+  if (!query || query.length > 200) return [];
+
+  const format = '--format=%H%x00%P%x00%D%x00%an%x00%aI%x00%s%x00%b%x01';
+  const parseCommits = (raw: string): CommitEntry[] =>
+    raw.split('\x01').filter(Boolean).map(record => {
+      const [hash, parentStr, refStr, author, date, message, ...bodyParts] = record.trim().split('\x00');
+      return {
+        hash,
+        parents: parentStr ? parentStr.split(' ') : [],
+        refs: refStr ? refStr.split(', ').map(r => r.trim()).filter(Boolean) : [],
+        author, date, message,
+        body: bodyParts.join('\x00').trim(),
+        additions: 0, deletions: 0,
+      };
+    });
+
+  const seen = new Set<string>();
+  const results: CommitEntry[] = [];
+
+  const addUnique = (commits: CommitEntry[]) => {
+    for (const c of commits) {
+      if (!seen.has(c.hash)) {
+        seen.add(c.hash);
+        results.push(c);
+      }
+    }
+  };
+
+  // Search by message (--grep)
+  try {
+    const raw = execFileSync('git', [
+      'log', format, `--max-count=${maxCount}`, '--all', '--topo-order',
+      '--grep', query, '--',
+    ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+    if (raw) addUnique(parseCommits(raw));
+  } catch {}
+
+  // Search by author
+  try {
+    const raw = execFileSync('git', [
+      'log', format, `--max-count=${maxCount}`, '--all', '--topo-order',
+      '--author', query, '--',
+    ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+    if (raw) addUnique(parseCommits(raw));
+  } catch {}
+
+  // Search by hash prefix (if query looks like hex)
+  if (/^[0-9a-f]{4,40}$/i.test(query)) {
+    try {
+      const raw = execFileSync('git', [
+        'log', format, '--max-count=1', query, '--',
+      ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+      if (raw) addUnique(parseCommits(raw));
+    } catch {}
+  }
+
+  // Sort by date descending
+  results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return results.slice(0, maxCount);
+}
+
 export function getFileList(cwd: string, hash: string): FileEntry[] {
   // Get file status (M/A/D)
   const raw = execFileSync('git', [

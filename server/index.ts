@@ -1347,6 +1347,19 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         ws.send(JSON.stringify({ type: 'git_graph_data', sessionId: id, commits: [], hasMore: false, skip, error: String(e) }));
       }
 
+    } else if (parsed.type === 'git_graph_search') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const query = typeof parsed.query === 'string' ? parsed.query : '';
+      try {
+        const commits = gitService.searchGitLog(session.cwd, query);
+        ws.send(JSON.stringify({ type: 'git_graph_search_data', sessionId: id, commits, query }));
+      } catch (e) {
+        ws.send(JSON.stringify({ type: 'git_graph_search_data', sessionId: id, commits: [], query, error: String(e) }));
+      }
+
     } else if (parsed.type === 'git_file_list') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
       if (!id) return;
