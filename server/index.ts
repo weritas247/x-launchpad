@@ -127,6 +127,7 @@ const DEFAULT_SETTINGS = {
     crtFlicker: true,
     vignette: true,
     glowIntensity: 1.0,
+    screenDimOpacity: 0,
   },
   terminal: {
     scrollback: 5000,
