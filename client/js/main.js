@@ -77,10 +77,13 @@ function handleMessage(msg) {
     onAiChangeUsage(msg.sessionId, msg.ai);
     if (msg.sessionId === S.activeSessionId) {
       requestBranch(msg.sessionId);
-      // Refresh side panels when CWD changes
+      // Refresh all relevant side panels when CWD changes (e.g. worktree switch)
       const panel = getActivePanel();
       if (panel === 'explorer') onExplorerSessionChange();
       else if (panel === 'source-control') onSourceControlSessionChange();
+      else if (panel === 'search') onSearchSessionChange();
+      // Always refresh source control status in background for badge updates
+      if (panel !== 'source-control') onSourceControlSessionChange();
     }
   } else if (msg.type === 'output') {
     const entry = terminalMap.get(msg.sessionId);

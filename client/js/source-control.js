@@ -119,6 +119,14 @@ export function initSourceControl() {
     });
   }
 
+  const wtPathInput = document.getElementById('sc-worktree-path');
+  if (wtPathInput) {
+    wtPathInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); wtCreateBtn?.click(); }
+      if (e.key === 'Escape') { document.getElementById('sc-worktree-add-form').style.display = 'none'; }
+    });
+  }
+
   const wtCancelBtn = document.getElementById('sc-worktree-cancel');
   if (wtCancelBtn) {
     wtCancelBtn.addEventListener('click', () => {
@@ -200,6 +208,11 @@ export function handleGitStatusData(msg) {
   upstream = msg.upstream || { ahead: 0, behind: 0 };
   setActivityBadge('source-control', gitStatusFiles.length);
   renderSourceControl();
+  // Hide worktree section if not a git repo
+  if (!isGitRepo) {
+    const wtSection = document.getElementById('sc-worktree-section');
+    if (wtSection) wtSection.style.display = 'none';
+  }
 }
 
 export function handleGitDiffData(msg) {

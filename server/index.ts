@@ -1363,9 +1363,14 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       }
       session.cwd = wtPath;
       if (session.pty) {
-        session.pty.write(`cd ${JSON.stringify(wtPath)}\r`);
+        // Use single-quotes for safe shell escaping
+        const escaped = wtPath.replace(/'/g, "'\\''");
+        session.pty.write(`cd '${escaped}'\r`);
       }
       ws.send(JSON.stringify({ type: 'git_worktree_switch_ack', sessionId: id, ok: true, path: wtPath }));
+      // Broadcast session_info so tabs/statusbar/sidebar update
+      const infoMsg = JSON.stringify({ type: 'session_info', sessionId: id, cwd: wtPath, ai: session.ai });
+      wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(infoMsg); });
       try {
         const isRepo = gitService.isGitRepo(session.cwd);
         if (isRepo) {
