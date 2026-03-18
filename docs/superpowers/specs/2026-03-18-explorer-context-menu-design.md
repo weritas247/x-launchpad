@@ -39,8 +39,10 @@ menu.hide();
 
 **핵심 동작:**
 - `show(event, context)`: DOM 생성 → `when` 조건으로 항목 필터링 → 위치 지정 → 표시
+- **인접 separator 축소**: `when` 필터링 후 연속 separator, 선두/후미 separator 자동 제거
 - viewport 경계 체크: 메뉴가 화면 밖으로 나가면 위치 보정
 - 문서 클릭 시 자동 닫힘
+- `.visible` 클래스 토글 방식 사용 (세션 컨텍스트 메뉴 패턴과 일치)
 - 기존 CSS 클래스 재사용: `.ctx-menu`, `.ctx-item`, `.ctx-sep`, `.ctx-item.danger`
 
 ### 2. Explorer 메뉴 항목 구성
@@ -77,9 +79,12 @@ Client → { type: 'session_create', name: 'Claude', cwd: '/path/to/folder', cmd
 ```
 
 서버 처리:
+- `session_create` 핸들러에서 `parsed.cwd`를 `createSession()`의 세 번째 인자로 전달 (현재 누락됨)
+- `parsed.cmd`를 네 번째 인자로 전달
 - PTY spawn with `cwd`
 - `cmd`가 존재하면 PTY ready 후 `pty.write(cmd + '\r')` 실행
 - 세션의 `cmd` 필드에 저장 (복원 시 재실행용)
+- `cwd` 없이 `cmd`만 있으면 기본 시작 디렉토리 사용
 
 #### 3b. `file_duplicate` 메시지 타입 추가
 
@@ -94,8 +99,12 @@ Server → 복제 로직 → { type: 'file_op_ack', sessionId, op: 'duplicate', 
 export function duplicateFile(cwd: string, filePath: string): { ok: boolean; error?: string }
 ```
 
+- **경로 검증 필수**: 기존 file ops와 동일하게 `path.resolve(cwd, filePath).startsWith(path.resolve(cwd))` 체크
 - 파일: `name.ext` → `name copy.ext`, 충돌 시 `name copy 2.ext`, `name copy 3.ext`...
-- 폴더: `dir` → `dir copy`, 충돌 시 `dir copy 2`... (재귀 복사)
+- 확장자 없는 파일: `Makefile` → `Makefile copy`
+- 도트파일: `.gitignore` → `.gitignore copy`
+- 다중 도트: `archive.tar.gz` → `archive.tar copy.gz` (마지막 `.` 기준 분리)
+- 폴더: `dir` → `dir copy`, 충돌 시 `dir copy 2`... (`fs.cpSync` 재귀 복사)
 
 ### 4. 데이터 플로우
 
@@ -110,7 +119,8 @@ Explorer 폴더 우클릭 → "Open with Claude" 클릭
 #### 경로 복사 플로우
 ```
 우클릭 → "Copy Path" 클릭
-  → sessionMeta.get(activeSessionId).cwd + '/' + entry.path
+  → cwd = sessionMeta.get(activeSessionId).cwd.replace(/\/+$/, '')
+  → absPath = cwd + '/' + entry.path  (trailing slash 제거 후 조합)
   → navigator.clipboard.writeText(absPath)
 ```
 
