@@ -20,6 +20,7 @@ import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCom
 import { initSearch, handleSearchResults, handleReplaceAck, onSearchSessionChange } from './search.js';
 import { setActivateSessionFn } from './file-viewer.js';
 import { initChatEditor } from './chat-editor.js';
+import { initPlanPanel, handlePlanFileData, onPlanSessionChange } from './plan-panel.js';
 
 S.currentTheme = THEMES[0];
 
@@ -130,6 +131,10 @@ function handleMessage(msg) {
     handleReplaceAck(msg);
   } else if (msg.type === 'file_read_data') {
     handleFileReadData(msg);
+    // Also route to plan panel for .md files
+    if (msg.filePath && /\.(md|markdown)$/i.test(msg.filePath)) {
+      handlePlanFileData(msg);
+    }
   } else if (msg.type === 'file_op_ack') {
     handleFileOpAck(msg);
   }
@@ -291,6 +296,7 @@ initExplorer();
 initSourceControl();
 initSearch();
 initChatEditor();
+initPlanPanel();
 
 // Wire up file viewer's lazy dependency
 setActivateSessionFn(activateSession);

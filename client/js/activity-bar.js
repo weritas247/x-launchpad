@@ -370,6 +370,7 @@ function triggerPanelLoad(panel) {
   } else if (panel === 'search') {
     document.getElementById('search-input')?.focus();
   }
+  // Plan panel doesn't need auto-load — user manually opens files
 }
 
 export function switchPanel(panel) {
