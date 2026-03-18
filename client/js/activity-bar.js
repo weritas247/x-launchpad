@@ -103,13 +103,17 @@ export function initActivityBar() {
     // Case 1: Header drag → swap split panels
     const headerPanel = e.dataTransfer.getData('text/sidebar-panel');
     if (headerPanel && secondaryPanel) {
-      swapSidebarSplit();
+      // Only swap if dragged to opposite zone
+      const draggedIsPrimary = headerPanel === activePanel;
+      if ((draggedIsPrimary && !isTop) || (!draggedIsPrimary && isTop)) {
+        swapSidebarSplit();
+      }
       return;
     }
 
     // Case 2: Activity bar icon drag
     const panel = e.dataTransfer.getData('text/activity-panel');
-    if (!panel || panel === activePanel) return;
+    if (!panel || panel === activePanel || panel === secondaryPanel) return;
 
     if (secondaryPanel) {
       // Already split → replace secondary with new panel
@@ -138,6 +142,8 @@ export function initActivityBar() {
     header.classList.remove('dragging');
     clearSidebarDropZones();
 
+    // If successfully dropped on a target, don't close
+    if (e.dataTransfer.dropEffect !== 'none') return;
     // If dropped outside sidebar, close split
     if (!secondaryPanel) return;
     const sidebarRect = sidebar.getBoundingClientRect();
