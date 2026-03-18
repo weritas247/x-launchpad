@@ -126,8 +126,8 @@ const DEFAULT_SETTINGS = {
     crtScanlinesIntensity: 0.07,
     crtFlicker: true,
     vignette: true,
-    glowIntensity: 1.0,
-    screenDimOpacity: 0,
+    glowIntensity: 0.4,
+    screenDimOpacity: 0.05,
   },
   terminal: {
     scrollback: 5000,
