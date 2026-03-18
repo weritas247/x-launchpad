@@ -16,7 +16,7 @@ import { initInputPanel, onSessionChange as inputPanelSessionChange } from './in
 import { handleClaudeUsageData, startUsagePolling, onSessionChangeUsage, onAiChangeUsage } from './claude-usage.js';
 import { initActivityBar, getActivePanel, switchPanel, toggleSidebarExport, initSidebarResize } from './activity-bar.js';
 import { initExplorer, handleFileTreeData, handleFileReadData, handleFileOpAck, onExplorerSessionChange, requestFileTree } from './explorer.js';
-import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange } from './source-control.js';
+import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange, handleWorktreeListData, handleWorktreeAddAck, handleWorktreeRemoveAck, handleWorktreeSwitchAck } from './source-control.js';
 import { initSearch, handleSearchResults, handleReplaceAck, onSearchSessionChange } from './search.js';
 import { setActivateSessionFn } from './file-viewer.js';
 import { initPlanPanel, handlePlanFileData, onPlanSessionChange } from './plan-panel.js';
@@ -74,10 +74,14 @@ function handleMessage(msg) {
     onAiChangeUsage(msg.sessionId, msg.ai);
     if (msg.sessionId === S.activeSessionId) {
       requestBranch(msg.sessionId);
-      // Refresh side panels when CWD changes
+      // Refresh all relevant side panels when CWD changes (e.g. worktree switch)
       const panel = getActivePanel();
       if (panel === 'explorer') onExplorerSessionChange();
       else if (panel === 'source-control') onSourceControlSessionChange();
+      else if (panel === 'search') onSearchSessionChange();
+      else if (panel === 'plan') onPlanSessionChange();
+      // Always refresh source control status in background for badge updates
+      if (panel !== 'source-control') onSourceControlSessionChange();
     }
   // output and scrollback are now handled by per-session data WebSocket in terminal.js
   } else if (msg.type === 'git_graph_data') {
@@ -108,6 +112,14 @@ function handleMessage(msg) {
     handleGitPushAck(msg);
   } else if (msg.type === 'git_generate_message_data') {
     handleGitGenerateMessage(msg);
+  } else if (msg.type === 'git_worktree_list_data') {
+    handleWorktreeListData(msg);
+  } else if (msg.type === 'git_worktree_add_ack') {
+    handleWorktreeAddAck(msg);
+  } else if (msg.type === 'git_worktree_remove_ack') {
+    handleWorktreeRemoveAck(msg);
+  } else if (msg.type === 'git_worktree_switch_ack') {
+    handleWorktreeSwitchAck(msg);
   } else if (msg.type === 'file_search_data') {
     handleSearchResults(msg);
   } else if (msg.type === 'file_replace_ack') {
@@ -247,12 +259,18 @@ document.getElementById('sp-close').addEventListener('click', hideSessionPicker)
 document.getElementById('session-picker').addEventListener('click', e => {
   if (e.target === e.currentTarget) hideSessionPicker();
 });
+function getCurrentSessionCwd() {
+  if (!S.activeSessionId) return undefined;
+  const meta = sessionMeta.get(S.activeSessionId);
+  return meta?.cwd || undefined;
+}
+
 document.querySelectorAll('.sp-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const label = btn.dataset.label || 'Shell';
     const cmd   = btn.dataset.cmd || null;
     hideSessionPicker();
-    wsSend({ type: 'session_create', name: label, cmd });
+    wsSend({ type: 'session_create', name: label, cmd, cwd: getCurrentSessionCwd() });
   });
 });
 
@@ -260,7 +278,7 @@ document.querySelectorAll('.btn-ai-quick').forEach(btn => {
   btn.addEventListener('click', () => {
     const label = btn.dataset.label || btn.dataset.ai;
     const cmd   = btn.dataset.cmd;
-    wsSend({ type: 'session_create', name: label, cmd });
+    wsSend({ type: 'session_create', name: label, cmd, cwd: getCurrentSessionCwd() });
   });
 });
 

@@ -578,3 +578,75 @@ export function getGitRoot(cwd: string): string | null {
     return null;
   }
 }
+
+// ─── GIT WORKTREE ────────────────────────────────────────────────
+export interface WorktreeEntry {
+  path: string;
+  branch: string;
+  head: string;
+  isMain: boolean;
+  isBare: boolean;
+}
+
+export function getWorktreeList(cwd: string): WorktreeEntry[] {
+  try {
+    const raw = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+      cwd, encoding: 'utf-8', timeout: 5000,
+    }).trim();
+    if (!raw) return [];
+
+    const entries: WorktreeEntry[] = [];
+    let current: Partial<WorktreeEntry> = {};
+
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('worktree ')) {
+        if (current.path) entries.push(current as WorktreeEntry);
+        current = { path: line.slice(9), branch: '', head: '', isMain: false, isBare: false };
+      } else if (line.startsWith('HEAD ')) {
+        current.head = line.slice(5, 12);
+      } else if (line.startsWith('branch ')) {
+        current.branch = line.slice(7).replace('refs/heads/', '');
+      } else if (line === 'bare') {
+        current.isBare = true;
+      } else if (line === 'detached') {
+        current.branch = current.head || '(detached)';
+      }
+    }
+    if (current.path) entries.push(current as WorktreeEntry);
+
+    if (entries.length > 0) entries[0].isMain = true;
+
+    return entries;
+  } catch {
+    return [];
+  }
+}
+
+export function addWorktree(cwd: string, wtPath: string, branch?: string, createBranch?: boolean): { ok: boolean; error?: string } {
+  try {
+    const args = ['worktree', 'add'];
+    if (createBranch && branch) {
+      args.push('-b', branch, wtPath);
+    } else if (branch) {
+      args.push(wtPath, branch);
+    } else {
+      args.push(wtPath);
+    }
+    execFileSync('git', args, { cwd, encoding: 'utf-8', timeout: 10000 });
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.stderr || e.message || String(e) };
+  }
+}
+
+export function removeWorktree(cwd: string, wtPath: string, force?: boolean): { ok: boolean; error?: string } {
+  try {
+    const args = ['worktree', 'remove'];
+    if (force) args.push('--force');
+    args.push(wtPath);
+    execFileSync('git', args, { cwd, encoding: 'utf-8', timeout: 10000 });
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.stderr || e.message || String(e) };
+  }
+}

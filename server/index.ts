@@ -833,7 +833,7 @@ function runCmdWhenReady(sess: Session, cmd: string) {
 function broadcastSessionList(exclude?: WebSocket) {
   persistSessions();
   const list = Array.from(sessions.values()).map(s => ({
-    id: s.id, name: s.name, createdAt: s.createdAt,
+    id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd,
   }));
   const msg = JSON.stringify({ type: 'session_list', sessions: list });
   wss.clients.forEach(client => {
@@ -961,7 +961,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
   // Send initial data
   const list = Array.from(sessions.values()).map(s => ({
-    id: s.id, name: s.name, createdAt: s.createdAt,
+    id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd,
   }));
   ws.send(JSON.stringify({ type: 'session_list', sessions: list }));
   ws.send(JSON.stringify({ type: 'settings', settings: currentSettings }));
@@ -1384,6 +1384,84 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       if (!session) return;
       const result = gitService.gitPush(session.cwd);
       ws.send(JSON.stringify({ type: 'git_push_ack', sessionId: id, ...result }));
+
+    } else if (parsed.type === 'git_worktree_list') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      try {
+        const worktrees = gitService.getWorktreeList(session.cwd);
+        ws.send(JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
+      } catch (e) {
+        ws.send(JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees: [], error: String(e) }));
+      }
+
+    } else if (parsed.type === 'git_worktree_add') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const wtPath = parsed.path as string;
+      const branch = parsed.branch as string | undefined;
+      const createBranch = parsed.createBranch as boolean | undefined;
+      // Resolve relative path from git root, not session.cwd (which may be a worktree)
+      const gitRoot = gitService.getGitRoot(session.cwd);
+      const addCwd = gitRoot || session.cwd;
+      const wtResult = gitService.addWorktree(addCwd, wtPath, branch, createBranch);
+      ws.send(JSON.stringify({ type: 'git_worktree_add_ack', sessionId: id, ...wtResult }));
+      if (wtResult.ok) {
+        const worktrees = gitService.getWorktreeList(session.cwd);
+        ws.send(JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
+      }
+
+    } else if (parsed.type === 'git_worktree_remove') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const wtPath = parsed.path as string;
+      const force = parsed.force as boolean || false;
+      const wtResult = gitService.removeWorktree(session.cwd, wtPath, force);
+      ws.send(JSON.stringify({ type: 'git_worktree_remove_ack', sessionId: id, ...wtResult }));
+      if (wtResult.ok) {
+        const worktrees = gitService.getWorktreeList(session.cwd);
+        ws.send(JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
+      }
+
+    } else if (parsed.type === 'git_worktree_switch') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const wtPath = parsed.path as string;
+      const fs = require('fs');
+      if (!fs.existsSync(wtPath)) {
+        ws.send(JSON.stringify({ type: 'git_worktree_switch_ack', sessionId: id, ok: false, error: 'Path does not exist' }));
+        return;
+      }
+      session.cwd = wtPath;
+      if (session.pty) {
+        // Use single-quotes for safe shell escaping
+        const escaped = wtPath.replace(/'/g, "'\\''");
+        session.pty.write(`cd '${escaped}'\r`);
+      }
+      ws.send(JSON.stringify({ type: 'git_worktree_switch_ack', sessionId: id, ok: true, path: wtPath }));
+      // Broadcast session_info so tabs/statusbar/sidebar update
+      const infoMsg = JSON.stringify({ type: 'session_info', sessionId: id, cwd: wtPath, ai: session.ai });
+      wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(infoMsg); });
+      try {
+        const isRepo = gitService.isGitRepo(session.cwd);
+        if (isRepo) {
+          const files = gitService.getGitStatus(session.cwd);
+          const branch = gitService.getCurrentBranch(session.cwd);
+          const root = gitService.getGitRoot(session.cwd);
+          const upstream = gitService.getUpstreamStatus(session.cwd);
+          ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true, upstream }));
+        }
+      } catch {}
+      const worktrees = gitService.getWorktreeList(session.cwd);
+      ws.send(JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
 
     } else if (parsed.type === 'claude_usage') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);

@@ -89,7 +89,9 @@ export function openGitGraph() {
 
   const meta = sessionMeta.get(S.activeSessionId);
   const cwd = meta?.cwd || '';
-  repoName.textContent = cwd.split('/').pop() || 'repo';
+  const wtMatch = cwd.match(/\.claude\/worktrees\/([^/]+)/);
+  const repoLabel = cwd.split('/').pop() || 'repo';
+  repoName.textContent = wtMatch ? `${repoLabel} [${wtMatch[1]}]` : repoLabel;
   branchBdg.textContent = sbBrName.textContent || '...';
 
   wsSend({ type: 'git_graph', sessionId: S.activeSessionId });

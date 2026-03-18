@@ -884,6 +884,45 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 #diff-content .diff-add,#diff-content .diff-del,#diff-content .diff-hunk,#diff-content .diff-ctx{padding:0 16px}
 .diff-loading{padding:40px;text-align:center;color:var(--text-ghost);font-size:12px;letter-spacing:.08em}
 
+/* ─── WORKTREE ─── */
+.sc-worktree-section{border-bottom:1px solid var(--border)}
+.sc-worktree-header{padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:.1em;
+  color:var(--text-ghost);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.sc-worktree-header:hover{color:var(--text-main)}
+.sc-worktree-toggle{font-size:9px;width:10px;text-align:center;transition:transform .15s}
+.sc-worktree-section.collapsed .sc-worktree-toggle{transform:rotate(-90deg)}
+.sc-worktree-section.collapsed .sc-worktree-list,
+.sc-worktree-section.collapsed .sc-worktree-add-form{display:none!important}
+.sc-worktree-title{flex:1}
+.sc-worktree-count{background:var(--bg-hover);border-radius:8px;padding:1px 6px;font-size:9px;min-width:18px;text-align:center}
+.sc-worktree-count:empty{display:none}
+.sc-worktree-list{display:flex;flex-direction:column}
+.sc-worktree-item{display:flex;align-items:center;gap:6px;padding:4px 12px;font-size:11px;
+  cursor:pointer;transition:background .1s;color:var(--text-main)}
+.sc-worktree-item:hover{background:var(--bg-hover)}
+.sc-worktree-item.active{background:var(--accent-dim);border-left:2px solid var(--accent)}
+.sc-worktree-item.active .sc-worktree-branch{color:var(--accent)}
+.sc-worktree-marker{font-size:8px;color:var(--accent);width:8px;flex-shrink:0}
+.sc-worktree-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.sc-worktree-branch{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-worktree-path{font-size:9px;color:var(--text-ghost);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-worktree-head{font-size:9px;color:var(--text-ghost);font-family:var(--font-mono);flex-shrink:0}
+.sc-worktree-remove{background:none;border:none;color:var(--text-ghost);font-size:11px;
+  cursor:pointer;display:none;padding:2px 4px;border-radius:3px;flex-shrink:0}
+.sc-worktree-item:hover .sc-worktree-remove{display:block}
+.sc-worktree-remove:hover{color:var(--danger);background:#ff336618}
+.sc-worktree-add-form{padding:8px 12px;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--border)}
+.sc-worktree-input{background:var(--bg-void);border:1px solid var(--border);border-radius:3px;
+  color:var(--text-main);padding:4px 8px;font-size:11px;font-family:var(--font-mono)}
+.sc-worktree-input:focus{border-color:var(--accent);outline:none}
+.sc-worktree-form-actions{display:flex;align-items:center;gap:8px;font-size:11px}
+.sc-worktree-label{color:var(--text-ghost);display:flex;align-items:center;gap:4px;cursor:pointer;flex:1}
+.sc-worktree-form-btn{background:var(--accent);color:var(--bg-void);border:none;border-radius:3px;
+  padding:3px 10px;font-size:10px;cursor:pointer;font-weight:600}
+.sc-worktree-form-btn:hover{filter:brightness(1.2)}
+.sc-worktree-cancel-btn{background:none;border:1px solid var(--border);color:var(--text-ghost)}
+.sc-worktree-cancel-btn:hover{color:var(--text-main);border-color:var(--text-ghost)}
+
 /* ═══ PLAN PANEL ═══ */
 .plan-file-bar{display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg-hover);font-size:11px;border-bottom:1px solid var(--border)}
 .plan-file-name{flex:1;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -923,6 +962,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .breadcrumb-sep{color:var(--text-ghost);margin:0 2px}
 .breadcrumb-part{color:var(--text-dim);cursor:default;white-space:nowrap}
 .breadcrumb-part:last-child{color:var(--accent)}
+.breadcrumb-wt{color:var(--accent2);font-weight:600;font-size:10px;white-space:nowrap}
 
 /* ═══ TOAST NOTIFICATIONS ═══ */
 #toast-container{position:fixed;bottom:48px;right:16px;z-index:9999;display:flex;flex-direction:column-reverse;gap:6px;pointer-events:none}
