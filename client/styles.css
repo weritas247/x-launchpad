@@ -82,6 +82,9 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .activity-btn.active{color:var(--accent)}
 .activity-btn.active::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:2px;
   background:var(--accent);border-radius:0 2px 2px 0}
+.activity-badge{position:absolute;top:2px;right:2px;background:var(--accent);color:var(--bg-void);
+  font-size:8px;font-weight:700;min-width:14px;height:14px;border-radius:7px;
+  display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;pointer-events:none}
 .activity-btn.dragging{opacity:.4}
 .activity-btn.drag-over-top{box-shadow:0 -2px 0 0 var(--accent)}
 .activity-btn.drag-over-bottom{box-shadow:0 2px 0 0 var(--accent)}

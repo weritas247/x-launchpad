@@ -2,11 +2,13 @@
 import { S, sessionMeta, escHtml } from './state.js';
 import { wsSend } from './websocket.js';
 import { showToast } from './toast.js';
+import { setActivityBadge } from './activity-bar.js';
 
 let gitStatusFiles = [];
 let gitBranch = '';
 let gitRoot = '';
 let isGitRepo = false;
+let upstream = { ahead: 0, behind: 0 };
 let viewMode = 'list'; // 'list' | 'tree'
 let expandedTreeDirs = new Set();
 let selectedFile = null;
@@ -111,6 +113,8 @@ export function handleGitStatusData(msg) {
   gitBranch = msg.branch || '';
   gitRoot = msg.root || '';
   isGitRepo = msg.isRepo || false;
+  upstream = msg.upstream || { ahead: 0, behind: 0 };
+  setActivityBadge('source-control', gitStatusFiles.length);
   renderSourceControl();
 }
 
@@ -150,7 +154,14 @@ function renderSourceControl() {
   const countEl = document.getElementById('sc-change-count');
   if (!container) return;
 
-  if (branchEl) branchEl.textContent = gitBranch || '—';
+  if (branchEl) {
+    let branchText = gitBranch || '—';
+    const parts = [];
+    if (upstream.behind > 0) parts.push(`↓${upstream.behind}`);
+    if (upstream.ahead > 0) parts.push(`↑${upstream.ahead}`);
+    if (parts.length) branchText += ` ${parts.join(' ')}`;
+    branchEl.textContent = branchText;
+  }
   if (countEl) countEl.textContent = gitStatusFiles.length > 0 ? gitStatusFiles.length : '';
 
   // Update commit input placeholder with branch name

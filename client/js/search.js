@@ -1,6 +1,7 @@
 // ─── SEARCH PANEL ────────────────────────────────────────────────
 import { S, sessionMeta, escHtml } from './state.js';
 import { wsSend } from './websocket.js';
+import { setActivityBadge } from './activity-bar.js';
 
 let searchResults = [];
 let lastQuery = '';
@@ -40,12 +41,14 @@ export function initSearch() {
 
 export function handleSearchResults(msg) {
   searchResults = msg.results || [];
+  setActivityBadge('search', searchResults.length);
   renderResults();
 }
 
 function clearResults() {
   searchResults = [];
   lastQuery = '';
+  setActivityBadge('search', 0);
   renderResults();
 }
 

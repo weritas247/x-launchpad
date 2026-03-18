@@ -470,6 +470,18 @@ export function searchInFiles(cwd: string, query: string, maxResults = 100): Sea
   }
 }
 
+export function getUpstreamStatus(cwd: string): { ahead: number; behind: number } {
+  try {
+    const raw = execFileSync('git', ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'], {
+      cwd, encoding: 'utf-8', timeout: 3000,
+    }).trim();
+    const [ahead, behind] = raw.split(/\s+/).map(Number);
+    return { ahead: ahead || 0, behind: behind || 0 };
+  } catch {
+    return { ahead: 0, behind: 0 };
+  }
+}
+
 export function getGitRoot(cwd: string): string | null {
   try {
     return execFileSync('git', ['rev-parse', '--show-toplevel'], {

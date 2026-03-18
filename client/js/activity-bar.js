@@ -157,3 +157,19 @@ export function initSidebarResize() {
 export function getActivePanel() {
   return activePanel;
 }
+
+export function setActivityBadge(panel, count) {
+  const btn = document.querySelector(`.activity-btn[data-panel="${panel}"]`);
+  if (!btn) return;
+  let badge = btn.querySelector('.activity-badge');
+  if (count > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'activity-badge';
+      btn.appendChild(badge);
+    }
+    badge.textContent = count > 99 ? '99+' : count;
+  } else if (badge) {
+    badge.remove();
+  }
+}

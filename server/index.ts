@@ -798,7 +798,8 @@ wss.on('connection', (ws: WebSocket) => {
         const files = gitService.getGitStatus(session.cwd);
         const branch = gitService.getCurrentBranch(session.cwd);
         const root = gitService.getGitRoot(session.cwd);
-        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+        const upstream = gitService.getUpstreamStatus(session.cwd);
+        ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true, upstream }));
       } catch (e) {
         ws.send(JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], error: String(e), isRepo: false }));
       }
