@@ -15,7 +15,24 @@ import * as db from './db';
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+// Control WS: session management, settings, git, file ops (JSON)
+const wss = new WebSocketServer({ noServer: true });
+// Data WS: per-session terminal I/O (binary)
+const wssData = new WebSocketServer({ noServer: true });
+
+// Route upgrade requests to the right WSS
+server.on('upgrade', (req, socket, head) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  if (url.pathname === '/pty') {
+    wssData.handleUpgrade(req, socket, head, (ws) => {
+      wssData.emit('connection', ws, req);
+    });
+  } else {
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit('connection', ws, req);
+    });
+  }
+});
 const PORT = process.env.PORT || 3000;
 const SETTINGS_PATH  = path.join(__dirname, '../../settings.json');
 const SESSIONS_PATH  = path.join(__dirname, '../../sessions.json');
@@ -547,6 +564,8 @@ const sessions = new Map<string, Session>();
 const wsSession = new Map<WebSocket, string>();
 // Extra subscriptions: receive output without changing active session
 const wsSubscriptions = new Map<WebSocket, Set<string>>();
+// Per-session data WebSocket connections (terminal I/O)
+const dataWsMap = new Map<string, Set<WebSocket>>();
 
 function createSession(id: string, name: string, restoreCwd?: string, restoreCmd?: string): Session {
   const s = currentSettings.shell;
@@ -615,20 +634,15 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     if (session.scrollback.length > SCROLLBACK_LIMIT) {
       session.scrollback = session.scrollback.slice(-SCROLLBACK_LIMIT);
     }
-    // Build binary frame: [0x01][sessionId-len:u16][sessionId][data]
-    const dataBuf = Buffer.from(outputBuf, 'utf-8');
-    const frame = Buffer.concat([binHeader, dataBuf]);
+    // Send raw output via per-session data WebSocket (no framing needed — 1 WS = 1 session)
+    const data = outputBuf;
     outputBuf = '';
-    // Only send to clients that have this session as ACTIVE (foreground tab).
-    // Non-active tabs get output via scrollback when user switches to them.
-    // This prevents N sessions × output from overwhelming a single WebSocket.
-    wss.clients.forEach(c => {
-      const cws = c as WebSocket;
-      if (cws.readyState !== WebSocket.OPEN) return;
-      // Backpressure: skip if client's send buffer is already backed up (>1MB)
-      if ((cws as any).bufferedAmount > 1024 * 1024) return;
-      const active = wsSession.get(cws) === id;
-      if (active) cws.send(frame);
+    const clients = dataWsMap.get(id);
+    if (!clients || clients.size === 0) return;
+    clients.forEach(ws => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      if ((ws as any).bufferedAmount > 1024 * 1024) return; // backpressure
+      ws.send(data);
     });
   }
 
@@ -887,6 +901,47 @@ function restoreSessions() {
 }
 
 // ─── WEBSOCKET ────────────────────────────────────────────────────
+// ─── DATA WEBSOCKET (per-session terminal I/O) ──────────────────
+wssData.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const sessionId = url.searchParams.get('sid') || '';
+
+  // Auth check
+  if (authEnabled) {
+    const token = url.searchParams.get('token') || '';
+    if (!verifyToken(token)) { ws.close(4001, 'Unauthorized'); return; }
+  }
+
+  const session = sessions.get(sessionId);
+  if (!session) { ws.close(4002, 'Session not found'); return; }
+
+  // Register this WS for this session's output
+  if (!dataWsMap.has(sessionId)) dataWsMap.set(sessionId, new Set());
+  dataWsMap.get(sessionId)!.add(ws);
+  console.log(`[data-ws] Connected for ${sessionId.slice(-6)} (${dataWsMap.get(sessionId)!.size} clients)`);
+
+  // Send scrollback immediately so client sees current state
+  if (session.scrollback) {
+    ws.send(session.scrollback);
+  }
+
+  // Input from client → PTY
+  ws.on('message', (message: Buffer | string) => {
+    const s = sessions.get(sessionId);
+    if (s) s.pty.write(message.toString());
+  });
+
+  ws.on('close', () => {
+    const set = dataWsMap.get(sessionId);
+    if (set) {
+      set.delete(ws);
+      if (set.size === 0) dataWsMap.delete(sessionId);
+    }
+    console.log(`[data-ws] Disconnected for ${sessionId.slice(-6)}`);
+  });
+});
+
+// ─── CONTROL WEBSOCKET (session mgmt, settings, git, files) ─────
 let clientCounter = 0;
 
 wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
@@ -966,7 +1021,6 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         ws.send(JSON.stringify({ type: 'error', message: `Session ${id} not found` }));
         return;
       }
-      const prevId = wsSession.get(ws);
       wsSession.set(ws, id);
       // Remove from subscriptions — active session gets output via wsSession
       wsSubscriptions.get(ws)?.delete(id);
@@ -974,16 +1028,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       // Replay current CWD/AI info immediately
       const sess = sessions.get(id)!;
       ws.send(JSON.stringify({ type: 'session_info', sessionId: id, cwd: sess.cwd, ai: sess.ai }));
-      // If switching tabs, send scrollback so user sees latest output
-      if (prevId !== id && sess.scrollback) {
-        const sidBuf = Buffer.from(id, 'utf-8');
-        const hdr = Buffer.alloc(1 + 2 + sidBuf.length);
-        hdr[0] = 0x02; // scrollback replay
-        hdr.writeUInt16BE(sidBuf.length, 1);
-        sidBuf.copy(hdr, 3);
-        const dataBuf = Buffer.from(sess.scrollback, 'utf-8');
-        ws.send(Buffer.concat([hdr, dataBuf]));
-      }
+      // Scrollback is now handled by per-session data WS on connect
 
     } else if (parsed.type === 'scrollback_request') {
       const id = parsed.sessionId as string;

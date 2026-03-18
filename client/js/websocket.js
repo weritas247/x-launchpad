@@ -152,6 +152,11 @@ export function wsSend(obj) {
 
 const _textDecoder = new TextDecoder();
 
+export function getAuthToken() {
+  const urlParams = new URLSearchParams(location.search);
+  return urlParams.get('token') || localStorage.getItem('super-terminal-token') || '';
+}
+
 export function requestScrollback(sessionId) {
   if (S.ws && S.ws.readyState === WebSocket.OPEN) {
     S.ws.send(JSON.stringify({ type: 'scrollback_request', sessionId }));

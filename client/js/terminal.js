@@ -1,13 +1,15 @@
 import { S, terminalMap, sessionMeta, tabBar, tabAddBtn, termWrapper, sbActiveName, sbSize, ctxMenu, escHtml } from './state.js';
 import { AI_REGISTRY } from './constants.js';
-import { wsSend } from './websocket.js';
+import { wsSend, getAuthToken } from './websocket.js';
 import { xtermKeyHandler } from './keyboard.js';
 import { trackInput } from './input-panel.js';
 import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session.js';
 import { removeSplitPane, teardownSplitLayout, showDropZoneOverlay, hideDropZoneOverlay } from './split-pane.js';
 import { resetTabStatus, tabStatusOnInput } from './tab-status.js';
 import { setupTerminalImageHandlers, hasPendingAttachments, uploadAndFlush } from './image-attach.js';
-import { destroyStream, bypassStream, unbypassStream } from './stream-writer.js';
+import { destroyStream, bypassStream, unbypassStream, streamWrite } from './stream-writer.js';
+import { aiNotifyCheck } from './notifications.js';
+import { tabStatusCheck } from './tab-status.js';
 
 export function newSession() {
   showSessionPicker();
@@ -83,6 +85,7 @@ export function closeSession(id) {
   wsSend({ type: 'session_close', sessionId: id });
   const entry = terminalMap.get(id);
   if (entry) {
+    if (entry.dataWs) { try { entry.dataWs.close(); } catch {} }
     entry.term.dispose();
     entry.tabEl.remove();
     terminalMap.delete(id);
@@ -206,20 +209,59 @@ export function attachTerminal(sessionId, name) {
   // Let app-level keybindings override xterm — execute action immediately
   term.attachCustomKeyEventHandler(e => xtermKeyHandler(e));
 
+  // ─── Per-session data WebSocket (terminal I/O) ────
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const token = getAuthToken();
+  const dataWsUrl = `${proto}//${location.host}/pty?sid=${encodeURIComponent(sessionId)}${token ? '&token=' + encodeURIComponent(token) : ''}`;
+  let dataWs = new WebSocket(dataWsUrl);
+
+  function connectDataWs() {
+    dataWs = new WebSocket(dataWsUrl);
+    dataWs.onopen = () => console.log(`[data-ws] Connected: ${sessionId.slice(-6)}`);
+    dataWs.onmessage = (event) => {
+      // Output from server → terminal (plain text, no framing)
+      streamWrite(sessionId, term, event.data);
+      aiNotifyCheck(sessionId, event.data);
+      tabStatusCheck(sessionId, event.data);
+    };
+    dataWs.onclose = () => {
+      // Reconnect after 2s if session still exists
+      if (terminalMap.has(sessionId)) {
+        setTimeout(connectDataWs, 2000);
+      }
+    };
+  }
+  // Initial connection already sends scrollback on connect
+  dataWs.onopen = () => console.log(`[data-ws] Connected: ${sessionId.slice(-6)}`);
+  dataWs.onmessage = (event) => {
+    streamWrite(sessionId, term, event.data);
+    aiNotifyCheck(sessionId, event.data);
+    tabStatusCheck(sessionId, event.data);
+  };
+  dataWs.onclose = () => {
+    if (terminalMap.has(sessionId)) setTimeout(connectDataWs, 2000);
+  };
+
+  // Send input via data WS (bypass control WS batching)
+  function dataSend(text) {
+    if (dataWs && dataWs.readyState === WebSocket.OPEN) {
+      dataWs.send(text);
+    }
+  }
+
   term.onData(data => {
     if (S.activeSessionId === sessionId) {
-      // Enter pressed with pending images → upload, inject paths, then send Enter
       if (data === '\r' && hasPendingAttachments(sessionId)) {
         trackInput(sessionId, data);
         uploadAndFlush(sessionId).then(paths => {
-          if (paths) wsSend({ type: 'input', sessionId, data: ' ' + paths });
-          wsSend({ type: 'input', sessionId, data: '\r' });
+          if (paths) dataSend(' ' + paths);
+          dataSend('\r');
         });
         tabStatusOnInput(sessionId);
         return;
       }
       trackInput(sessionId, data);
-      wsSend({ type: 'input', sessionId, data });
+      dataSend(data);
     }
     tabStatusOnInput(sessionId);
   });
@@ -234,7 +276,7 @@ export function attachTerminal(sessionId, name) {
       e.preventDefault();
       try {
         const text = await navigator.clipboard.readText();
-        if (text) wsSend({ type:'input', sessionId, data: text });
+        if (text) dataSend(text);
       } catch {}
     }
   });
@@ -248,7 +290,7 @@ export function attachTerminal(sessionId, name) {
   const sidebarEl = createSidebarItem(sessionId, name);
   const tabEl = createTab(sessionId, name);
 
-  terminalMap.set(sessionId, { term, fitAddon, div, tabEl, sidebarEl });
+  terminalMap.set(sessionId, { term, fitAddon, div, tabEl, sidebarEl, dataWs });
   hideEmptyState();
   updateStatusBar();
 }

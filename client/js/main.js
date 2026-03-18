@@ -82,20 +82,7 @@ function handleMessage(msg) {
       if (panel === 'explorer') onExplorerSessionChange();
       else if (panel === 'source-control') onSourceControlSessionChange();
     }
-  } else if (msg.type === 'output') {
-    const entry = terminalMap.get(msg.sessionId);
-    if (entry) {
-      streamWrite(msg.sessionId, entry.term, msg.data);
-      aiNotifyCheck(msg.sessionId, msg.data);
-      tabStatusCheck(msg.sessionId, msg.data);
-    }
-  } else if (msg.type === 'scrollback') {
-    // Replay scrollback history directly to terminal (bypass stream writer)
-    const entry = terminalMap.get(msg.sessionId);
-    if (entry && msg.data) {
-      entry.term.write(msg.data);
-      entry.term.scrollToBottom();
-    }
+  // output and scrollback are now handled by per-session data WebSocket in terminal.js
   } else if (msg.type === 'git_graph_data') {
     handleGitGraphData(msg);
   } else if (msg.type === 'git_file_list_data') {
