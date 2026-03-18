@@ -406,6 +406,16 @@ function relTime(iso) {
   return `${Math.floor(diff/604800)}w`;
 }
 
+function absTime(iso) {
+  const d = new Date(iso);
+  const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const h = d.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${mon[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} at ${h12}:${min}\u202F${ampm}`;
+}
+
 // ─── CO-AUTHOR PARSING ───────────────────────────────
 function parseCoAuthors(body) {
   if (!body) return [];
@@ -548,21 +558,25 @@ function renderGraph(commits) {
 
   let svg = '';
 
-  // Edges
+  // Edges (Fork-style: straight lines with rounded bends)
   for (const e of edges) {
     if (e.x1 === e.x2) {
-      svg += `<line x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" stroke="${e.color}" stroke-width="2" />`;
+      svg += `<line x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" stroke="${e.color}" stroke-width="1.5" />`;
     } else {
-      const my = (e.y1 + e.y2) / 2;
-      svg += `<path d="M${e.x1},${e.y1} C${e.x1},${my} ${e.x2},${my} ${e.x2},${e.y2}" stroke="${e.color}" stroke-width="2" fill="none" />`;
+      // Fork style: straight down then curve into target column
+      const R = 8; // bend radius
+      const dx = e.x2 - e.x1;
+      const dir = dx > 0 ? 1 : -1;
+      const bendY = e.y2 - R;
+      svg += `<path d="M${e.x1},${e.y1} L${e.x1},${bendY} Q${e.x1},${e.y2} ${e.x1 + R * dir},${e.y2} L${e.x2},${e.y2}" stroke="${e.color}" stroke-width="1.5" fill="none" />`;
     }
   }
 
-  // Nodes
+  // Nodes (solid filled, no stroke)
   for (const c of commits) {
     const p = positions.get(c.hash);
     if (!p) continue;
-    svg += `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${p.color}" stroke="var(--bg-panel)" stroke-width="2" />`;
+    svg += `<circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${p.color}" />`;
   }
 
   svgEl.innerHTML = svg;
@@ -570,16 +584,13 @@ function renderGraph(commits) {
   // Commit rows
   commitBox.innerHTML = commits.map((c, i) => {
     const refs = c.refs.length > 0 ? `<span class="gg-refs">${c.refs.map(refBadge).join('')}</span>` : '';
-    const hashClass = 'gg-hash';
     const coAuthors = parseCoAuthors(c.body);
     const coAuthorHtml = coAuthorBadge(coAuthors);
     return `<div class="gg-row" data-hash="${escHtml(c.hash)}" style="height:${ROW_H}px">` +
-      `<span class="${hashClass}" data-hash="${escHtml(c.hash)}">${escHtml(c.hash.slice(0,7))}</span>` +
-      `<span class="gg-branch-col">${refs}</span>` +
-      `<span class="gg-msg">${escHtml(c.message)}</span>` +
-      `<span class="gg-stat">${statBadge(c.additions, c.deletions)}</span>` +
+      `<span class="gg-msg">${refs}${escHtml(c.message)}</span>` +
       `<span class="gg-author">${escHtml(c.author)}${coAuthorHtml}</span>` +
-      `<span class="gg-time">${relTime(c.date)}</span>` +
+      `<span class="gg-hash" data-hash="${escHtml(c.hash)}">${escHtml(c.hash.slice(0,7))}</span>` +
+      `<span class="gg-time">${absTime(c.date)}</span>` +
       `</div>`;
   }).join('');
 }
