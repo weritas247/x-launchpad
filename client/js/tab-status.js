@@ -212,11 +212,6 @@ function updateTabUI(sessionId, status, text) {
   const indicator = entry.tabEl.querySelector('.tab-indicator');
   if (indicator) indicator.setAttribute('aria-label', text);
 
-  // Update sidebar item (icon color + status text)
-  entry.sidebarEl.dataset.status = status;
-  const statusTextEl = entry.sidebarEl.querySelector('.session-status-text');
-  if (statusTextEl) statusTextEl.textContent = text;
-
   // Handle done → idle auto-transition
   clearTimeout(doneTimers.get(sessionId));
   if (status === 'done') {

@@ -8,7 +8,7 @@ import { newSession, closeSession, renameSession, syncSessionList, attachTermina
 import { loadSettings, applySettings, openSettings, closeSettings, initSettingsUI } from './settings.js';
 import { aiNotifyCheck, resetNotifyState, initNotifications } from './notifications.js';
 import { tabStatusCheck, tabStatusOnAiChange, suppressTabStatus } from './tab-status.js';
-import { createFolder, initFolderDnD } from './folder.js';
+import { initFolderDnD } from './folder.js';
 import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, handleGitPullAck, requestBranch, handleGitGraphKeydown } from './git-graph.js';
 import { streamWrite, bypassStream, unbypassStream } from './stream-writer.js';
 import { registerAction, buildCombo, matchCombo, tryKeybinding } from './keyboard.js';
@@ -256,10 +256,8 @@ window.addEventListener('resize', () => {
   terminalMap.forEach(({ fitAddon }) => fitAddon.fit());
 });
 
-document.getElementById('btn-new-session').addEventListener('click', newSession);
 tabAddBtn.addEventListener('click', newSession);
 document.getElementById('btn-start-empty').addEventListener('click', newSession);
-document.getElementById('btn-new-folder').addEventListener('click', createFolder);
 
 document.getElementById('sp-close').addEventListener('click', hideSessionPicker);
 document.getElementById('session-picker').addEventListener('click', e => {

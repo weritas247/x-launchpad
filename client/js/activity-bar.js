@@ -2,7 +2,7 @@
 import { requestFileTree } from './explorer.js';
 import { requestGitStatus } from './source-control.js';
 
-let activePanel = 'sessions';
+let activePanel = 'search';
 let splits = [];          // [{ id, primary, secondary, ratio, btnEl }]
 let activeSplitId = null;  // currently shown split's id (null = single panel view)
 let splitIdCounter = 0;

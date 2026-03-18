@@ -16,29 +16,26 @@ export function activateSession(id) {
   deactivateAllFileTabs();
 
   if (S.layoutTree === null) {
-    terminalMap.forEach(({ div, tabEl, sidebarEl }, sid) => {
+    terminalMap.forEach(({ div, tabEl }, sid) => {
       const a = sid === id;
       div.classList.toggle('active', a);
       tabEl.classList.toggle('active', a);
-      sidebarEl.classList.toggle('active', a);
     });
   } else {
     const paneIds = collectPaneIds(S.layoutTree);
     if (!paneIds.includes(id)) {
       teardownSplitLayout();
-      terminalMap.forEach(({ div, tabEl, sidebarEl }, sid) => {
+      terminalMap.forEach(({ div, tabEl }, sid) => {
         const a = sid === id;
         div.classList.toggle('active', a);
         tabEl.classList.toggle('active', a);
-        sidebarEl.classList.toggle('active', a);
       });
     } else {
-      terminalMap.forEach(({ div, tabEl, sidebarEl }, sid) => {
+      terminalMap.forEach(({ div, tabEl }, sid) => {
         const a = sid === id;
         div.classList.toggle('split-active', a);
         div.classList.toggle('split-inactive', !a);
         tabEl.classList.toggle('active', a);
-        sidebarEl.classList.toggle('active', a);
       });
     }
   }

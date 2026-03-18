@@ -1,4 +1,4 @@
-import { S, terminalMap, sessionMeta, sessionList, sessionEmpty, tabBar, tabAddBtn, termWrapper, sbActiveName, sbSize, ctxMenu, escHtml } from './state.js';
+import { S, terminalMap, sessionMeta, tabBar, tabAddBtn, termWrapper, sbActiveName, sbSize, ctxMenu, escHtml } from './state.js';
 import { AI_REGISTRY } from './constants.js';
 import { wsSend } from './websocket.js';
 import { xtermKeyHandler } from './keyboard.js';
@@ -85,7 +85,6 @@ export function closeSession(id) {
   if (entry) {
     entry.term.dispose();
     entry.tabEl.remove();
-    entry.sidebarEl.remove();
     terminalMap.delete(id);
 
     if (S.layoutTree !== null) {
@@ -117,7 +116,6 @@ export function renameSession(id, newName) {
   wsSend({ type: 'session_rename', sessionId: id, name: newName });
   const entry = terminalMap.get(id);
   if (entry) {
-    entry.sidebarEl.querySelector('.session-name').textContent = newName;
     entry.tabEl.querySelector('.tab-name').textContent = newName;
   }
   if (S.activeSessionId === id) sbActiveName.textContent = newName;
@@ -256,30 +254,18 @@ export function attachTerminal(sessionId, name) {
 }
 
 export function createSidebarItem(sessionId, name) {
+  // Sidebar sessions panel removed — create a hidden placeholder element
+  // so that existing references to sidebarEl don't break
   const el = document.createElement('div');
   el.className = 'session-item';
   el.dataset.sessionId = sessionId;
   el.dataset.status = 'idle';
   el.innerHTML = `
-    <span class="session-icon">❯</span>
-    <div class="session-info">
-      <div class="session-name">${escHtml(name)}</div>
-      <div class="session-meta">
-        <div class="session-cwd" data-cwd>~</div>
-      </div>
-      <div class="session-status-text">대기</div>
-    </div>
-    <button class="session-close">✕</button>
+    <div class="session-name">${escHtml(name)}</div>
+    <div class="session-meta"><div class="session-cwd" data-cwd>~</div></div>
+    <div class="session-status-text">대기</div>
   `;
-  el.addEventListener('click', e => {
-    if (e.target.closest('.session-close')) { closeSession(sessionId); return; }
-    activateSession(sessionId);
-    wsSend({ type:'session_attach', sessionId });
-  });
-  el.addEventListener('contextmenu', e => showCtxMenu(e, sessionId));
-  makeSidebarItemDraggable(el, sessionId);
-  sessionEmpty.style.display = 'none';
-  sessionList.appendChild(el);
+  // Not appended to DOM — purely internal reference
   return el;
 }
 
@@ -291,29 +277,25 @@ export function updateSessionInfo(sessionId, cwd, ai) {
   const parts = shortCwd.replace(/\/$/, '').split('/');
   if (parts.length > 3) shortCwd = '…/' + parts.slice(-2).join('/');
 
-  const cwdEl = entry.sidebarEl.querySelector('[data-cwd]');
-  if (cwdEl) cwdEl.textContent = shortCwd;
-
-  let badgeEl = entry.sidebarEl.querySelector('.session-ai-badge');
-  const metaEl = entry.sidebarEl.querySelector('.session-meta');
+  // Update tab AI icon
+  let tabAiIcon = entry.tabEl.querySelector('.tab-ai-icon');
   if (ai) {
     const reg = AI_REGISTRY[ai];
-    const def = reg
-      ? { icon: `<img src="${reg.icon}" class="badge-img" alt="${reg.label}">`, label: reg.label }
-      : { icon: '🤖', label: ai };
-    if (!badgeEl) {
-      badgeEl = document.createElement('div');
-      metaEl.appendChild(badgeEl);
+    if (!tabAiIcon) {
+      tabAiIcon = document.createElement('span');
+      tabAiIcon.className = 'tab-ai-icon';
+      const indicator = entry.tabEl.querySelector('.tab-indicator');
+      indicator.after(tabAiIcon);
     }
-    badgeEl.className = 'session-ai-badge';
-    badgeEl.dataset.ai = ai;
     if (reg) {
-      badgeEl.style.setProperty('--badge-rgb', reg.rgb.join(','));
-      badgeEl.style.setProperty('--badge-color', reg.color);
+      tabAiIcon.innerHTML = `<img src="${reg.icon}" class="tab-ai-img" alt="${reg.label}" title="${reg.label}">`;
+      tabAiIcon.style.setProperty('--tab-ai-color', reg.color);
+    } else {
+      tabAiIcon.textContent = '🤖';
+      tabAiIcon.title = ai;
     }
-    badgeEl.innerHTML = `<span class="badge-icon">${def.icon}</span>${def.label}`;
-  } else if (badgeEl) {
-    badgeEl.remove();
+  } else if (tabAiIcon) {
+    tabAiIcon.remove();
   }
 
   const tabNameEl = entry.tabEl.querySelector('.tab-name');
@@ -322,7 +304,7 @@ export function updateSessionInfo(sessionId, cwd, ai) {
   tabNameEl.textContent = `${baseName}  ${shortCwd}`;
 
   if (S.activeSessionId === sessionId) {
-    sbActiveName.textContent = `${baseName}  ${shortCwd}${ai ? `  [${ai}]` : ''}`;
+    sbActiveName.textContent = `${baseName}  ${shortCwd}`;
     updateBreadcrumb(cwd);
   }
 
@@ -354,6 +336,7 @@ export function createTab(sessionId, name) {
     activateSession(sessionId);
     wsSend({ type:'session_attach', sessionId });
   });
+  el.addEventListener('contextmenu', e => showCtxMenu(e, sessionId));
 
   el.addEventListener('dragstart', e => {
     e.dataTransfer.setData('text/tab-session', sessionId);
@@ -426,17 +409,18 @@ export function initContextMenu() {
     if (!S.ctxTargetId) return;
     const entry = terminalMap.get(S.ctxTargetId);
     if (!entry) return;
-    const nameEl = entry.sidebarEl.querySelector('.session-name');
-    const old = nameEl.textContent;
+    const nameEl = entry.tabEl.querySelector('.tab-name');
+    const meta = sessionMeta.get(S.ctxTargetId);
+    const old = meta ? meta.name : nameEl.textContent;
     const input = document.createElement('input');
-    input.className = 'session-name-input';
+    input.className = 'session-name-input tab-rename-input';
     input.value = old;
     nameEl.replaceWith(input);
     input.focus(); input.select();
     const finish = () => {
       const n = input.value.trim() || old;
-      const span = document.createElement('div');
-      span.className = 'session-name';
+      const span = document.createElement('span');
+      span.className = 'tab-name';
       span.textContent = n;
       input.replaceWith(span);
       renameSession(S.ctxTargetId, n);

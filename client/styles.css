@@ -29,6 +29,14 @@
   --sidebar-w:  240px;
   --header-h:   44px;
   --font-mono: 'JetBrains Mono','Share Tech Mono',monospace;
+
+  /* Per-section font sizes (overridden by JS from settings) */
+  --sidebar-font-size: 12px;
+  --statusbar-font-size: 11px;
+  --tabbar-font-size: 12px;
+  --input-panel-font-size: 11px;
+  --file-viewer-font-size: 13px;
+  --git-graph-font-size: 12px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{width:100%;height:100%;background:var(--bg-void);color:var(--text-main);font-family:var(--font-mono);overflow:hidden;user-select:none}
@@ -228,10 +236,13 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .session-item[data-status="tool"] .session-icon{color:var(--accent2)}
 .session-item[data-status="question"] .session-icon{color:var(--danger);animation:blink 1s ease-in-out infinite}
 .session-item[data-status="done"] .session-icon{color:var(--ok)}
+.tab-ai-icon{display:flex;align-items:center;flex-shrink:0}
+.tab-ai-img{width:14px;height:14px;object-fit:contain;display:block;filter:drop-shadow(0 0 3px var(--tab-ai-color, transparent))}
 .tab-name{overflow:hidden;text-overflow:ellipsis;flex:1}
 .tab-close-btn{background:none;border:none;color:var(--text-ghost);font-size:13px;cursor:pointer;padding:0 2px;font-family:var(--font-mono);line-height:1;flex-shrink:0;opacity:0;transition:opacity .12s}
 .tab:hover .tab-close-btn{opacity:1}
 .tab-close-btn:hover{color:var(--danger)}
+.tab-rename-input{background:none;border:none;border-bottom:1px solid var(--accent);color:var(--text-bright);font-family:var(--font-mono);font-size:12px;outline:none;width:100%;padding:0}
 .tab-add-btn{height:28px;width:28px;background:none;border:1px solid var(--border);border-bottom:none;border-radius:4px 4px 0 0;color:var(--text-dim);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;font-family:var(--font-mono);line-height:1;flex-shrink:0;margin-left:4px}
 .tab-add-btn:hover{color:var(--accent);border-color:var(--border-lit);background:var(--accent-dim)}
 
@@ -890,3 +901,58 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .toast-success{background:#0a1f0a;border:1px solid var(--ok);color:var(--ok)}
 .toast-error{background:#1f0a0a;border:1px solid var(--danger);color:var(--danger)}
 .toast-info{background:#0a0f1f;border:1px solid var(--accent);color:var(--accent)}
+
+/* ═══ PER-SECTION FONT SIZE OVERRIDES ═══ */
+/* Sidebar: sessions, search, explorer, source control, plan panels */
+#sidebar{font-size:var(--sidebar-font-size)}
+#sidebar .sidebar-header{font-size:calc(var(--sidebar-font-size) - 1px)}
+#sidebar .session-name{font-size:calc(var(--sidebar-font-size) + 1px)}
+#sidebar .session-meta{font-size:calc(var(--sidebar-font-size) - 2px)}
+#sidebar .session-cwd{font-size:calc(var(--sidebar-font-size) - 2px)}
+#sidebar .session-ai-badge{font-size:calc(var(--sidebar-font-size) - 2px)}
+#sidebar .session-empty{font-size:calc(var(--sidebar-font-size) - 1px)}
+#sidebar .session-status-text{font-size:calc(var(--sidebar-font-size) - 2px)}
+#sidebar .folder-header{font-size:calc(var(--sidebar-font-size) - 1px)}
+#sidebar .folder-count{font-size:calc(var(--sidebar-font-size) - 2px)}
+#sidebar .search-input{font-size:calc(var(--sidebar-font-size) - 1px)}
+#sidebar .search-include{font-size:calc(var(--sidebar-font-size) - 2px)}
+#sidebar .search-count{font-size:calc(var(--sidebar-font-size) - 3px)}
+#sidebar .search-file-header{font-size:calc(var(--sidebar-font-size) - 1px)}
+#sidebar .search-match-line{font-size:calc(var(--sidebar-font-size) - 1px)}
+#sidebar .search-line-num{font-size:calc(var(--sidebar-font-size) - 2px)}
+#sidebar .explorer-item{font-size:var(--sidebar-font-size)}
+#sidebar .explorer-path-bar{font-size:calc(var(--sidebar-font-size) - 2px)}
+#sidebar .explorer-preview-content{font-size:calc(var(--sidebar-font-size) - 1px)}
+#sidebar .sc-file-item{font-size:var(--sidebar-font-size)}
+#sidebar .sc-branch-bar{font-size:calc(var(--sidebar-font-size) - 1px)}
+#sidebar .sc-commit-input{font-size:calc(var(--sidebar-font-size) - 1px)}
+#sidebar .sc-diff-content{font-size:calc(var(--sidebar-font-size) - 1px)}
+#sidebar .plan-content{font-size:var(--sidebar-font-size)}
+#sidebar .plan-empty{font-size:calc(var(--sidebar-font-size) - 1px)}
+#sidebar .plan-annot-item{font-size:calc(var(--sidebar-font-size) - 1px)}
+
+/* Tab bar */
+#tab-bar .tab{font-size:var(--tabbar-font-size)}
+
+/* Status bar */
+#statusbar{font-size:var(--statusbar-font-size)}
+
+/* Input history panel */
+.input-panel-header{font-size:calc(var(--input-panel-font-size) - 1px)}
+.input-entry{font-size:var(--input-panel-font-size)}
+.input-entry-num{font-size:calc(var(--input-panel-font-size) - 1px)}
+.input-entry-time{font-size:calc(var(--input-panel-font-size) - 2px)}
+
+/* File viewer */
+.file-pane-content{font-size:var(--file-viewer-font-size)}
+.fl-ln{font-size:calc(var(--file-viewer-font-size) - 1px)}
+.file-pane-header{font-size:calc(var(--file-viewer-font-size) - 2px)}
+
+/* Git graph */
+#git-graph-modal .gg-row{font-size:var(--git-graph-font-size)}
+#git-graph-modal .gg-hash{font-size:calc(var(--git-graph-font-size) - 1px)}
+#git-graph-modal .gg-author{font-size:calc(var(--git-graph-font-size) - 1px)}
+#git-graph-modal .gg-time{font-size:calc(var(--git-graph-font-size) - 1px)}
+#git-graph-modal .gg-stat{font-size:calc(var(--git-graph-font-size) - 2px)}
+#git-graph-modal .gg-file-item{font-size:calc(var(--git-graph-font-size) - 1px)}
+#git-graph-modal .gg-commit-body{font-size:calc(var(--git-graph-font-size) - 1px)}

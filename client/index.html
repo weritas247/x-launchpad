@@ -47,10 +47,7 @@
 
   <!-- ACTIVITY BAR -->
   <nav id="activity-bar">
-    <button class="activity-btn active" data-panel="sessions" title="Sessions">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-    </button>
-    <button class="activity-btn" data-panel="search" title="Search">
+    <button class="activity-btn active" data-panel="search" title="Search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M16 16l4.5 4.5"/></svg>
     </button>
     <button class="activity-btn" data-panel="explorer" title="Explorer">
@@ -66,22 +63,13 @@
 
   <!-- SIDEBAR -->
   <aside id="sidebar">
-    <!-- SESSIONS PANEL -->
-    <div class="sidebar-panel active" id="panel-sessions">
-      <div class="sidebar-header">
-        <span class="sidebar-title-text">SESSIONS</span>
-        <div class="sidebar-header-actions">
-          <button class="btn-folder" id="btn-new-folder" title="New folder">▶</button>
-          <button class="btn-new" id="btn-new-session" title="New session">+</button>
-        </div>
-      </div>
-      <div class="session-list" id="session-list">
-        <div class="session-empty" id="session-empty">No active sessions.<br/>Press <span style="color:var(--accent)">+</span> to start.</div>
-      </div>
+    <!-- Hidden session list container (internal use) -->
+    <div id="session-list" style="display:none">
+      <div id="session-empty" style="display:none"></div>
     </div>
 
     <!-- SEARCH PANEL -->
-    <div class="sidebar-panel" id="panel-search">
+    <div class="sidebar-panel active" id="panel-search">
       <div class="sidebar-header">
         <span class="sidebar-title-text">SEARCH</span>
         <div class="sidebar-header-actions">
@@ -431,6 +419,64 @@
                 <div class="range-row">
                   <input type="range" class="s-range" id="s-lineHeight" min="1.0" max="2.0" step="0.05"/>
                   <span class="range-val" id="s-lineHeight-val">1.2</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <div class="section-title">Section Font Sizes</div>
+            <div class="field-row">
+              <div class="field-label">Sidebar<small>Sessions, Search, Explorer, SC, Plan</small></div>
+              <div class="field-control">
+                <div class="range-row">
+                  <input type="range" class="s-range" id="s-sidebarFontSize" min="8" max="20" step="1"/>
+                  <span class="range-val" id="s-sidebarFontSize-val">12</span>
+                </div>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">Tab Bar</div>
+              <div class="field-control">
+                <div class="range-row">
+                  <input type="range" class="s-range" id="s-tabBarFontSize" min="8" max="20" step="1"/>
+                  <span class="range-val" id="s-tabBarFontSize-val">12</span>
+                </div>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">Status Bar</div>
+              <div class="field-control">
+                <div class="range-row">
+                  <input type="range" class="s-range" id="s-statusBarFontSize" min="8" max="20" step="1"/>
+                  <span class="range-val" id="s-statusBarFontSize-val">11</span>
+                </div>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">Input Panel<small>Input History</small></div>
+              <div class="field-control">
+                <div class="range-row">
+                  <input type="range" class="s-range" id="s-inputPanelFontSize" min="8" max="20" step="1"/>
+                  <span class="range-val" id="s-inputPanelFontSize-val">11</span>
+                </div>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">File Viewer</div>
+              <div class="field-control">
+                <div class="range-row">
+                  <input type="range" class="s-range" id="s-fileViewerFontSize" min="8" max="24" step="1"/>
+                  <span class="range-val" id="s-fileViewerFontSize-val">13</span>
+                </div>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">Git Graph</div>
+              <div class="field-control">
+                <div class="range-row">
+                  <input type="range" class="s-range" id="s-gitGraphFontSize" min="8" max="20" step="1"/>
+                  <span class="range-val" id="s-gitGraphFontSize-val">12</span>
                 </div>
               </div>
             </div>

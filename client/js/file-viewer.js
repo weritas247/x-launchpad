@@ -104,10 +104,9 @@ export function activateFileTab(filePath) {
   activeFilePath = filePath;
 
   // Deactivate all terminal tabs/panes
-  terminalMap.forEach(({ div, tabEl, sidebarEl }) => {
+  terminalMap.forEach(({ div, tabEl }) => {
     div.classList.remove('active');
     tabEl.classList.remove('active');
-    sidebarEl.classList.remove('active');
   });
 
   // Deactivate all file tabs/panes, activate target

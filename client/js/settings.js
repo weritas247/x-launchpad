@@ -27,6 +27,7 @@ export function applySettings(s) {
   applyTheme(t);
 
   applyEffects(s.appearance);
+  applySectionFontSizes(s.appearance);
 
   customCssTag.textContent = s.advanced?.customCss || '';
 
@@ -69,6 +70,16 @@ export function applyTerminalOptions(term, s) {
   term.options.cursorBlink = ap.cursorBlink !== false;
   term.options.scrollback = s.terminal?.scrollback || 5000;
   term.options.theme = S.currentTheme.term;
+}
+
+export function applySectionFontSizes(ap) {
+  const root = document.documentElement;
+  root.style.setProperty('--sidebar-font-size', (ap.sidebarFontSize || 12) + 'px');
+  root.style.setProperty('--statusbar-font-size', (ap.statusBarFontSize || 11) + 'px');
+  root.style.setProperty('--tabbar-font-size', (ap.tabBarFontSize || 12) + 'px');
+  root.style.setProperty('--input-panel-font-size', (ap.inputPanelFontSize || 11) + 'px');
+  root.style.setProperty('--file-viewer-font-size', (ap.fileViewerFontSize || 13) + 'px');
+  root.style.setProperty('--git-graph-font-size', (ap.gitGraphFontSize || 12) + 'px');
 }
 
 export function openSettings() {
@@ -208,6 +219,13 @@ function populateForm(s) {
   setRangeValue('s-backgroundOpacity', ap.backgroundOpacity, '');
   updateFontPreview(ap.fontFamily, ap.fontSize);
 
+  setRangeValue('s-sidebarFontSize', ap.sidebarFontSize ?? 12, 'px');
+  setRangeValue('s-statusBarFontSize', ap.statusBarFontSize ?? 11, 'px');
+  setRangeValue('s-tabBarFontSize', ap.tabBarFontSize ?? 12, 'px');
+  setRangeValue('s-inputPanelFontSize', ap.inputPanelFontSize ?? 11, 'px');
+  setRangeValue('s-fileViewerFontSize', ap.fileViewerFontSize ?? 13, 'px');
+  setRangeValue('s-gitGraphFontSize', ap.gitGraphFontSize ?? 12, 'px');
+
   document.getElementById('s-scrollback').value = te.scrollback;
   setSelectValue('s-bellStyle', te.bellStyle);
   document.getElementById('s-copyOnSelect').checked = te.copyOnSelect;
@@ -270,6 +288,13 @@ function readForm() {
   s.appearance.vignette = document.getElementById('s-vignette').checked;
   s.appearance.glowIntensity = parseFloat(document.getElementById('s-glowIntensity').value);
   s.appearance.backgroundOpacity = parseFloat(document.getElementById('s-backgroundOpacity').value);
+
+  s.appearance.sidebarFontSize = parseInt(document.getElementById('s-sidebarFontSize')?.value) || 12;
+  s.appearance.statusBarFontSize = parseInt(document.getElementById('s-statusBarFontSize')?.value) || 11;
+  s.appearance.tabBarFontSize = parseInt(document.getElementById('s-tabBarFontSize')?.value) || 12;
+  s.appearance.inputPanelFontSize = parseInt(document.getElementById('s-inputPanelFontSize')?.value) || 11;
+  s.appearance.fileViewerFontSize = parseInt(document.getElementById('s-fileViewerFontSize')?.value) || 13;
+  s.appearance.gitGraphFontSize = parseInt(document.getElementById('s-gitGraphFontSize')?.value) || 12;
 
   s.terminal.scrollback = parseInt(document.getElementById('s-scrollback').value);
   s.terminal.bellStyle = document.getElementById('s-bellStyle').value;
