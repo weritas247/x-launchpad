@@ -349,6 +349,8 @@ function getClaudeUsage(cwd: string): ClaudeUsage | null {
 }
 
 // ─── SESSION MANAGEMENT ───────────────────────────────────────────
+const SCROLLBACK_LIMIT = 128 * 1024; // keep last 128KB of output per session
+
 interface Session {
   id: string;
   name: string;
@@ -360,6 +362,7 @@ interface Session {
   cwdTimer?: ReturnType<typeof setInterval>;
   pendingCmd?: string;
   resized?: boolean;
+  scrollback: string; // ring buffer of recent output
 }
 
 const sessions = new Map<string, Session>();
@@ -387,7 +390,7 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     cwd: fs.existsSync(cwd0) ? cwd0 : (process.env.HOME || '/'),
     env: mergedEnv,
   });
-  const session: Session = { id, name, pty: ptyProcess, createdAt: Date.now(), cwd: cwd0, ai: null, cmd: restoreCmd };
+  const session: Session = { id, name, pty: ptyProcess, createdAt: Date.now(), cwd: cwd0, ai: null, cmd: restoreCmd, scrollback: '' };
   sessions.set(id, session);
 
   // PTY output → clients with this session active OR subscribed
@@ -406,6 +409,11 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   function flushOutput() {
     flushTimer = null;
     if (!outputBuf) return;
+    // Accumulate scrollback for reconnect replay
+    session.scrollback += outputBuf;
+    if (session.scrollback.length > SCROLLBACK_LIMIT) {
+      session.scrollback = session.scrollback.slice(-SCROLLBACK_LIMIT);
+    }
     // Build binary frame: [0x01][sessionId-len:u16][sessionId][data]
     const dataBuf = Buffer.from(outputBuf, 'utf-8');
     const frame = Buffer.concat([binHeader, dataBuf]);
@@ -706,6 +714,20 @@ wss.on('connection', (ws: WebSocket) => {
       // Replay current CWD/AI info immediately
       const sess = sessions.get(id)!;
       ws.send(JSON.stringify({ type: 'session_info', sessionId: id, cwd: sess.cwd, ai: sess.ai }));
+
+    } else if (parsed.type === 'scrollback_request') {
+      const id = parsed.sessionId as string;
+      const session = sessions.get(id);
+      if (session && session.scrollback) {
+        // Send scrollback via binary frame (same format as output)
+        const sidBuf = Buffer.from(id, 'utf-8');
+        const hdr = Buffer.alloc(1 + 2 + sidBuf.length);
+        hdr[0] = 0x02; // type: scrollback replay
+        hdr.writeUInt16BE(sidBuf.length, 1);
+        sidBuf.copy(hdr, 3);
+        const dataBuf = Buffer.from(session.scrollback, 'utf-8');
+        ws.send(Buffer.concat([hdr, dataBuf]));
+      }
 
     } else if (parsed.type === 'session_rename') {
       const id = parsed.sessionId as string;

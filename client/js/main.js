@@ -1,6 +1,6 @@
 import { S, terminalMap, sessionMeta, sbClock, tabAddBtn, settingsOverlay } from './state.js';
 import { THEMES } from './constants.js';
-import { connect, wsSend, setOnInputSend } from './websocket.js';
+import { connect, wsSend, setOnInputSend, requestScrollback } from './websocket.js';
 import { initThemeSwatches } from './themes.js';
 import { activateSession, updateStatusBar, setOnSessionChangeSidePanels } from './session.js';
 import { initSplitDnD, refitAllPanes, updateSidebarSplitGroup } from './split-pane.js';
@@ -39,6 +39,8 @@ function handleMessage(msg) {
         suppressTabStatus(s.id, 2000);
         bypassStream(s.id);
         setTimeout(() => unbypassStream(s.id), 3000);
+        // Request scrollback history to restore terminal content
+        requestScrollback(s.id);
       });
     }
     S.wsJustReconnected = false;
@@ -85,6 +87,13 @@ function handleMessage(msg) {
       streamWrite(msg.sessionId, entry.term, msg.data);
       aiNotifyCheck(msg.sessionId, msg.data);
       tabStatusCheck(msg.sessionId, msg.data);
+    }
+  } else if (msg.type === 'scrollback') {
+    // Replay scrollback history directly to terminal (bypass stream writer)
+    const entry = terminalMap.get(msg.sessionId);
+    if (entry && msg.data) {
+      entry.term.write(msg.data);
+      entry.term.scrollToBottom();
     }
   } else if (msg.type === 'git_graph_data') {
     handleGitGraphData(msg);
