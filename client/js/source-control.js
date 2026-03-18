@@ -207,6 +207,11 @@ export function handleWorktreeAddAck(msg) {
 export function handleWorktreeRemoveAck(msg) {
   if (msg.ok) {
     showToast('Worktree removed', 'success');
+  } else if (msg.error && msg.error.includes('modified or untracked')) {
+    const yes = confirm('이 워크트리에 저장되지 않은 변경사항이 있습니다.\n강제로 삭제하시겠습니까?');
+    if (yes) {
+      wsSend({ type: 'git_worktree_remove', sessionId: S.activeSessionId, path: msg.path, force: true });
+    }
   } else {
     showToast('Worktree removal failed: ' + (msg.error || 'unknown'), 'error', 5000);
   }

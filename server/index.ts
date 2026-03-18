@@ -1747,7 +1747,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const wtPath = parsed.path as string;
       const force = parsed.force as boolean || false;
       const wtResult = gitService.removeWorktree(session.cwd, wtPath, force);
-      wsSend(ws, JSON.stringify({ type: 'git_worktree_remove_ack', sessionId: id, ...wtResult }));
+      wsSend(ws, JSON.stringify({ type: 'git_worktree_remove_ack', sessionId: id, path: wtPath, ...wtResult }));
       if (wtResult.ok) {
         const worktrees = gitService.getWorktreeList(session.cwd);
         wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
