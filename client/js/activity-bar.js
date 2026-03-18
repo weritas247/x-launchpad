@@ -134,8 +134,18 @@ export function initActivityBar() {
 
   sidebar.addEventListener('dragend', (e) => {
     const header = e.target.closest('.sidebar-header');
-    if (header) header.classList.remove('dragging');
+    if (!header) return;
+    header.classList.remove('dragging');
     clearSidebarDropZones();
+
+    // If dropped outside sidebar, close split
+    if (!secondaryPanel) return;
+    const sidebarRect = sidebar.getBoundingClientRect();
+    const droppedOutside = e.clientX < sidebarRect.left || e.clientX > sidebarRect.right ||
+                           e.clientY < sidebarRect.top || e.clientY > sidebarRect.bottom;
+    if (droppedOutside) {
+      closeSidebarSplit();
+    }
   });
 
   // ─── Sidebar split resize handle ───
