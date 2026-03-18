@@ -358,14 +358,19 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     flushTimer = null;
     if (!outputBuf) return;
     const msg = JSON.stringify({ type: 'output', sessionId: id, data: outputBuf });
+    const byteLen = outputBuf.length;
     outputBuf = '';
+    let sentCount = 0;
     wss.clients.forEach(c => {
       const cws = c as WebSocket;
       if (cws.readyState !== WebSocket.OPEN) return;
       const active = wsSession.get(cws) === id;
       const subscribed = wsSubscriptions.get(cws)?.has(id) ?? false;
-      if (active || subscribed) cws.send(msg);
+      if (active || subscribed) { cws.send(msg); sentCount++; }
     });
+    if (sentCount === 0 && wss.clients.size > 0) {
+      console.warn(`[pty:${id.slice(-6)}] Output dropped (${byteLen}B) — no active/subscribed client`);
+    }
   }
 
   ptyProcess.onData((chunk: string) => {
