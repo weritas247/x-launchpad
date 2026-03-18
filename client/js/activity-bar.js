@@ -2,6 +2,8 @@
 import { requestFileTree } from './explorer.js';
 import { requestGitStatus } from './source-control.js';
 
+const ICON_ORDER_KEY = 'super-terminal-activity-order';
+
 let activePanel = 'search';
 let splits = [];          // [{ id, primary, secondary, ratio, btnEl }]
 let activeSplitId = null;  // currently shown split's id (null = single panel view)
@@ -13,7 +15,33 @@ function findSplitByPanel(panel) {
   return splits.find(s => s.primary === panel || s.secondary === panel);
 }
 
+function saveIconOrder() {
+  const bar = document.getElementById('activity-bar');
+  const order = [...bar.querySelectorAll('.activity-btn[data-panel]')].map(b => b.dataset.panel);
+  try { localStorage.setItem(ICON_ORDER_KEY, JSON.stringify(order)); } catch {}
+}
+
+function restoreIconOrder() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(ICON_ORDER_KEY));
+    if (!Array.isArray(saved) || saved.length === 0) return;
+    const bar = document.getElementById('activity-bar');
+    const btnMap = {};
+    bar.querySelectorAll('.activity-btn[data-panel]').forEach(b => { btnMap[b.dataset.panel] = b; });
+    // Reorder: append in saved order, skip unknown
+    for (const panel of saved) {
+      if (btnMap[panel]) bar.appendChild(btnMap[panel]);
+    }
+    // Append any remaining buttons not in saved order
+    Object.keys(btnMap).forEach(p => {
+      if (!saved.includes(p)) bar.appendChild(btnMap[p]);
+    });
+  } catch {}
+}
+
 export function initActivityBar() {
+  restoreIconOrder();
+
   const buttons = document.querySelectorAll('.activity-btn');
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -87,6 +115,7 @@ export function initActivityBar() {
       } else {
         bar.insertBefore(dragSrcBtn, btn.nextSibling);
       }
+      saveIconOrder();
     });
   });
 
