@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.dev' });
+
 import express from 'express';
 import * as http from 'http';
 import * as path from 'path';

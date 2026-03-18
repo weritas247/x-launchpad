@@ -8,3 +8,4 @@ data.db-shm
 *.js.map
 .worktrees/
 .superpowers/
+.env.dev
