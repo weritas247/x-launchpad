@@ -1,4 +1,4 @@
-import { S, connDot, connLabel, sbWs } from './state.js';
+import { S, connDot, connLabel } from './state.js';
 import { showToast } from './toast.js';
 
 // ─── Latency UI elements ────────────────────────────
@@ -46,8 +46,6 @@ function resetLatencyUI() {
 export function setWsStatus(online) {
   connDot.className = 'meta-dot' + (online ? ' live' : ' dead');
   connLabel.textContent = online ? 'ONLINE' : 'OFFLINE';
-  sbWs.textContent = online ? 'WS LIVE' : 'WS OFFLINE';
-  sbWs.className = 'sb-item' + (online ? ' sb-ok' : ' sb-warn');
   if (!online) resetLatencyUI();
 }
 

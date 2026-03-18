@@ -138,7 +138,10 @@ export function renderPanel() {
 
 function renderClaudePrompts() {
   if (titleEl) titleEl.textContent = 'CLAUDE PROMPTS';
-  const prompts = claudePromptsMap.get(S.activeSessionId) || [];
+  const allPrompts = claudePromptsMap.get(S.activeSessionId) || [];
+  const meta = sessionMeta.get(S.activeSessionId);
+  const sessionCreatedAt = meta && meta.createdAt ? meta.createdAt : 0;
+  const prompts = allPrompts.filter(p => p.timestamp && new Date(p.timestamp).getTime() >= sessionCreatedAt);
   if (prompts.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'input-entry-empty';

@@ -1,4 +1,4 @@
-import { S, terminalMap, sessionMeta, tabBar, tabAddBtn, termWrapper, sbActiveName, sbSize, ctxMenu, escHtml } from './state.js';
+import { S, terminalMap, sessionMeta, tabBar, tabAddBtn, termWrapper, ctxMenu, escHtml } from './state.js';
 import { AI_REGISTRY } from './constants.js';
 import { wsSend, getAuthToken, apiFetch } from './websocket.js';
 import { xtermKeyHandler } from './keyboard.js';
@@ -121,7 +121,6 @@ export function renameSession(id, newName) {
   if (entry) {
     entry.tabEl.querySelector('.tab-name').textContent = newName;
   }
-  if (S.activeSessionId === id) sbActiveName.textContent = newName;
 }
 
 export function syncSessionList(sessions, isReconnect = false) {
@@ -268,7 +267,6 @@ export function attachTerminal(sessionId, name) {
 
   term.onResize(({ cols, rows }) => {
     wsSend({ type:'resize', sessionId, cols, rows });
-    if (S.activeSessionId === sessionId) sbSize.textContent = `${cols}×${rows}`;
   });
 
   div.addEventListener('contextmenu', async (e) => {
@@ -361,7 +359,6 @@ export function updateSessionInfo(sessionId, cwd, ai) {
   tabNameEl.textContent = `${baseName}${wtTag}  ${shortCwd}`;
 
   if (S.activeSessionId === sessionId) {
-    sbActiveName.textContent = `${baseName}${wtTag}  ${shortCwd}${ai ? `  [${ai}]` : ''}`;
     updateBreadcrumb(cwd);
   }
 

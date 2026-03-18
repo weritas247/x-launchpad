@@ -1,4 +1,4 @@
-import { S, terminalMap, sessionMeta, sbActiveName, sbCount, sbSize, hdrCount, sessionEmpty, emptyState } from './state.js';
+import { S, terminalMap, sessionMeta, hdrCount, sessionEmpty, emptyState } from './state.js';
 import { requestBranch } from './git-graph.js';
 import { collectPaneIds, teardownSplitLayout } from './split-pane.js';
 import { renderPanel as renderInputPanel } from './prompt-history.js';
@@ -45,8 +45,6 @@ export function activateSession(id) {
     entry.fitAddon.fit();
     entry.term.focus();
     const meta = sessionMeta.get(id);
-    sbActiveName.textContent = meta ? meta.name : id;
-    sbSize.textContent = `${entry.term.cols}×${entry.term.rows}`;
     requestBranch(id);
   }
   updateStatusBar();
@@ -56,10 +54,9 @@ export function activateSession(id) {
 
 export function updateStatusBar() {
   const c = terminalMap.size;
-  sbCount.textContent = c;
   hdrCount.textContent = c;
   sessionEmpty.style.display = c === 0 ? 'block' : 'none';
 }
 
-export function showEmptyState()  { emptyState.style.display = 'flex'; sbActiveName.textContent='—'; sbSize.textContent='—'; }
+export function showEmptyState()  { emptyState.style.display = 'flex'; }
 export function hideEmptyState()  { emptyState.style.display = 'none'; }

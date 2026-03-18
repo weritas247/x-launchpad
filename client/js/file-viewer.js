@@ -1,5 +1,5 @@
 // ─── FILE VIEWER: opens files from explorer as tabs in main view ───
-import { S, terminalMap, tabBar, tabAddBtn, termWrapper, sbActiveName, sbSize, escHtml } from './state.js';
+import { S, terminalMap, tabBar, tabAddBtn, termWrapper, escHtml } from './state.js';
 
 // Map<filePath, { tabEl, paneEl }>
 const fileTabs = new Map();
@@ -217,8 +217,6 @@ export function activateFileTab(filePath) {
 
   // Update status bar
   const fileName = filePath.split('/').pop();
-  sbActiveName.textContent = fileName;
-  sbSize.textContent = '';
 }
 
 export function closeFileTab(filePath) {

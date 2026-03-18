@@ -1188,7 +1188,6 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
   #statusbar { font-size: 10px; padding: 0 8px; gap: 6px; }
   .sb-branch-group { display: none !important; }
   #sb-clock { display: none; }
-  #sb-size { display: none; }
 
   /* ── Empty State ── */
   .empty-art { display: none; }
