@@ -947,14 +947,14 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   const CWD_POLL_ACTIVE = 2000;
   const CWD_POLL_BG = 10000;
   let lastPollTime = 0;
-  session.cwdTimer = setInterval(async () => {
+  session.cwdTimer = setInterval(() => {
     // Throttle background sessions: only poll every 10s
     const isActive = Array.from(wsSession.values()).includes(id);
     const interval = isActive ? CWD_POLL_ACTIVE : CWD_POLL_BG;
     const now = Date.now();
     if (now - lastPollTime < interval) return;
     lastPollTime = now;
-    try {
+    void (async () => { try {
       let newCwd = cwd0;
       let shellPid = ptyProcess.pid;
 
@@ -1039,7 +1039,8 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
         const msg = JSON.stringify({ type: 'session_info', sessionId: id, cwd: newCwd, ai: newAi });
         wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg); });
       }
-    } catch {}
+    } catch (e) { console.error(`[cwd-poll] Error for ${id}:`, e); }
+    })();
   }, 2000);
 
   console.log(`[session] Created: ${id} (${name})`);
@@ -1066,6 +1067,18 @@ function stripEscape(s: string): string {
 
 function runCmdWhenReady(sess: Session, cmd: string) {
   let sent = false;
+  let disposed = false;
+
+  function finish(delay = 0) {
+    if (sent) return;
+    sent = true;
+    if (!disposed) { disposed = true; unsub.dispose(); }
+    if (delay > 0) {
+      setTimeout(() => sess.pty.write(cmd + '\r'), delay);
+    } else {
+      sess.pty.write(cmd + '\r');
+    }
+  }
 
   // Primary: detect shell prompt in PTY output
   let buf = '';
@@ -1076,34 +1089,18 @@ function runCmdWhenReady(sess: Session, cmd: string) {
     gotFirstData = true;
     const clean = stripEscape(buf);
     if (/[$%>#❯›]\s*$/.test(clean)) {
-      sent = true;
-      unsub.dispose();
-      setTimeout(() => sess.pty.write(cmd + '\r'), 100);
+      finish(100);
     }
     if (buf.length > 4000 && !sent) {
-      sent = true;
-      unsub.dispose();
-      sess.pty.write(cmd + '\r');
+      finish();
     }
   });
 
   // Fallback A: if we got data but prompt regex never matched, send after 3s
-  setTimeout(() => {
-    if (!sent && gotFirstData) {
-      sent = true;
-      unsub.dispose();
-      sess.pty.write(cmd + '\r');
-    }
-  }, 3000);
+  setTimeout(() => { if (!sent && gotFirstData) finish(); }, 3000);
 
   // Fallback B: hard timeout — send no matter what after 6s
-  setTimeout(() => {
-    if (!sent) {
-      sent = true;
-      unsub.dispose();
-      sess.pty.write(cmd + '\r');
-    }
-  }, 6000);
+  setTimeout(() => { if (!sent) finish(); }, 6000);
 }
 
 function broadcastSessionList(exclude?: WebSocket) {
