@@ -12,8 +12,10 @@ let upstream = { ahead: 0, behind: 0 };
 let viewMode = 'list'; // 'list' | 'tree'
 let expandedTreeDirs = new Set();
 let selectedFile = null;
+let ctxTarget = null; // { path, staged, status }
 
 export function initSourceControl() {
+  initScContextMenu();
   const refreshBtn = document.getElementById('sc-refresh');
   if (refreshBtn) refreshBtn.addEventListener('click', requestGitStatus);
 
@@ -410,6 +412,14 @@ function createFileItem(file, isStaged, treeDepth) {
   item.appendChild(nameSpan);
   item.appendChild(rightGroup);
 
+  // Right-click context menu
+  item.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    ctxTarget = { path: file.path, staged: isStaged, status: file.status };
+    showScContextMenu(e.clientX, e.clientY);
+  });
+
   // Click for diff modal
   item.addEventListener('click', () => {
     selectedFile = file.path;
@@ -441,4 +451,70 @@ function getStatusLabel(status) {
 
 export function onSourceControlSessionChange() {
   requestGitStatus();
+}
+
+// ─── Source Control Context Menu ─────────────────────
+function showScContextMenu(x, y) {
+  const menu = document.getElementById('sc-ctx-menu');
+  if (!menu || !ctxTarget) return;
+
+  // Show/hide items based on context
+  const stageItem = document.getElementById('sctx-stage');
+  const unstageItem = document.getElementById('sctx-unstage');
+  const discardItem = document.getElementById('sctx-discard');
+
+  if (stageItem) stageItem.style.display = ctxTarget.staged ? 'none' : '';
+  if (unstageItem) unstageItem.style.display = ctxTarget.staged ? '' : 'none';
+  // Discard only for unstaged tracked files
+  if (discardItem) discardItem.style.display = (!ctxTarget.staged && ctxTarget.status !== 'U' && ctxTarget.status !== '?') ? '' : 'none';
+
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  menu.classList.add('visible');
+}
+
+function hideScContextMenu() {
+  const menu = document.getElementById('sc-ctx-menu');
+  if (menu) menu.classList.remove('visible');
+}
+
+function initScContextMenu() {
+  document.addEventListener('click', hideScContextMenu);
+
+  document.getElementById('sctx-diff')?.addEventListener('click', () => {
+    if (!ctxTarget || !S.activeSessionId) return;
+    const overlay = document.getElementById('diff-overlay');
+    const titleFile = document.getElementById('diff-title-file');
+    const diffContent = document.getElementById('diff-content');
+    const diffLoading = document.getElementById('diff-loading');
+    if (titleFile) titleFile.textContent = ctxTarget.path;
+    if (diffContent) diffContent.innerHTML = '';
+    if (diffLoading) diffLoading.style.display = '';
+    if (overlay) overlay.classList.add('open');
+    wsSend({ type: 'git_diff', sessionId: S.activeSessionId, filePath: ctxTarget.path, staged: ctxTarget.staged });
+  });
+
+  document.getElementById('sctx-stage')?.addEventListener('click', () => {
+    if (!ctxTarget || !S.activeSessionId) return;
+    wsSend({ type: 'git_stage', sessionId: S.activeSessionId, filePath: ctxTarget.path });
+  });
+
+  document.getElementById('sctx-unstage')?.addEventListener('click', () => {
+    if (!ctxTarget || !S.activeSessionId) return;
+    wsSend({ type: 'git_unstage', sessionId: S.activeSessionId, filePath: ctxTarget.path });
+  });
+
+  document.getElementById('sctx-discard')?.addEventListener('click', () => {
+    if (!ctxTarget || !S.activeSessionId) return;
+    wsSend({ type: 'git_discard', sessionId: S.activeSessionId, filePath: ctxTarget.path });
+  });
+
+  document.getElementById('sctx-delete')?.addEventListener('click', () => {
+    if (!ctxTarget || !S.activeSessionId) return;
+    const confirmed = confirm(`Delete "${ctxTarget.path}"?`);
+    if (!confirmed) return;
+    wsSend({ type: 'file_delete', sessionId: S.activeSessionId, filePath: ctxTarget.path });
+    // Refresh after short delay to let server process
+    setTimeout(requestGitStatus, 300);
+  });
 }

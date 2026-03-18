@@ -247,6 +247,10 @@ function hasDirChanges(dirPath) {
 export function handleFileOpAck(msg) {
   if (msg.ok) {
     requestFileTree();
+    if (msg.op === 'delete') {
+      // Also refresh source control after file delete
+      import('./source-control.js').then(m => m.requestGitStatus());
+    }
     showToast(`File ${msg.op} successful`, 'success');
   } else {
     showToast(`File ${msg.op} failed: ${msg.error}`, 'error', 4000);
