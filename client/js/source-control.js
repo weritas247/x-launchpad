@@ -229,7 +229,10 @@ export function handleGitStatusData(msg) {
   gitRoot = msg.root || '';
   isGitRepo = msg.isRepo || false;
   upstream = msg.upstream || { ahead: 0, behind: 0 };
-  setActivityBadge('source-control', gitStatusFiles.length);
+  setActivityBadge('source-control', gitStatusFiles.length, {
+    isInWorktree: msg.isInWorktree || false,
+    mainCount: msg.mainBranchFileCount != null ? msg.mainBranchFileCount : null,
+  });
   renderSourceControl();
   // Hide worktree section if not a git repo
   if (!isGitRepo) {

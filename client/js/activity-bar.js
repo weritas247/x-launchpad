@@ -604,18 +604,43 @@ export function getActivePanel() {
   return activePanel;
 }
 
-export function setActivityBadge(panel, count) {
+export function setActivityBadge(panel, count, opts) {
   const btn = document.querySelector(`.activity-btn[data-panel="${panel}"]`);
   if (!btn) return;
-  let badge = btn.querySelector('.activity-badge');
-  if (count > 0) {
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.className = 'activity-badge';
-      btn.appendChild(badge);
+
+  // Remove existing badges
+  btn.querySelectorAll('.activity-badge, .activity-badge-group').forEach(el => el.remove());
+
+  const total = (opts && opts.mainCount != null) ? count + opts.mainCount : count;
+  if (total <= 0) return;
+
+  // Dual badge: worktree + main branch
+  if (opts && opts.isInWorktree && opts.mainCount != null) {
+    const group = document.createElement('span');
+    group.className = 'activity-badge-group';
+
+    if (opts.mainCount > 0) {
+      const mainBadge = document.createElement('span');
+      mainBadge.className = 'activity-badge activity-badge-main';
+      mainBadge.textContent = opts.mainCount > 99 ? '99+' : opts.mainCount;
+      mainBadge.title = 'main branch';
+      group.appendChild(mainBadge);
     }
+
+    if (count > 0) {
+      const wtBadge = document.createElement('span');
+      wtBadge.className = 'activity-badge activity-badge-wt';
+      wtBadge.textContent = count > 99 ? '99+' : count;
+      wtBadge.title = 'worktree';
+      group.appendChild(wtBadge);
+    }
+
+    btn.appendChild(group);
+  } else {
+    // Single badge (default)
+    const badge = document.createElement('span');
+    badge.className = 'activity-badge';
     badge.textContent = count > 99 ? '99+' : count;
-  } else if (badge) {
-    badge.remove();
+    btn.appendChild(badge);
   }
 }
