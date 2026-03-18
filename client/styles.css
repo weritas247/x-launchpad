@@ -111,6 +111,9 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .sidebar-split-resize::after{content:'';position:absolute;inset:-3px 0}
 .sidebar-split-close{font-size:12px;cursor:pointer;color:var(--text-ghost);transition:color .12s}
 .sidebar-split-close:hover{color:var(--danger)}
+#sidebar.sidebar-split .sidebar-header[draggable]{cursor:grab}
+#sidebar.sidebar-split .sidebar-header[draggable]:active{cursor:grabbing}
+#sidebar.sidebar-split .sidebar-header.dragging{opacity:.5;cursor:grabbing}
 .activity-btn.active-secondary{color:var(--accent);opacity:.6}
 .activity-btn.active-secondary::before{top:4px;bottom:4px;opacity:.4}
 .sidebar-header{padding:12px 14px 8px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
