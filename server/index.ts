@@ -36,7 +36,7 @@ server.on('upgrade', (req, socket, head) => {
     });
   }
 });
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 const SETTINGS_PATH  = path.join(__dirname, '../../settings.json');
 const SESSIONS_PATH  = path.join(__dirname, '../../sessions.json');
 
@@ -594,7 +594,8 @@ const MODEL_PRICING: Record<string, { input: number; output: number; cacheRead: 
 
 function cwdToProjectDir(cwd: string): string {
   // Convert /Users/foo/Dev/project → -Users-foo-Dev-project
-  return cwd.replace(/\//g, '-');
+  // Claude Code also replaces underscores with hyphens in project dir names
+  return cwd.replace(/[/_]/g, '-');
 }
 
 function getClaudeUsage(cwd: string): ClaudeUsage | null {
@@ -683,6 +684,71 @@ function getClaudeUsage(cwd: string): ClaudeUsage | null {
     return { inputTokens, outputTokens, cacheReadTokens, cacheCreateTokens, totalCost, sessionId: claudeSessionId, model };
   } catch {
     return null;
+  }
+}
+
+function getClaudePrompts(cwd: string): { text: string; timestamp: string }[] {
+  try {
+    const projectKey = cwdToProjectDir(cwd);
+    const projectDir = path.join(CLAUDE_PROJECTS_DIR, projectKey);
+    if (!fs.existsSync(projectDir)) return [];
+
+    // Find active session from ~/.claude/sessions/
+    let activeSessionId: string | null = null;
+    try {
+      const sessDir = path.join(CLAUDE_DIR, 'sessions');
+      if (fs.existsSync(sessDir)) {
+        const sessFiles = fs.readdirSync(sessDir).filter(f => f.endsWith('.json'));
+        for (const sf of sessFiles) {
+          try {
+            const raw = fs.readFileSync(path.join(sessDir, sf), 'utf-8');
+            const sess = JSON.parse(raw);
+            if (sess.cwd === cwd && sess.sessionId) activeSessionId = sess.sessionId;
+          } catch {}
+        }
+      }
+    } catch {}
+
+    let targetJsonl: string | null = null;
+    if (activeSessionId) {
+      const candidate = path.join(projectDir, `${activeSessionId}.jsonl`);
+      if (fs.existsSync(candidate)) targetJsonl = candidate;
+    }
+    if (!targetJsonl) {
+      const jsonls = fs.readdirSync(projectDir)
+        .filter(f => f.endsWith('.jsonl'))
+        .map(f => ({ name: f, mtime: fs.statSync(path.join(projectDir, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime);
+      if (jsonls.length > 0) targetJsonl = path.join(projectDir, jsonls[0].name);
+    }
+    if (!targetJsonl) return [];
+
+    const content = fs.readFileSync(targetJsonl, 'utf-8');
+    const lines = content.trim().split('\n');
+    const prompts: { text: string; timestamp: string }[] = [];
+
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+        // Only real user prompts: type=user, no toolUseResult, no isMeta
+        if (entry.type !== 'user' || entry.toolUseResult || entry.isMeta) continue;
+        const msg = entry.message;
+        if (!msg) continue;
+        let text = '';
+        if (typeof msg.content === 'string') {
+          text = msg.content;
+        } else if (Array.isArray(msg.content)) {
+          for (const block of msg.content) {
+            if (block.type === 'text' && block.text) { text = block.text; break; }
+          }
+        }
+        if (!text.trim()) continue;
+        prompts.push({ text: text.trim(), timestamp: entry.timestamp || '' });
+      } catch {}
+    }
+    return prompts;
+  } catch {
+    return [];
   }
 }
 
@@ -1614,6 +1680,16 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       if (!session) return;
       const usage = getClaudeUsage(session.cwd);
       ws.send(JSON.stringify({ type: 'claude_usage_data', sessionId: id, usage }));
+
+    } else if (parsed.type === 'claude_prompts') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      console.log(`[claude_prompts] sessionId=${id} cwd=${session.cwd} ai=${session.ai}`);
+      const prompts = getClaudePrompts(session.cwd);
+      console.log(`[claude_prompts] found ${prompts.length} prompts`);
+      ws.send(JSON.stringify({ type: 'claude_prompts_data', sessionId: id, prompts }));
     }
   });
 
@@ -1627,8 +1703,17 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Super Terminal → http://localhost:${PORT}`);
+  // 로컬 네트워크 IP 표시
+  const nets = require('os').networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        console.log(`  Network   → http://${net.address}:${PORT}`);
+      }
+    }
+  }
   restoreSessions();
 });
 
