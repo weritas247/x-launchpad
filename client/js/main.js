@@ -1,4 +1,4 @@
-import { S, terminalMap, sessionMeta, tabAddBtn, settingsOverlay } from './state.js';
+import { S, terminalMap, sessionMeta, sbClock, tabAddBtn, settingsOverlay } from './state.js';
 import { THEMES } from './constants.js';
 import { connect, wsSend, setOnInputSend, requestScrollback } from './websocket.js';
 import { initThemeSwatches } from './themes.js';
@@ -29,6 +29,7 @@ setOnInputSend(resetNotifyState);
 const hdrTime = document.getElementById('hdr-time');
 setInterval(() => {
   const t = new Date().toTimeString().slice(0,8);
+  sbClock.textContent = t;
   hdrTime.textContent = t;
 }, 1000);
 

@@ -797,8 +797,14 @@ function doSearch(query) {
   if (clientResults.length >= 10) {
     renderSearchResults(clientResults, query);
   } else {
-    // Show client results immediately, then request server
-    if (clientResults.length > 0) renderSearchResults(clientResults, query);
+    // Show client results immediately (or clear graph), then request server
+    if (clientResults.length > 0) {
+      renderSearchResults(clientResults, query);
+    } else {
+      svgEl.innerHTML = '';
+      svgEl.setAttribute('height', 0);
+      commitBox.innerHTML = '';
+    }
     wsSend({ type: 'git_graph_search', sessionId: S.activeSessionId, query });
   }
 }
