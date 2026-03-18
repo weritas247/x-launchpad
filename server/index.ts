@@ -8,6 +8,7 @@ import * as os from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
+import { execSync } from 'child_process';
 const execFileAsync = promisify(execFile);
 import * as gitService from './git-service';
 
@@ -17,6 +18,59 @@ const wss = new WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
 const SETTINGS_PATH  = path.join(__dirname, '../../settings.json');
 const SESSIONS_PATH  = path.join(__dirname, '../../sessions.json');
+
+// ─── TMUX INTEGRATION ────────────────────────────────────────────
+const TMUX_SOCKET = path.join(os.tmpdir(), 'super-terminal-tmux');
+let tmuxAvailable = false;
+try {
+  execSync('tmux -V', { stdio: 'ignore' });
+  tmuxAvailable = true;
+  console.log(`[tmux] Available — socket: ${TMUX_SOCKET}`);
+} catch {
+  console.log('[tmux] Not found — falling back to direct PTY');
+}
+
+function tmuxExec(args: string[], timeout = 3000): string {
+  return execSync(`tmux -S "${TMUX_SOCKET}" ${args.join(' ')}`, {
+    encoding: 'utf-8', timeout,
+  }).trim();
+}
+
+function tmuxSessionExists(name: string): boolean {
+  try {
+    tmuxExec(['has-session', '-t', name]);
+    return true;
+  } catch { return false; }
+}
+
+function tmuxCreateSession(name: string, cwd: string, shell: string): void {
+  const safeCwd = fs.existsSync(cwd) ? cwd : (process.env.HOME || '/');
+  tmuxExec(['new-session', '-d', '-s', name, '-c', safeCwd, shell]);
+}
+
+function tmuxKillSession(name: string): void {
+  try { tmuxExec(['kill-session', '-t', name]); } catch {}
+}
+
+function tmuxGetCwd(name: string): string | null {
+  try {
+    return tmuxExec(['display-message', '-t', name, '-p', '#{pane_current_path}']);
+  } catch { return null; }
+}
+
+function tmuxGetPanePid(name: string): number | null {
+  try {
+    const pid = tmuxExec(['display-message', '-t', name, '-p', '#{pane_pid}']);
+    return parseInt(pid) || null;
+  } catch { return null; }
+}
+
+function tmuxListSessions(): string[] {
+  try {
+    const out = tmuxExec(['list-sessions', '-F', '#{session_name}']);
+    return out.split('\n').filter(Boolean);
+  } catch { return []; }
+}
 
 // ─── DEFAULT SETTINGS ─────────────────────────────────────────────
 const DEFAULT_SETTINGS = {
@@ -363,6 +417,7 @@ interface Session {
   pendingCmd?: string;
   resized?: boolean;
   scrollback: string; // ring buffer of recent output
+  tmuxName?: string;  // tmux session name (if tmux-backed)
 }
 
 const sessions = new Map<string, Session>();
@@ -383,14 +438,37 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   };
   const cwd0 = restoreCwd || s.startDirectory || process.env.HOME || '/';
 
-  const ptyProcess = pty.spawn(shellPath, ['-i'], {
-    name: 'xterm-256color',
-    cols: 80,
-    rows: 24,
-    cwd: fs.existsSync(cwd0) ? cwd0 : (process.env.HOME || '/'),
-    env: mergedEnv,
-  });
-  const session: Session = { id, name, pty: ptyProcess, createdAt: Date.now(), cwd: cwd0, ai: null, cmd: restoreCmd, scrollback: '' };
+  // Sanitize tmux session name: replace dots/colons which tmux doesn't like
+  const tmuxName = id.replace(/[.:]/g, '-');
+  const useTmux = tmuxAvailable;
+
+  let ptyProcess: pty.IPty;
+  if (useTmux) {
+    // Create tmux session if it doesn't already exist (survives server restart)
+    if (!tmuxSessionExists(tmuxName)) {
+      tmuxCreateSession(tmuxName, cwd0, shellPath);
+      console.log(`[tmux] Created session: ${tmuxName}`);
+    } else {
+      console.log(`[tmux] Reattaching to existing session: ${tmuxName}`);
+    }
+    // Attach to tmux session via PTY
+    ptyProcess = pty.spawn('tmux', ['-S', TMUX_SOCKET, 'attach-session', '-t', tmuxName], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: fs.existsSync(cwd0) ? cwd0 : (process.env.HOME || '/'),
+      env: mergedEnv,
+    });
+  } else {
+    ptyProcess = pty.spawn(shellPath, ['-i'], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: fs.existsSync(cwd0) ? cwd0 : (process.env.HOME || '/'),
+      env: mergedEnv,
+    });
+  }
+  const session: Session = { id, name, pty: ptyProcess, createdAt: Date.now(), cwd: cwd0, ai: null, cmd: restoreCmd, scrollback: '', tmuxName: useTmux ? tmuxName : undefined };
   sessions.set(id, session);
 
   // PTY output → clients with this session active OR subscribed
@@ -459,6 +537,13 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   ptyProcess.onExit(({ exitCode }) => {
     console.log(`[session] ${id} exited: ${exitCode}`);
     if (session.cwdTimer) clearInterval(session.cwdTimer);
+    // For tmux sessions, only remove if tmux session itself is gone
+    // (PTY exit just means detach — the shell survives)
+    if (session.tmuxName && tmuxSessionExists(session.tmuxName)) {
+      console.log(`[tmux] PTY detached but tmux session '${session.tmuxName}' still alive — keeping`);
+      // Re-attach on next client connect via restoreSessions logic
+      return;
+    }
     sessions.delete(id);
     broadcastSessionList();
   });
@@ -466,15 +551,25 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   // Poll CWD + detect running AI every 2s (non-blocking)
   session.cwdTimer = setInterval(async () => {
     try {
-      const pid = ptyProcess.pid;
       let newCwd = cwd0;
-      try {
-        const { stdout } = await execFileAsync('lsof', ['-p', String(pid), '-a', '-d', 'cwd', '-Fn'], {
-          encoding: 'utf-8', timeout: 500,
-        });
-        const match = stdout.match(/\nn(.+)/);
-        if (match) newCwd = match[1].trim();
-      } catch {}
+      let shellPid = ptyProcess.pid;
+
+      if (session.tmuxName) {
+        // tmux: get CWD and pane PID directly from tmux
+        const tmuxCwd = tmuxGetCwd(session.tmuxName);
+        if (tmuxCwd) newCwd = tmuxCwd;
+        const panePid = tmuxGetPanePid(session.tmuxName);
+        if (panePid) shellPid = panePid;
+      } else {
+        // Direct PTY: use lsof
+        try {
+          const { stdout } = await execFileAsync('lsof', ['-p', String(shellPid), '-a', '-d', 'cwd', '-Fn'], {
+            encoding: 'utf-8', timeout: 500,
+          });
+          const match = stdout.match(/\nn(.+)/);
+          if (match) newCwd = match[1].trim();
+        } catch {}
+      }
 
       let newAi: string | null = null;
       try {
@@ -493,7 +588,7 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
             cmdOf.set(p, m[3]);
           }
         }
-        const rootPid = pid;
+        const rootPid = shellPid;
         const descendants = new Set<number>([rootPid]);
         for (const [p, pp] of parentOf) {
           let cur = pp;
@@ -621,15 +716,30 @@ function restoreSessions() {
     const raw = fs.readFileSync(SESSIONS_PATH, 'utf-8');
     const saved: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string }> = JSON.parse(raw);
     if (!Array.isArray(saved) || saved.length === 0) return;
+
+    // Get list of live tmux sessions (if tmux is available)
+    const liveTmux = tmuxAvailable ? new Set(tmuxListSessions()) : new Set<string>();
+
     console.log(`[session] Restoring ${saved.length} session(s) from disk...`);
     for (const s of saved) {
-      const cmd = cmdForSession(s);
-      const sess = createSession(s.id, s.name, s.cwd, cmd);
-      if (cmd) {
-        console.log(`[session] Will run '${cmd}' in restored session '${s.name}' after first resize`);
-        // Store as pending — will be executed when client sends first resize (correct terminal size)
-        sess.pendingCmd = cmd;
+      const tmuxName = s.id.replace(/[.:]/g, '-');
+      const tmuxAlive = liveTmux.has(tmuxName);
+
+      if (tmuxAvailable && tmuxAlive) {
+        // tmux session survived server restart — just reattach (no need to re-run command)
+        console.log(`[session] Reattaching to live tmux session: ${s.name} (${tmuxName})`);
+        const sess = createSession(s.id, s.name, s.cwd);
+        // Don't set pendingCmd — the process is still running inside tmux
         sess.resized = false;
+      } else {
+        // No tmux or tmux session is gone — recreate with command
+        const cmd = cmdForSession(s);
+        const sess = createSession(s.id, s.name, s.cwd, cmd);
+        if (cmd) {
+          console.log(`[session] Will run '${cmd}' in restored session '${s.name}' after first resize`);
+          sess.pendingCmd = cmd;
+          sess.resized = false;
+        }
       }
     }
   } catch (e) {
@@ -743,6 +853,7 @@ wss.on('connection', (ws: WebSocket) => {
       if (session) {
         if (session.cwdTimer) clearInterval(session.cwdTimer);
         session.pty.kill();
+        if (session.tmuxName) tmuxKillSession(session.tmuxName);
         sessions.delete(id);
         broadcastSessionList();
       }
