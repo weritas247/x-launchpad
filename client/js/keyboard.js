@@ -3,9 +3,35 @@
 // Called from both xterm custom key handler and document keydown.
 
 import { S, terminalMap, settingsOverlay } from './state.js';
-import { normalizeKey } from './constants.js';
+import { normalizeKey, KB_DEFS } from './constants.js';
 
 const actionMap = new Map();   // action name → callback
+
+// ─── SHORTCUT OVERLAY ────────────────────────────────
+let overlayEl = null;
+let overlayTimer = null;
+
+function getOverlay() {
+  if (overlayEl) return overlayEl;
+  overlayEl = document.createElement('div');
+  overlayEl.className = 'shortcut-overlay';
+  document.body.appendChild(overlayEl);
+  return overlayEl;
+}
+
+function showShortcutOverlay(combo, action) {
+  const el = getOverlay();
+  const def = KB_DEFS.find(d => d.key === action);
+  const label = def ? def.label : action;
+  const displayCombo = combo
+    .replace('Meta', '⌘').replace('Ctrl', '⌃')
+    .replace('Shift', '⇧').replace('Alt', '⌥')
+    .replace(/\+/g, ' ');
+  el.innerHTML = `<span class="shortcut-overlay-keys">${displayCombo}</span><span class="shortcut-overlay-label">${label}</span>`;
+  el.classList.add('visible');
+  clearTimeout(overlayTimer);
+  overlayTimer = setTimeout(() => el.classList.remove('visible'), 800);
+}
 
 export function registerAction(name, fn) {
   actionMap.set(name, fn);
@@ -45,6 +71,7 @@ export function tryKeybinding(e) {
   const fn = actionMap.get(action);
   if (fn) {
     e.preventDefault();
+    showShortcutOverlay(combo, action);
     fn();
     return true;
   }

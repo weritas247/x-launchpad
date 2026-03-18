@@ -1,4 +1,6 @@
 import { execFileSync } from 'child_process';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 export interface CommitEntry {
   hash: string;
@@ -252,9 +254,17 @@ export function getGitDiff(cwd: string, filePath?: string, staged = false): stri
     if (staged) args.push('--cached');
     args.push('--no-color');
     if (filePath) args.push('--', filePath);
-    return execFileSync('git', args, {
+    const diff = execFileSync('git', args, {
       cwd, encoding: 'utf-8', timeout: 5000,
     });
+    // For untracked files, git diff returns empty — read file directly
+    if (!diff && filePath) {
+      const content = readFileSync(join(cwd, filePath), 'utf-8');
+      const lines = content.split('\n');
+      const header = `--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n`;
+      return header + lines.map(l => '+' + l).join('\n');
+    }
+    return diff;
   } catch {
     return '';
   }

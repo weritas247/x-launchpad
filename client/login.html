@@ -157,6 +157,12 @@
           switchToToken.classList.remove('hidden');
         }
 
+        // First-time setup: show registration form directly
+        if (data.setupRequired) {
+          showView('register');
+          return;
+        }
+
         // If auth mode is token-only, show token view
         if (data.authMode === 'token' && !data.registrationAllowed) {
           showView('token');

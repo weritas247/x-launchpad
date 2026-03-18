@@ -159,6 +159,7 @@ const DEFAULT_SETTINGS = {
     focusSearch: 'Ctrl+Shift+f',
     focusExplorer: 'Ctrl+Shift+e',
     focusSourceControl: 'Ctrl+Shift+g',
+    toggleInputPanel: 'Meta+i',
   },
   advanced: {
     customCss: '',
@@ -213,7 +214,11 @@ const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
 const tokenAuthEnabled = AUTH_TOKEN.length > 0;
 
 function isAuthEnabled(): boolean {
-  return tokenAuthEnabled || db.getUserCount() > 0;
+  return tokenAuthEnabled || db.getUserCount() > 0 || isSetupRequired();
+}
+
+function isSetupRequired(): boolean {
+  return db.getUserCount() === 0 && !tokenAuthEnabled;
 }
 
 function isRegistrationAllowed(): boolean {
@@ -415,7 +420,7 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.get('/api/auth/check', (req, res) => {
   const authOn = isAuthEnabled();
-  if (!authOn) return res.json({ ok: true, authEnabled: false, authMode: 'none', registrationAllowed: false });
+  if (!authOn) return res.json({ ok: true, authEnabled: false, authMode: 'none', registrationAllowed: isRegistrationAllowed(), setupRequired: false });
 
   const token = extractToken(req);
   const valid = token ? verifyToken(token) : false;
@@ -425,6 +430,7 @@ app.get('/api/auth/check', (req, res) => {
     authEnabled: true,
     authMode: getAuthMode(),
     registrationAllowed: isRegistrationAllowed(),
+    setupRequired: isSetupRequired(),
     tokenAuthEnabled,
   };
 

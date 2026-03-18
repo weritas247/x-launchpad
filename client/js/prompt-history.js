@@ -22,11 +22,13 @@ const claudePromptsMap = new Map();
 // Polling timer for Claude prompts
 let claudePollTimer = null;
 
+export function toggleInputPanel() {
+  panel.classList.toggle('collapsed');
+  toggle.textContent = panel.classList.contains('collapsed') ? '▸' : '◂';
+}
+
 export function initInputPanel() {
-  toggle.addEventListener('click', () => {
-    panel.classList.toggle('collapsed');
-    toggle.textContent = panel.classList.contains('collapsed') ? '▸' : '◂';
-  });
+  toggle.addEventListener('click', () => toggleInputPanel());
 
   clearBtn.addEventListener('click', () => {
     if (S.activeSessionId) {
@@ -156,6 +158,7 @@ function renderClaudePrompts() {
       <span class="input-entry-time">${timeStr}</span>
     `;
     el.addEventListener('click', () => {
+      scrollToPromptInTerminal(p.text);
       navigator.clipboard.writeText(p.text).catch(() => {});
       el.classList.add('copied');
       setTimeout(() => el.classList.remove('copied'), 600);
@@ -183,6 +186,27 @@ function renderInputHistory() {
   });
 
   panelList.scrollTop = panelList.scrollHeight;
+}
+
+function scrollToPromptInTerminal(text) {
+  const termEntry = terminalMap.get(S.activeSessionId);
+  if (!termEntry) return;
+  const term = termEntry.term;
+  const buf = term.buffer.active;
+  const totalLines = buf.baseY + buf.cursorY;
+  // Search for the prompt text in terminal buffer (search first 40 chars to handle wrapping)
+  const needle = stripAnsi(text).slice(0, 40);
+  if (!needle) return;
+  for (let i = 0; i <= totalLines; i++) {
+    const line = buf.getLine(i);
+    if (!line) continue;
+    const lineText = line.translateToString(true);
+    if (lineText.includes(needle)) {
+      const targetLine = Math.max(0, i - Math.floor(term.rows / 2));
+      term.scrollToLine(targetLine);
+      return;
+    }
+  }
 }
 
 function scrollToEntry(entry) {

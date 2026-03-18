@@ -2,7 +2,7 @@ import { S, terminalMap, sessionMeta, tabBar, tabAddBtn, termWrapper, sbActiveNa
 import { AI_REGISTRY } from './constants.js';
 import { wsSend, getAuthToken } from './websocket.js';
 import { xtermKeyHandler } from './keyboard.js';
-import { trackInput } from './input-panel.js';
+import { trackInput } from './prompt-history.js';
 import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session.js';
 import { removeSplitPane, teardownSplitLayout, showDropZoneOverlay, hideDropZoneOverlay } from './split-pane.js';
 import { resetTabStatus, tabStatusOnInput } from './tab-status.js';

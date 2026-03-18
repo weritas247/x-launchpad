@@ -259,11 +259,32 @@ export function handleGitStatusData(msg) {
   }
 }
 
+// Track current diff overlay close handler to avoid duplicates
+let _diffCloseHandler = null;
+
+function openDiffOverlay(overlay) {
+  if (_diffCloseHandler) return; // already registered
+
+  const closeBtn = document.getElementById('diff-close');
+  const closeDiff = () => {
+    overlay.classList.remove('open');
+    closeBtn.removeEventListener('click', closeDiff);
+    overlay.removeEventListener('click', onOverlayClick);
+    document.removeEventListener('keydown', onEsc);
+    _diffCloseHandler = null;
+  };
+  const onOverlayClick = (e) => { if (e.target === overlay) closeDiff(); };
+  const onEsc = (e) => { if (e.key === 'Escape') closeDiff(); };
+
+  closeBtn.addEventListener('click', closeDiff);
+  overlay.addEventListener('click', onOverlayClick);
+  document.addEventListener('keydown', onEsc);
+  _diffCloseHandler = closeDiff;
+}
+
 export function handleGitDiffData(msg) {
   const overlay = document.getElementById('diff-overlay');
   if (!overlay) return;
-  if (!msg.diff) return;
-
   const titleFile = document.getElementById('diff-title-file');
   const titleBadge = document.getElementById('diff-title-badge');
   const diffContent = document.getElementById('diff-content');
@@ -275,24 +296,16 @@ export function handleGitDiffData(msg) {
     titleBadge.className = 'diff-title-badge ' + (msg.staged ? 'diff-badge-staged' : 'diff-badge-unstaged');
   }
   if (diffLoading) diffLoading.style.display = 'none';
-  if (diffContent) diffContent.innerHTML = renderDiffHtml(msg.diff);
+  if (diffContent) {
+    if (msg.diff) {
+      diffContent.innerHTML = renderDiffHtml(msg.diff);
+    } else {
+      diffContent.innerHTML = '<div class="diff-ctx diff-meta">No changes</div>';
+    }
+  }
 
   overlay.classList.add('open');
-
-  // Close handlers
-  const closeBtn = document.getElementById('diff-close');
-  const closeDiff = () => {
-    overlay.classList.remove('open');
-    closeBtn.removeEventListener('click', closeDiff);
-    overlay.removeEventListener('click', onOverlayClick);
-    document.removeEventListener('keydown', onEsc);
-  };
-  const onOverlayClick = (e) => { if (e.target === overlay) closeDiff(); };
-  const onEsc = (e) => { if (e.key === 'Escape') closeDiff(); };
-
-  closeBtn.addEventListener('click', closeDiff);
-  overlay.addEventListener('click', onOverlayClick);
-  document.addEventListener('keydown', onEsc);
+  openDiffOverlay(overlay);
 }
 
 function renderDiffHtml(diff) {
@@ -766,7 +779,10 @@ function handleFileItemDblClick(file, isStaged) {
   if (titleFile) titleFile.textContent = file.path;
   if (diffContent) diffContent.innerHTML = '';
   if (diffLoading) diffLoading.style.display = '';
-  if (overlay) overlay.classList.add('open');
+  if (overlay) {
+    overlay.classList.add('open');
+    openDiffOverlay(overlay);
+  }
   wsSend({ type: 'git_diff', sessionId: S.activeSessionId, filePath: file.path, staged: isStaged });
 }
 
@@ -907,7 +923,7 @@ function initScContextMenu() {
     if (titleFile) titleFile.textContent = ctxTarget.path;
     if (diffContent) diffContent.innerHTML = '';
     if (diffLoading) diffLoading.style.display = '';
-    if (overlay) overlay.classList.add('open');
+    if (overlay) { overlay.classList.add('open'); openDiffOverlay(overlay); }
     wsSend({ type: 'git_diff', sessionId: S.activeSessionId, filePath: ctxTarget.path, staged: ctxTarget.staged });
   });
 

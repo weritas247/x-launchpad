@@ -1073,6 +1073,25 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 #git-graph-modal .gg-file-item{font-size:calc(var(--git-graph-font-size) - 1px)}
 #git-graph-modal .gg-commit-body{font-size:calc(var(--git-graph-font-size) - 1px)}
 
+/* ═══ SHORTCUT OVERLAY ═══ */
+.shortcut-overlay{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);
+  z-index:9999;pointer-events:none;
+  display:flex;align-items:center;gap:12px;
+  padding:14px 24px;border-radius:10px;
+  background:rgba(0,0,0,.75);backdrop-filter:blur(12px);
+  border:1px solid var(--border-lit);
+  opacity:0;transition:opacity .15s ease,transform .15s ease;
+}
+.shortcut-overlay.visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.shortcut-overlay-keys{
+  font-size:15px;font-weight:600;letter-spacing:.08em;
+  color:var(--accent);font-family:var(--font-mono);
+}
+.shortcut-overlay-label{
+  font-size:13px;color:var(--text-dim);font-family:var(--font-mono);
+}
+
 /* Bottom nav & mobile overlay: hidden on desktop */
 #bottom-nav { display: none; }
 #mobile-sidebar-overlay { display: none; }

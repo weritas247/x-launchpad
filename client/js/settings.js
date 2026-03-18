@@ -6,7 +6,7 @@ import { applyTheme, updateSwatches } from './themes.js';
 export async function loadSettings() {
   try {
     const r = await fetch('/api/settings');
-    S.settings = await r.json();
+    S.settings = r.ok ? await r.json() : null;
   } catch {
     S.settings = null;
   }

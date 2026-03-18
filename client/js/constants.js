@@ -66,6 +66,11 @@ export const KB_DEFS = [
   { key:'openSettings',    label:'Open Settings' },
   { key:'fullscreen',      label:'Toggle Fullscreen' },
   { key:'gitGraph',        label:'Git Graph' },
+  { key:'toggleSidebar',   label:'Toggle Sidebar' },
+  { key:'toggleInputPanel',label:'Toggle Input Panel' },
+  { key:'focusSearch',     label:'Focus Search' },
+  { key:'focusExplorer',   label:'Focus Explorer' },
+  { key:'focusSourceControl', label:'Focus Source Control' },
 ];
 
 /** IME(한글 등) 활성 시에도 물리 키 기준으로 단축키가 동작하도록 e.code 사용 */
