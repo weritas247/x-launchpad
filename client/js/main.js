@@ -308,10 +308,6 @@ setOnSessionChangeSidePanels(() => {
 // Explorer refresh button
 document.getElementById('explorer-refresh')?.addEventListener('click', requestFileTree);
 
-// Diff panel close button
-document.getElementById('sc-diff-close')?.addEventListener('click', () => {
-  const diffPanel = document.getElementById('sc-diff-panel');
-  if (diffPanel) diffPanel.style.display = 'none';
-});
+// Diff modal is now handled internally by source-control.js
 
 loadSettings().then(() => { connect(handleMessage); startUsagePolling(); });

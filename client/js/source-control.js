@@ -119,31 +119,65 @@ export function handleGitStatusData(msg) {
 }
 
 export function handleGitDiffData(msg) {
-  const diffPanel = document.getElementById('sc-diff-panel');
-  if (!diffPanel) return;
-  if (!msg.diff) {
-    diffPanel.style.display = 'none';
-    return;
+  const overlay = document.getElementById('diff-overlay');
+  if (!overlay) return;
+  if (!msg.diff) return;
+
+  const titleFile = document.getElementById('diff-title-file');
+  const titleBadge = document.getElementById('diff-title-badge');
+  const diffContent = document.getElementById('diff-content');
+  const diffLoading = document.getElementById('diff-loading');
+
+  if (titleFile) titleFile.textContent = msg.filePath || '—';
+  if (titleBadge) {
+    titleBadge.textContent = msg.staged ? 'STAGED' : 'UNSTAGED';
+    titleBadge.className = 'diff-title-badge ' + (msg.staged ? 'diff-badge-staged' : 'diff-badge-unstaged');
   }
-  diffPanel.style.display = '';
-  const diffContent = document.getElementById('sc-diff-content');
-  if (diffContent) {
-    diffContent.innerHTML = renderDiffHtml(msg.diff);
-  }
+  if (diffLoading) diffLoading.style.display = 'none';
+  if (diffContent) diffContent.innerHTML = renderDiffHtml(msg.diff);
+
+  overlay.classList.add('open');
+
+  // Close handlers
+  const closeBtn = document.getElementById('diff-close');
+  const closeDiff = () => {
+    overlay.classList.remove('open');
+    closeBtn.removeEventListener('click', closeDiff);
+    overlay.removeEventListener('click', onOverlayClick);
+    document.removeEventListener('keydown', onEsc);
+  };
+  const onOverlayClick = (e) => { if (e.target === overlay) closeDiff(); };
+  const onEsc = (e) => { if (e.key === 'Escape') closeDiff(); };
+
+  closeBtn.addEventListener('click', closeDiff);
+  overlay.addEventListener('click', onOverlayClick);
+  document.addEventListener('keydown', onEsc);
 }
 
 function renderDiffHtml(diff) {
   const lines = diff.split('\n');
+  let oldLine = 0, newLine = 0;
   return lines.map(line => {
     const escaped = escHtml(line);
-    if (line.startsWith('+') && !line.startsWith('+++')) {
-      return `<div class="diff-add">${escaped}</div>`;
-    } else if (line.startsWith('-') && !line.startsWith('---')) {
-      return `<div class="diff-del">${escaped}</div>`;
-    } else if (line.startsWith('@@')) {
+    // Parse hunk header for line numbers
+    const hunkMatch = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunkMatch) {
+      oldLine = parseInt(hunkMatch[1]);
+      newLine = parseInt(hunkMatch[2]);
       return `<div class="diff-hunk">${escaped}</div>`;
     }
-    return `<div class="diff-ctx">${escaped}</div>`;
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      const ln = newLine++;
+      return `<div class="diff-add"><span class="diff-ln diff-ln-old"></span><span class="diff-ln">${ln}</span>${escaped}</div>`;
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      const ln = oldLine++;
+      return `<div class="diff-del"><span class="diff-ln">${ln}</span><span class="diff-ln diff-ln-new"></span>${escaped}</div>`;
+    } else if (line.startsWith('diff ') || line.startsWith('index ') || line.startsWith('---') || line.startsWith('+++')) {
+      return `<div class="diff-ctx diff-meta">${escaped}</div>`;
+    }
+    const oln = oldLine++;
+    const nln = newLine++;
+    return `<div class="diff-ctx"><span class="diff-ln">${oln}</span><span class="diff-ln">${nln}</span>${escaped}</div>`;
   }).join('');
 }
 
@@ -376,9 +410,18 @@ function createFileItem(file, isStaged, treeDepth) {
   item.appendChild(nameSpan);
   item.appendChild(rightGroup);
 
-  // Click for diff preview
+  // Click for diff modal
   item.addEventListener('click', () => {
     selectedFile = file.path;
+    // Show modal with loading
+    const overlay = document.getElementById('diff-overlay');
+    const titleFile = document.getElementById('diff-title-file');
+    const diffContent = document.getElementById('diff-content');
+    const diffLoading = document.getElementById('diff-loading');
+    if (titleFile) titleFile.textContent = file.path;
+    if (diffContent) diffContent.innerHTML = '';
+    if (diffLoading) diffLoading.style.display = '';
+    if (overlay) overlay.classList.add('open');
     wsSend({ type: 'git_diff', sessionId: S.activeSessionId, filePath: file.path, staged: isStaged });
   });
 

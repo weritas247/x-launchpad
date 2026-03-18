@@ -143,13 +143,6 @@
       </div>
       <div class="sc-empty" id="sc-empty">No changes detected</div>
       <div class="sc-file-list-container" id="sc-file-list"></div>
-      <div class="sc-diff-panel" id="sc-diff-panel" style="display:none">
-        <div class="sc-diff-header">
-          <span class="sc-diff-title">DIFF</span>
-          <button class="btn-icon-sm" id="sc-diff-close" title="Close">✕</button>
-        </div>
-        <div class="sc-diff-content" id="sc-diff-content"></div>
-      </div>
     </div>
 
     <!-- PLAN PANEL -->
@@ -320,6 +313,23 @@
       </div>
     </div>
     <div class="gg-resize-handle" id="gg-resize-handle"></div>
+  </div>
+</div>
+
+<!-- DIFF MODAL -->
+<div id="diff-overlay">
+  <div id="diff-modal">
+    <div class="diff-titlebar">
+      <span class="diff-title-icon">±</span>
+      <span class="diff-title-file" id="diff-title-file">—</span>
+      <span class="diff-title-badge" id="diff-title-badge"></span>
+      <span style="flex:1"></span>
+      <button class="diff-close-btn" id="diff-close">✕</button>
+    </div>
+    <div class="diff-body" id="diff-body">
+      <div class="diff-loading" id="diff-loading" style="display:none">Loading diff...</div>
+      <div class="diff-content" id="diff-content"></div>
+    </div>
   </div>
 </div>
 
