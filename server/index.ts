@@ -510,7 +510,7 @@ app.post('/api/upload-image',
     if (!allowedExts.includes(ext)) {
       return res.status(400).json({ ok: false, error: 'Unsupported image format' });
     }
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 23);
     const safeName = `pasted-image-${timestamp}${ext}`;
     const fullPath = path.join(targetDir, safeName);
     try {
