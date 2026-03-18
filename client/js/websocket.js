@@ -95,6 +95,7 @@ function _flushBatch(sessionId) {
   const batch = _inputBatch.get(sessionId);
   if (!batch) return;
   _inputBatch.delete(sessionId);
+  if (!batch.data) return; // nothing accumulated — first key was already sent
   const msg = { type: 'input', sessionId, data: batch.data };
   if (!_rawSend(msg)) {
     _enqueueInput(msg);
@@ -121,15 +122,18 @@ function _flushInputQueue() {
 export function wsSend(obj) {
   if (obj.type === 'input' && obj.sessionId && _onInputSend) _onInputSend(obj.sessionId);
 
-  // Input messages: batch + buffer
+  // Input messages: send first immediately, batch subsequent within window
   if (obj.type === 'input' && obj.sessionId) {
     if (S.ws && S.ws.readyState === WebSocket.OPEN) {
       const existing = _inputBatch.get(obj.sessionId);
       if (existing) {
+        // Subsequent keystrokes within batch window — accumulate
         existing.data += obj.data;
-        // Timer already running — will flush accumulated data
       } else {
-        _inputBatch.set(obj.sessionId, { data: obj.data });
+        // First keystroke — send immediately for responsiveness
+        _rawSend(obj);
+        // Open batch window for any rapid follow-up keystrokes
+        _inputBatch.set(obj.sessionId, { data: '' });
         setTimeout(() => _flushBatch(obj.sessionId), INPUT_BATCH_WINDOW);
       }
     } else {

@@ -47,10 +47,13 @@ function tmuxSessionExists(name: string): boolean {
 function tmuxCreateSession(name: string, cwd: string, shell: string): void {
   const safeCwd = fs.existsSync(cwd) ? cwd : (process.env.HOME || '/');
   tmuxExec(['new-session', '-d', '-s', name, '-c', safeCwd, shell]);
-  // Hide tmux status bar — our UI provides its own chrome
+  // Hide all tmux chrome — our UI provides its own
   try { tmuxExec(['set-option', '-t', name, 'status', 'off']); } catch {}
+  try { tmuxExec(['set-option', '-t', name, 'pane-border-status', 'off']); } catch {}
+  try { tmuxExec(['set-option', '-t', name, 'set-titles', 'off']); } catch {}
   // Disable tmux prefix key to avoid capturing user shortcuts
   try { tmuxExec(['set-option', '-t', name, 'prefix', 'None']); } catch {}
+  try { tmuxExec(['set-option', '-t', name, 'prefix2', 'None']); } catch {}
 }
 
 function tmuxKillSession(name: string): void {
