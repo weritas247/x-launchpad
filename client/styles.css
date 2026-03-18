@@ -705,6 +705,22 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .gg-confirm-cancel{background:none;color:var(--text-dim);border:1px solid var(--border);border-radius:4px;padding:5px 14px;font-size:11px;cursor:pointer;font-family:var(--font-mono)}
 .gg-confirm-cancel:hover{color:var(--text-main);border-color:var(--text-dim)}
 
+/* Search bar */
+.gg-search-toggle{background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-dim);font-size:14px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);transition:all .12s}
+.gg-search-toggle:hover,.gg-search-toggle.active{color:var(--accent);border-color:var(--accent)}
+.gg-search-bar{padding:6px 14px;background:var(--bg-deep);border-bottom:1px solid var(--border);flex-shrink:0}
+.gg-search-input-wrap{display:flex;align-items:center;background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;padding:4px 10px;gap:8px}
+.gg-search-input-wrap:focus-within{border-color:var(--accent)}
+.gg-search-icon{color:var(--text-ghost);font-size:13px;flex-shrink:0}
+.gg-search-input{background:none;border:none;color:var(--text-main);font-size:12px;font-family:var(--font-mono);flex:1;outline:none}
+.gg-search-input::placeholder{color:var(--text-ghost)}
+.gg-search-hint{font-size:9px;color:var(--text-ghost);background:var(--bg-deep);border:1px solid var(--border);border-radius:3px;padding:1px 5px;flex-shrink:0}
+.gg-highlight{background:var(--accent-dim);color:var(--accent);border-radius:2px;padding:0 1px}
+/* Load more spinner */
+.gg-load-more{display:flex;align-items:center;justify-content:center;padding:12px;position:absolute;bottom:0;left:0;right:0}
+/* Search empty state */
+.gg-search-empty{display:flex;align-items:center;justify-content:center;flex:1;color:var(--text-ghost);font-size:12px;letter-spacing:.06em;padding:40px}
+
 /* Floating scroll buttons */
 #scroll-float{position:fixed;bottom:40px;right:16px;z-index:900;display:flex;flex-direction:column;gap:4px;opacity:0;pointer-events:none;transition:opacity .2s}
 #scroll-float.visible{opacity:1;pointer-events:auto}
