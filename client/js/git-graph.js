@@ -11,6 +11,19 @@ let pendingCheckoutBranch = null;
 let dropdownAbort = null;
 let focusedRowIdx = -1;
 
+// ─── PAGINATION STATE ─────────────────────────────────
+let isLoadingMore = false;
+let hasMore = false;
+let currentSkip = 0;
+const PAGE_SIZE = 50;
+const MAX_COMMITS = 500;
+let scrollRAF = null;
+
+// ─── SEARCH STATE ─────────────────────────────────────
+let searchActive = false;
+let searchQuery = '';
+let searchDebounce = null;
+
 // ─── DOM REFS ────────────────────────────────────────
 const overlay   = document.getElementById('git-graph-overlay');
 const repoName  = document.getElementById('gg-repo-name');
@@ -27,6 +40,7 @@ const commitBody = document.getElementById('gg-commit-body');
 const sbBranch  = document.getElementById('sb-branch');
 const sbBrSep   = document.getElementById('sb-branch-sep');
 const sbBrName  = document.getElementById('sb-branch-name');
+const loadMore   = document.getElementById('gg-load-more');
 
 // Branch dropdown
 const branchDropdown = document.getElementById('gg-branch-dropdown');
@@ -76,6 +90,10 @@ export function openGitGraph() {
   cachedCommits = [];
   githubBaseUrl = null;
   focusedRowIdx = -1;
+  isLoadingMore = false;
+  hasMore = false;
+  currentSkip = 0;
+  loadMore.style.display = 'none';
   restoreModalSize();
   overlay.classList.add('open');
   loading.style.display = 'flex';
@@ -228,15 +246,42 @@ export function handleGitGraphKeydown(e) {
 // ─── HANDLERS ────────────────────────────────────────
 export function handleGitGraphData(msg) {
   loading.style.display = 'none';
-  if (msg.error || !msg.commits || msg.commits.length === 0) {
-    errorEl.style.display = 'flex';
-    errorEl.textContent = msg.error ? 'Not a git repository' : 'No commits found';
-    content.style.display = 'none';
+
+  // Discard append responses if search became active while loading
+  const isAppend = msg.skip > 0;
+  if (isAppend && searchActive) {
+    isLoadingMore = false;
+    loadMore.style.display = 'none';
     return;
   }
-  cachedCommits = msg.commits;
-  content.style.display = 'flex';
-  renderGraph(msg.commits);
+
+  if (!isAppend) {
+    // Initial load
+    if (msg.error || !msg.commits || msg.commits.length === 0) {
+      errorEl.style.display = 'flex';
+      errorEl.textContent = msg.error ? 'Not a git repository' : 'No commits found';
+      content.style.display = 'none';
+      return;
+    }
+    cachedCommits = msg.commits;
+    content.style.display = 'flex';
+  } else {
+    // Append load
+    if (msg.commits && msg.commits.length > 0) {
+      cachedCommits = cachedCommits.concat(msg.commits);
+    }
+  }
+
+  hasMore = !!msg.hasMore && cachedCommits.length < MAX_COMMITS;
+  currentSkip = cachedCommits.length;
+  isLoadingMore = false;
+  loadMore.style.display = 'none';
+
+  // Re-render, preserving scroll position
+  const scrollEl = document.getElementById('gg-scroll');
+  const prevScroll = scrollEl.scrollTop;
+  renderGraph(cachedCommits);
+  if (isAppend) scrollEl.scrollTop = prevScroll;
 }
 
 export function handleGitFileListData(msg) {
@@ -746,4 +791,20 @@ resizeHandle.addEventListener('mousedown', e => {
 
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
+});
+
+// ─── INFINITE SCROLL ──────────────────────────────────
+const scrollEl = document.getElementById('gg-scroll');
+scrollEl.addEventListener('scroll', () => {
+  if (scrollRAF) return;
+  scrollRAF = requestAnimationFrame(() => {
+    scrollRAF = null;
+    if (!isOpen || isLoadingMore || !hasMore || searchActive) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollEl;
+    if (scrollHeight - scrollTop - clientHeight < 200) {
+      isLoadingMore = true;
+      loadMore.style.display = 'flex';
+      wsSend({ type: 'git_graph', sessionId: S.activeSessionId, skip: currentSkip });
+    }
+  });
 });
