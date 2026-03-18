@@ -5,11 +5,16 @@ import { setActivityBadge } from './activity-bar.js';
 
 let searchResults = [];
 let lastQuery = '';
+let caseSensitive = false;
+let useRegex = false;
 
 export function initSearch() {
   const input = document.getElementById('search-input');
   const btn = document.getElementById('search-btn');
   const clearBtn = document.getElementById('search-clear');
+  const caseBtn = document.getElementById('search-opt-case');
+  const regexBtn = document.getElementById('search-opt-regex');
+  const includeInput = document.getElementById('search-include');
 
   let debounceTimer = null;
 
@@ -17,9 +22,9 @@ export function initSearch() {
     if (!input || !S.activeSessionId) return;
     const query = input.value.trim();
     if (!query) { clearResults(); return; }
-    if (query === lastQuery) return;
     lastQuery = query;
-    wsSend({ type: 'file_search', sessionId: S.activeSessionId, query });
+    const include = includeInput?.value.trim() || '';
+    wsSend({ type: 'file_search', sessionId: S.activeSessionId, query, caseSensitive, useRegex, include });
   };
 
   if (input) {
@@ -36,6 +41,21 @@ export function initSearch() {
     if (input) input.value = '';
     lastQuery = '';
     clearResults();
+  });
+
+  // Toggle buttons
+  if (caseBtn) caseBtn.addEventListener('click', () => {
+    caseSensitive = !caseSensitive;
+    caseBtn.classList.toggle('active', caseSensitive);
+    if (lastQuery) doSearch();
+  });
+  if (regexBtn) regexBtn.addEventListener('click', () => {
+    useRegex = !useRegex;
+    regexBtn.classList.toggle('active', useRegex);
+    if (lastQuery) doSearch();
+  });
+  if (includeInput) includeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && lastQuery) doSearch();
   });
 }
 

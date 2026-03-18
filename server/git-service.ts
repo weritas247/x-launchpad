@@ -443,16 +443,22 @@ export interface SearchResult {
   text: string;
 }
 
-export function searchInFiles(cwd: string, query: string, maxResults = 100): SearchResult[] {
+export function searchInFiles(cwd: string, query: string, opts?: { caseSensitive?: boolean; useRegex?: boolean; include?: string }, maxResults = 100): SearchResult[] {
   if (!query.trim()) return [];
   try {
-    const raw = execFileSync('grep', [
-      '-rn', '--include=*.{js,ts,jsx,tsx,json,css,html,md,py,go,rs,rb,sh,yml,yaml,toml,txt,cfg,conf,env}',
-      '-I', // skip binary files
-      '--max-count=5', // max matches per file
-      query,
-      '.'
-    ], { cwd, encoding: 'utf-8', timeout: 5000, maxBuffer: 1024 * 512 }).trim();
+    const args = ['-rn', '-I', '--max-count=5'];
+    if (!opts?.caseSensitive) args.push('-i');
+    if (!opts?.useRegex) args.push('-F'); // fixed string (literal)
+    // Include patterns
+    if (opts?.include) {
+      for (const pat of opts.include.split(',').map(s => s.trim()).filter(Boolean)) {
+        args.push(`--include=${pat}`);
+      }
+    } else {
+      args.push('--include=*.{js,ts,jsx,tsx,json,css,html,md,py,go,rs,rb,sh,yml,yaml,toml,txt,cfg,conf,env}');
+    }
+    args.push(query, '.');
+    const raw = execFileSync('grep', args, { cwd, encoding: 'utf-8', timeout: 5000, maxBuffer: 1024 * 512 }).trim();
 
     if (!raw) return [];
     const results: SearchResult[] = [];

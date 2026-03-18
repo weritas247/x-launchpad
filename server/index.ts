@@ -907,7 +907,11 @@ wss.on('connection', (ws: WebSocket) => {
       const session = sessions.get(id);
       if (!session) return;
       const query = parsed.query as string;
-      const results = gitService.searchInFiles(session.cwd, query);
+      const results = gitService.searchInFiles(session.cwd, query, {
+        caseSensitive: parsed.caseSensitive as boolean,
+        useRegex: parsed.useRegex as boolean,
+        include: parsed.include as string,
+      });
       ws.send(JSON.stringify({ type: 'file_search_data', sessionId: id, results }));
 
     } else if (parsed.type === 'git_generate_message') {

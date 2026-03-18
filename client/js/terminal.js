@@ -469,9 +469,10 @@ export function initContextMenu() {
 function updateBreadcrumb(cwd) {
   const bar = document.getElementById('breadcrumb-bar');
   if (!bar || !cwd) { if (bar) bar.innerHTML = ''; return; }
-  const home = (typeof process !== 'undefined' && process.env?.HOME) || '/Users';
   let display = cwd;
-  if (display.startsWith(home)) display = '~' + display.slice(home.length);
+  // Detect home dir pattern: /Users/xxx or /home/xxx
+  const homeMatch = cwd.match(/^(\/(?:Users|home)\/[^/]+)/);
+  if (homeMatch) display = '~' + cwd.slice(homeMatch[1].length);
   const parts = display.split('/').filter(Boolean);
   bar.innerHTML = parts.map(p =>
     `<span class="breadcrumb-part">${escHtml(p)}</span>`
