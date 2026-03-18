@@ -396,10 +396,19 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
   const FLUSH_DELAY = 16; // ms — batch within one animation frame
 
+  // Pre-compute binary header for this session's output frames
+  const sessionIdBuf = Buffer.from(id, 'utf-8');
+  const binHeader = Buffer.alloc(1 + 2 + sessionIdBuf.length);
+  binHeader[0] = 0x01; // type: terminal output
+  binHeader.writeUInt16BE(sessionIdBuf.length, 1);
+  sessionIdBuf.copy(binHeader, 3);
+
   function flushOutput() {
     flushTimer = null;
     if (!outputBuf) return;
-    const msg = JSON.stringify({ type: 'output', sessionId: id, data: outputBuf });
+    // Build binary frame: [0x01][sessionId-len:u16][sessionId][data]
+    const dataBuf = Buffer.from(outputBuf, 'utf-8');
+    const frame = Buffer.concat([binHeader, dataBuf]);
     const byteLen = outputBuf.length;
     outputBuf = '';
     let sentCount = 0;
@@ -408,7 +417,7 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
       if (cws.readyState !== WebSocket.OPEN) return;
       const active = wsSession.get(cws) === id;
       const subscribed = wsSubscriptions.get(cws)?.has(id) ?? false;
-      if (active || subscribed) { cws.send(msg); sentCount++; }
+      if (active || subscribed) { cws.send(frame); sentCount++; }
     });
     if (sentCount === 0 && wss.clients.size > 0) {
       console.warn(`[pty:${id.slice(-6)}] Output dropped (${byteLen}B) — no active/subscribed client`);

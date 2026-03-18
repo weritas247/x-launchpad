@@ -146,9 +146,12 @@ export function wsSend(obj) {
   }
 }
 
+const _textDecoder = new TextDecoder();
+
 export function connect(messageHandler) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   S.ws = new WebSocket(`${proto}//${location.host}`);
+  S.ws.binaryType = 'arraybuffer';
 
   S.ws.onopen = () => {
     setWsStatus(true);
@@ -166,6 +169,19 @@ export function connect(messageHandler) {
   };
 
   S.ws.onmessage = (event) => {
+    // Binary frame: terminal output [0x01][sidLen:u16][sessionId][data]
+    if (event.data instanceof ArrayBuffer) {
+      const view = new DataView(event.data);
+      const type = view.getUint8(0);
+      if (type === 0x01) {
+        const sidLen = view.getUint16(1);
+        const sessionId = _textDecoder.decode(new Uint8Array(event.data, 3, sidLen));
+        const data = _textDecoder.decode(new Uint8Array(event.data, 3 + sidLen));
+        messageHandler({ type: 'output', sessionId, data });
+      }
+      return;
+    }
+    // JSON text frame: all other messages
     let msg;
     try { msg = JSON.parse(event.data); } catch { return; }
     // Handle pong from server — measure RTT
