@@ -275,7 +275,7 @@ export function updateSessionInfo(sessionId, cwd, ai) {
 
   let shortCwd = cwd || '~';
   const parts = shortCwd.replace(/\/$/, '').split('/');
-  if (parts.length > 3) shortCwd = '…/' + parts.slice(-2).join('/');
+  shortCwd = parts[parts.length - 1] || '~';
 
   // Update tab AI icon
   let tabAiIcon = entry.tabEl.querySelector('.tab-ai-icon');
