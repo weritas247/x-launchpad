@@ -1329,7 +1329,10 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const wtPath = parsed.path as string;
       const branch = parsed.branch as string | undefined;
       const createBranch = parsed.createBranch as boolean | undefined;
-      const wtResult = gitService.addWorktree(session.cwd, wtPath, branch, createBranch);
+      // Resolve relative path from git root, not session.cwd (which may be a worktree)
+      const gitRoot = gitService.getGitRoot(session.cwd);
+      const addCwd = gitRoot || session.cwd;
+      const wtResult = gitService.addWorktree(addCwd, wtPath, branch, createBranch);
       ws.send(JSON.stringify({ type: 'git_worktree_add_ack', sessionId: id, ...wtResult }));
       if (wtResult.ok) {
         const worktrees = gitService.getWorktreeList(session.cwd);

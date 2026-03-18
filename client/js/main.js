@@ -82,6 +82,7 @@ function handleMessage(msg) {
       if (panel === 'explorer') onExplorerSessionChange();
       else if (panel === 'source-control') onSourceControlSessionChange();
       else if (panel === 'search') onSearchSessionChange();
+      else if (panel === 'plan') onPlanSessionChange();
       // Always refresh source control status in background for badge updates
       if (panel !== 'source-control') onSourceControlSessionChange();
     }
