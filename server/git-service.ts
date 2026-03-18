@@ -410,6 +410,56 @@ export function deleteFile(cwd: string, filePath: string): { ok: boolean; error?
   }
 }
 
+export function duplicateFile(cwd: string, filePath: string): { ok: boolean; error?: string } {
+  const path = require('path') as typeof import('path');
+  const fs = require('fs') as typeof import('fs');
+  const fullPath = path.resolve(cwd, filePath);
+  if (!fullPath.startsWith(path.resolve(cwd))) return { ok: false, error: 'Access denied' };
+  try {
+    if (!fs.existsSync(fullPath)) return { ok: false, error: 'File not found' };
+    const stat = fs.statSync(fullPath);
+    const dir = path.dirname(fullPath);
+    const baseName = path.basename(fullPath);
+
+    // Split name and extension (last dot only)
+    let nameWithoutExt: string;
+    let ext: string;
+    if (stat.isDirectory()) {
+      nameWithoutExt = baseName;
+      ext = '';
+    } else {
+      const dotIdx = baseName.lastIndexOf('.');
+      // Handle dotfiles (.gitignore) and no-extension files (Makefile)
+      if (dotIdx <= 0) {
+        nameWithoutExt = baseName;
+        ext = '';
+      } else {
+        nameWithoutExt = baseName.slice(0, dotIdx);
+        ext = baseName.slice(dotIdx); // includes the dot
+      }
+    }
+
+    // Find unique name: "name copy.ext", "name copy 2.ext", ...
+    let copyPath: string;
+    const candidate = `${nameWithoutExt} copy${ext}`;
+    copyPath = path.join(dir, candidate);
+    if (fs.existsSync(copyPath)) {
+      let n = 2;
+      while (fs.existsSync(path.join(dir, `${nameWithoutExt} copy ${n}${ext}`))) n++;
+      copyPath = path.join(dir, `${nameWithoutExt} copy ${n}${ext}`);
+    }
+
+    if (stat.isDirectory()) {
+      fs.cpSync(fullPath, copyPath, { recursive: true });
+    } else {
+      fs.copyFileSync(fullPath, copyPath);
+    }
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message || String(e) };
+  }
+}
+
 // ─── FILE READ ───────────────────────────────────────────────────
 export function readFileContent(cwd: string, filePath: string): { content?: string; binary?: boolean; error?: string } {
   const path = require('path') as typeof import('path');

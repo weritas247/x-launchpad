@@ -614,7 +614,7 @@ wss.on('connection', (ws: WebSocket) => {
       const id = `session-${Date.now()}`;
       const nameFormat = currentSettings.shell.sessionNameFormat || 'shell-{n}';
       const name = (parsed.name as string) || nameFormat.replace('{n}', String(sessions.size + 1));
-      const sess = createSession(id, name);
+      const sess = createSession(id, name, parsed.cwd as string | undefined);
       wsSession.set(ws, id);
       if (parsed.cmd) {
         sess.cmd = parsed.cmd as string;
@@ -912,6 +912,14 @@ wss.on('connection', (ws: WebSocket) => {
       if (!session) return;
       const result = gitService.deleteFile(session.cwd, parsed.filePath as string);
       ws.send(JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'delete', ...result }));
+
+    } else if (parsed.type === 'file_duplicate') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const result = gitService.duplicateFile(session.cwd, parsed.filePath as string);
+      ws.send(JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'duplicate', ...result }));
 
     } else if (parsed.type === 'file_read') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
