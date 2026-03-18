@@ -1,6 +1,7 @@
 // ─── ACTIVITY BAR (LEFT ICON BAR) ────────────────────────────────
 import { requestFileTree } from './explorer.js';
 import { requestGitStatus } from './source-control.js';
+import { onSearchSessionChange } from './search.js';
 
 let activePanel = 'sessions'; // 'sessions' | 'explorer' | 'source-control'
 let dragSrcBtn = null;
@@ -113,6 +114,8 @@ export function switchPanel(panel) {
     requestFileTree();
   } else if (panel === 'source-control') {
     requestGitStatus();
+  } else if (panel === 'search') {
+    document.getElementById('search-input')?.focus();
   }
 }
 

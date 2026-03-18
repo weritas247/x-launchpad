@@ -358,6 +358,40 @@ export function gitCommit(cwd: string, message: string): { ok: boolean; error?: 
   }
 }
 
+// ─── FILE SEARCH (grep) ──────────────────────────────────────────
+export interface SearchResult {
+  file: string;
+  line: number;
+  text: string;
+}
+
+export function searchInFiles(cwd: string, query: string, maxResults = 100): SearchResult[] {
+  if (!query.trim()) return [];
+  try {
+    const raw = execFileSync('grep', [
+      '-rn', '--include=*.{js,ts,jsx,tsx,json,css,html,md,py,go,rs,rb,sh,yml,yaml,toml,txt,cfg,conf,env}',
+      '-I', // skip binary files
+      '--max-count=5', // max matches per file
+      query,
+      '.'
+    ], { cwd, encoding: 'utf-8', timeout: 5000, maxBuffer: 1024 * 512 }).trim();
+
+    if (!raw) return [];
+    const results: SearchResult[] = [];
+    for (const line of raw.split('\n')) {
+      if (results.length >= maxResults) break;
+      // Format: ./path/file:lineNum:text
+      const match = line.match(/^\.\/(.+?):(\d+):(.*)$/);
+      if (match) {
+        results.push({ file: match[1], line: parseInt(match[2]), text: match[3].slice(0, 200) });
+      }
+    }
+    return results;
+  } catch {
+    return [];
+  }
+}
+
 export function getGitRoot(cwd: string): string | null {
   try {
     return execFileSync('git', ['rev-parse', '--show-toplevel'], {

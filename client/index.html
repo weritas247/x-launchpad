@@ -41,6 +41,9 @@
     <button class="activity-btn active" data-panel="sessions" title="Sessions">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
     </button>
+    <button class="activity-btn" data-panel="search" title="Search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M16 16l4.5 4.5"/></svg>
+    </button>
     <button class="activity-btn" data-panel="explorer" title="Explorer">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7V5a2 2 0 012-2h4l2 2h8a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
     </button>
@@ -69,6 +72,24 @@
       </div>
       <div class="sidebar-footer">
         <span>node-pty · xterm.js</span>
+      </div>
+    </div>
+
+    <!-- SEARCH PANEL -->
+    <div class="sidebar-panel" id="panel-search">
+      <div class="sidebar-header">
+        <span class="sidebar-title-text">SEARCH</span>
+        <div class="sidebar-header-actions">
+          <button class="btn-icon-sm" id="search-clear" title="Clear">✕</button>
+        </div>
+      </div>
+      <div class="search-input-bar">
+        <input type="text" class="search-input" id="search-input" placeholder="Search in files..."/>
+        <button class="search-go-btn" id="search-btn" title="Search">→</button>
+      </div>
+      <div class="search-count" id="search-count"></div>
+      <div class="search-results-container" id="search-results">
+        <div class="search-empty">Type to search in files</div>
       </div>
     </div>
 

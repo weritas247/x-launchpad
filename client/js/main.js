@@ -17,6 +17,7 @@ import { handleClaudeUsageData, startUsagePolling, onSessionChangeUsage, onAiCha
 import { initActivityBar, getActivePanel } from './activity-bar.js';
 import { initExplorer, handleFileTreeData, onExplorerSessionChange, requestFileTree } from './explorer.js';
 import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange } from './source-control.js';
+import { initSearch, handleSearchResults, onSearchSessionChange } from './search.js';
 
 S.currentTheme = THEMES[0];
 
@@ -112,6 +113,8 @@ function handleMessage(msg) {
     handleGitPushAck(msg);
   } else if (msg.type === 'git_generate_message_data') {
     handleGitGenerateMessage(msg);
+  } else if (msg.type === 'file_search_data') {
+    handleSearchResults(msg);
   }
 }
 
@@ -264,12 +267,14 @@ initInputPanel();
 initActivityBar();
 initExplorer();
 initSourceControl();
+initSearch();
 
 // Register side panel refresh on session change
 setOnSessionChangeSidePanels(() => {
   const panel = getActivePanel();
   if (panel === 'explorer') onExplorerSessionChange();
   else if (panel === 'source-control') onSourceControlSessionChange();
+  else if (panel === 'search') onSearchSessionChange();
 });
 
 // Explorer refresh button
