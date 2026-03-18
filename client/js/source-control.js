@@ -104,13 +104,16 @@ export function initSourceControl() {
       if (!pathInput || !S.activeSessionId) return;
       const value = pathInput.value.trim();
       if (!value) return;
+      // Sanitize: only allow alphanumeric, hyphens, underscores, dots
+      const safeName = value.replace(/[^a-zA-Z0-9._-]/g, '-');
+      if (!safeName) { showToast('Invalid branch/worktree name', 'error'); return; }
       const isNewBranch = newBranchCb?.checked || false;
-      const path = `.claude/worktrees/${value}`;
+      const path = `.claude/worktrees/${safeName}`;
       wsSend({
         type: 'git_worktree_add',
         sessionId: S.activeSessionId,
         path,
-        branch: value,
+        branch: isNewBranch ? safeName : value,
         createBranch: isNewBranch
       });
       pathInput.value = '';

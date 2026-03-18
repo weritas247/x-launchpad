@@ -483,7 +483,9 @@ function updateBreadcrumb(cwd) {
   const homeMatch = cwd.match(/^(\/(?:Users|home)\/[^/]+)/);
   if (homeMatch) display = '~' + cwd.slice(homeMatch[1].length);
   const parts = display.split('/').filter(Boolean);
-  bar.innerHTML = parts.map(p =>
+  const wtName = detectWorktreeName(cwd);
+  const prefix = wtName ? `<span class="breadcrumb-wt">⌥${escHtml(wtName)}</span><span class="breadcrumb-sep">›</span>` : '';
+  bar.innerHTML = prefix + parts.map(p =>
     `<span class="breadcrumb-part">${escHtml(p)}</span>`
   ).join('<span class="breadcrumb-sep">›</span>');
 }

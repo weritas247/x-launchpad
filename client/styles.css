@@ -917,6 +917,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .breadcrumb-sep{color:var(--text-ghost);margin:0 2px}
 .breadcrumb-part{color:var(--text-dim);cursor:default;white-space:nowrap}
 .breadcrumb-part:last-child{color:var(--accent)}
+.breadcrumb-wt{color:var(--accent2);font-weight:600;font-size:10px;white-space:nowrap}
 
 /* ═══ TOAST NOTIFICATIONS ═══ */
 #toast-container{position:fixed;bottom:48px;right:16px;z-index:9999;display:flex;flex-direction:column-reverse;gap:6px;pointer-events:none}

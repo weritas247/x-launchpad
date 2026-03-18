@@ -799,7 +799,7 @@ function runCmdWhenReady(sess: Session, cmd: string) {
 function broadcastSessionList(exclude?: WebSocket) {
   persistSessions();
   const list = Array.from(sessions.values()).map(s => ({
-    id: s.id, name: s.name, createdAt: s.createdAt,
+    id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd,
   }));
   const msg = JSON.stringify({ type: 'session_list', sessions: list });
   wss.clients.forEach(client => {
@@ -886,7 +886,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
   // Send initial data
   const list = Array.from(sessions.values()).map(s => ({
-    id: s.id, name: s.name, createdAt: s.createdAt,
+    id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd,
   }));
   ws.send(JSON.stringify({ type: 'session_list', sessions: list }));
   ws.send(JSON.stringify({ type: 'settings', settings: currentSettings }));
