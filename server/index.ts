@@ -168,9 +168,102 @@ function saveSettings(s: typeof DEFAULT_SETTINGS): void {
 
 let currentSettings = loadSettings();
 
+// ─── AUTHENTICATION ──────────────────────────────────────────────
+import { timingSafeEqual } from 'crypto';
+const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
+const authEnabled = AUTH_TOKEN.length > 0;
+
+// Rate limiting for auth failures
+const authFailures = new Map<string, { count: number; resetAt: number }>();
+const AUTH_MAX_FAILURES = 5;
+const AUTH_WINDOW_MS = 60_000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = authFailures.get(ip);
+  if (!entry || now > entry.resetAt) {
+    authFailures.set(ip, { count: 0, resetAt: now + AUTH_WINDOW_MS });
+    return true;
+  }
+  return entry.count < AUTH_MAX_FAILURES;
+}
+
+function recordAuthFailure(ip: string): void {
+  const entry = authFailures.get(ip);
+  if (entry) entry.count++;
+}
+
+function verifyToken(token: string): boolean {
+  if (!authEnabled) return true;
+  if (!token || token.length !== AUTH_TOKEN.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(token), Buffer.from(AUTH_TOKEN));
+  } catch {
+    return false;
+  }
+}
+
+function extractToken(req: express.Request): string {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7);
+  return (req.query.token as string) || '';
+}
+
+// Auth middleware — skip for login page and static assets
+function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  if (!authEnabled) return next();
+  // Allow login endpoint and static assets without auth
+  if (req.path === '/api/auth/login' || req.path === '/api/auth/check') return next();
+  // Allow the login page itself
+  if (req.path === '/login' || req.path === '/login.html') return next();
+
+  const token = extractToken(req);
+  if (verifyToken(token)) return next();
+
+  // For API calls, return 401; for page loads, redirect to login
+  if (req.path.startsWith('/api/')) {
+    res.status(401).json({ error: 'Unauthorized' });
+  } else if (req.path === '/' || req.path === '/index.html') {
+    res.redirect('/login');
+  } else {
+    // Allow static assets (CSS, JS, icons) without auth so login page works
+    next();
+  }
+}
+
+if (authEnabled) {
+  console.log('[auth] Token authentication enabled');
+}
+
 // ─── HTTP ─────────────────────────────────────────────────────────
 app.use(express.json());
+app.use(authMiddleware);
 app.use(express.static(path.join(__dirname, '../../client')));
+
+// Auth endpoints
+app.post('/api/auth/login', (req, res) => {
+  const ip = req.ip || 'unknown';
+  if (!checkRateLimit(ip)) {
+    return res.status(429).json({ ok: false, error: 'Too many attempts. Try again later.' });
+  }
+  const token = req.body?.token as string;
+  if (verifyToken(token)) {
+    res.json({ ok: true });
+  } else {
+    recordAuthFailure(ip);
+    res.status(401).json({ ok: false, error: 'Invalid token' });
+  }
+});
+
+app.get('/api/auth/check', (req, res) => {
+  if (!authEnabled) return res.json({ ok: true, authEnabled: false });
+  const token = extractToken(req);
+  res.json({ ok: verifyToken(token), authEnabled: true });
+});
+
+app.get('/login', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../../client/login.html'));
+});
 
 app.get('/api/settings', (_req, res) => {
   res.json(currentSettings);
@@ -769,7 +862,17 @@ function restoreSessions() {
 // ─── WEBSOCKET ────────────────────────────────────────────────────
 let clientCounter = 0;
 
-wss.on('connection', (ws: WebSocket) => {
+wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
+  // Authenticate WebSocket connections
+  if (authEnabled) {
+    const url = new URL(req.url || '', `http://${req.headers.host}`);
+    const token = url.searchParams.get('token') || '';
+    if (!verifyToken(token)) {
+      ws.close(4001, 'Unauthorized');
+      return;
+    }
+  }
+
   const clientId = ++clientCounter;
   const clientTag = `[ws:client-${clientId}]`;
   console.log(`${clientTag} Client connected (total: ${wss.clients.size})`);

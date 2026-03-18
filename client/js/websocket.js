@@ -156,7 +156,13 @@ export function requestScrollback(sessionId) {
 
 export function connect(messageHandler) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  S.ws = new WebSocket(`${proto}//${location.host}`);
+  // Pass auth token to WebSocket if present
+  const urlParams = new URLSearchParams(location.search);
+  const token = urlParams.get('token') || localStorage.getItem('super-terminal-token') || '';
+  const wsUrl = token
+    ? `${proto}//${location.host}?token=${encodeURIComponent(token)}`
+    : `${proto}//${location.host}`;
+  S.ws = new WebSocket(wsUrl);
   S.ws.binaryType = 'arraybuffer';
 
   S.ws.onopen = () => {
