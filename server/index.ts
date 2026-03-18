@@ -1587,6 +1587,20 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const result = gitService.duplicateFile(session.cwd, parsed.filePath as string);
       ws.send(JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'duplicate', ...result }));
 
+    } else if (parsed.type === 'file_reveal') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const filePath = parsed.filePath as string;
+      if (!filePath || filePath.includes('..')) return;
+      const fullPath = path.join(session.cwd, filePath);
+      execFile('open', ['-R', fullPath], (err) => {
+        if (err) {
+          ws.send(JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'reveal', ok: false, error: err.message }));
+        }
+      });
+
     } else if (parsed.type === 'file_read') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
       if (!id) return;
