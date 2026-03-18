@@ -17,7 +17,7 @@ import { handleClaudeUsageData, startUsagePolling, onSessionChangeUsage, onAiCha
 import { initActivityBar, getActivePanel, switchPanel, toggleSidebarExport, initSidebarResize } from './activity-bar.js';
 import { initExplorer, handleFileTreeData, handleFileReadData, handleFileOpAck, onExplorerSessionChange, requestFileTree } from './explorer.js';
 import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange } from './source-control.js';
-import { initSearch, handleSearchResults, onSearchSessionChange } from './search.js';
+import { initSearch, handleSearchResults, handleReplaceAck, onSearchSessionChange } from './search.js';
 
 S.currentTheme = THEMES[0];
 
@@ -115,6 +115,8 @@ function handleMessage(msg) {
     handleGitGenerateMessage(msg);
   } else if (msg.type === 'file_search_data') {
     handleSearchResults(msg);
+  } else if (msg.type === 'file_replace_ack') {
+    handleReplaceAck(msg);
   } else if (msg.type === 'file_read_data') {
     handleFileReadData(msg);
   } else if (msg.type === 'file_op_ack') {

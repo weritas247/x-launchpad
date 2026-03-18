@@ -618,6 +618,12 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .search-go-btn{background:var(--accent);color:var(--bg-void);border:none;border-radius:3px;
   font-family:var(--font-mono);font-size:12px;width:26px;cursor:pointer;transition:all .15s;flex-shrink:0}
 .search-go-btn:hover{filter:brightness(1.2)}
+.search-replace-toggle{background:none;border:none;color:var(--text-ghost);font-size:10px;cursor:pointer;padding:0 2px;flex-shrink:0;transition:color .15s}
+.search-replace-toggle:hover{color:var(--accent)}
+.search-replace-row{padding:4px 10px 4px 24px;display:flex;gap:4px;align-items:center}
+.search-replace-btn{background:none;border:1px solid var(--border);border-radius:3px;color:var(--text-ghost);
+  font-family:var(--font-mono);font-size:10px;padding:3px 6px;cursor:pointer;transition:all .15s;flex-shrink:0;white-space:nowrap}
+.search-replace-btn:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-dim)}
 .search-options{padding:4px 10px;display:flex;gap:4px;align-items:center;border-bottom:1px solid var(--border)}
 .search-opt-btn{background:none;border:1px solid var(--border);border-radius:3px;color:var(--text-ghost);
   font-family:var(--font-mono);font-size:10px;padding:2px 6px;cursor:pointer;transition:all .15s;font-weight:600}

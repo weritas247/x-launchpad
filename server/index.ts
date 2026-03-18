@@ -914,6 +914,29 @@ wss.on('connection', (ws: WebSocket) => {
       });
       ws.send(JSON.stringify({ type: 'file_search_data', sessionId: id, results }));
 
+    } else if (parsed.type === 'file_replace') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const result = gitService.replaceInFile(session.cwd, parsed.filePath as string, parsed.query as string, parsed.replacement as string, {
+        caseSensitive: parsed.caseSensitive as boolean,
+        useRegex: parsed.useRegex as boolean,
+      });
+      ws.send(JSON.stringify({ type: 'file_replace_ack', sessionId: id, ...result }));
+
+    } else if (parsed.type === 'file_replace_all') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const result = gitService.replaceInAllFiles(session.cwd, parsed.query as string, parsed.replacement as string, {
+        caseSensitive: parsed.caseSensitive as boolean,
+        useRegex: parsed.useRegex as boolean,
+        include: parsed.include as string,
+      });
+      ws.send(JSON.stringify({ type: 'file_replace_ack', sessionId: id, ...result }));
+
     } else if (parsed.type === 'git_generate_message') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
       if (!id) return;

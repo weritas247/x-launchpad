@@ -84,8 +84,14 @@
         </div>
       </div>
       <div class="search-input-bar">
+        <button class="search-replace-toggle" id="search-replace-toggle" title="Toggle Replace">▸</button>
         <input type="text" class="search-input" id="search-input" placeholder="Search in files..."/>
         <button class="search-go-btn" id="search-btn" title="Search">→</button>
+      </div>
+      <div class="search-replace-row" id="search-replace-row" style="display:none">
+        <input type="text" class="search-input" id="search-replace-input" placeholder="Replace"/>
+        <button class="search-replace-btn" id="search-replace-btn" title="Replace in file">⇄</button>
+        <button class="search-replace-btn" id="search-replace-all-btn" title="Replace all">⇄All</button>
       </div>
       <div class="search-options">
         <button class="search-opt-btn" id="search-opt-case" title="Match Case">Aa</button>

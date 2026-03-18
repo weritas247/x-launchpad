@@ -476,6 +476,37 @@ export function searchInFiles(cwd: string, query: string, opts?: { caseSensitive
   }
 }
 
+// ─── FILE REPLACE ────────────────────────────────────────────────
+export function replaceInFile(cwd: string, filePath: string, query: string, replacement: string, opts?: { caseSensitive?: boolean; useRegex?: boolean }): { ok: boolean; count: number; error?: string } {
+  const path = require('path') as typeof import('path');
+  const fs = require('fs') as typeof import('fs');
+  const fullPath = path.resolve(cwd, filePath);
+  if (!fullPath.startsWith(path.resolve(cwd))) return { ok: false, count: 0, error: 'Access denied' };
+  try {
+    let content = fs.readFileSync(fullPath, 'utf-8');
+    const flags = opts?.caseSensitive ? 'g' : 'gi';
+    const pattern = opts?.useRegex ? new RegExp(query, flags) : new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+    let count = 0;
+    content = content.replace(pattern, () => { count++; return replacement; });
+    fs.writeFileSync(fullPath, content, 'utf-8');
+    return { ok: true, count };
+  } catch (e: any) {
+    return { ok: false, count: 0, error: e.message || String(e) };
+  }
+}
+
+export function replaceInAllFiles(cwd: string, query: string, replacement: string, opts?: { caseSensitive?: boolean; useRegex?: boolean; include?: string }): { ok: boolean; count: number; error?: string } {
+  // First find matching files using search
+  const results = searchInFiles(cwd, query, opts);
+  const files = [...new Set(results.map(r => r.file))];
+  let totalCount = 0;
+  for (const file of files) {
+    const result = replaceInFile(cwd, file, query, replacement, opts);
+    if (result.ok) totalCount += result.count;
+  }
+  return { ok: true, count: totalCount };
+}
+
 export function getUpstreamStatus(cwd: string): { ahead: number; behind: number } {
   try {
     const raw = execFileSync('git', ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'], {

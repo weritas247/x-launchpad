@@ -2,11 +2,13 @@
 import { S, sessionMeta, escHtml } from './state.js';
 import { wsSend } from './websocket.js';
 import { setActivityBadge } from './activity-bar.js';
+import { showToast } from './toast.js';
 
 let searchResults = [];
 let lastQuery = '';
 let caseSensitive = false;
 let useRegex = false;
+let replaceVisible = false;
 
 export function initSearch() {
   const input = document.getElementById('search-input');
@@ -15,6 +17,11 @@ export function initSearch() {
   const caseBtn = document.getElementById('search-opt-case');
   const regexBtn = document.getElementById('search-opt-regex');
   const includeInput = document.getElementById('search-include');
+  const replaceToggle = document.getElementById('search-replace-toggle');
+  const replaceInput = document.getElementById('search-replace-input');
+  const replaceBtn = document.getElementById('search-replace-btn');
+  const replaceAllBtn = document.getElementById('search-replace-all-btn');
+  const replaceRow = document.getElementById('search-replace-row');
 
   let debounceTimer = null;
 
@@ -57,12 +64,51 @@ export function initSearch() {
   if (includeInput) includeInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && lastQuery) doSearch();
   });
+
+  // Replace toggle
+  if (replaceToggle && replaceRow) {
+    replaceToggle.addEventListener('click', () => {
+      replaceVisible = !replaceVisible;
+      replaceRow.style.display = replaceVisible ? 'flex' : 'none';
+      replaceToggle.textContent = replaceVisible ? '▾' : '▸';
+    });
+  }
+
+  // Replace in file / Replace all
+  if (replaceBtn) replaceBtn.addEventListener('click', () => {
+    if (!lastQuery || !replaceInput || !S.activeSessionId) return;
+    const replacement = replaceInput.value;
+    // Replace in first matching file
+    if (searchResults.length > 0) {
+      const file = searchResults[0].file;
+      wsSend({ type: 'file_replace', sessionId: S.activeSessionId, query: lastQuery, replacement, filePath: file, caseSensitive, useRegex });
+    }
+  });
+  if (replaceAllBtn) replaceAllBtn.addEventListener('click', () => {
+    if (!lastQuery || !replaceInput || !S.activeSessionId) return;
+    const replacement = replaceInput.value;
+    if (!confirm(`Replace all occurrences of "${lastQuery}" with "${replacement}"?`)) return;
+    const includeVal = includeInput?.value.trim() || '';
+    wsSend({ type: 'file_replace_all', sessionId: S.activeSessionId, query: lastQuery, replacement, caseSensitive, useRegex, include: includeVal });
+  });
 }
 
 export function handleSearchResults(msg) {
   searchResults = msg.results || [];
   setActivityBadge('search', searchResults.length);
   renderResults();
+}
+
+export function handleReplaceAck(msg) {
+  if (msg.ok) {
+    showToast(`Replaced ${msg.count || 0} occurrences`, 'success');
+    // Re-search to refresh results
+    if (lastQuery && S.activeSessionId) {
+      wsSend({ type: 'file_search', sessionId: S.activeSessionId, query: lastQuery, caseSensitive, useRegex });
+    }
+  } else {
+    showToast('Replace failed: ' + (msg.error || 'unknown'), 'error');
+  }
 }
 
 function clearResults() {
@@ -109,11 +155,23 @@ function renderResults() {
     fileHeader.innerHTML = `<span class="search-file-name">${escHtml(fileName)}</span>` +
       (dirPath ? `<span class="search-file-dir">${escHtml(dirPath)}</span>` : '') +
       `<span class="search-file-count">${matches.length}</span>`;
+
+    // Click file header to preview file
+    fileHeader.style.cursor = 'pointer';
+    fileHeader.addEventListener('click', () => {
+      if (!S.activeSessionId) return;
+      wsSend({ type: 'file_read', sessionId: S.activeSessionId, filePath: file });
+    });
+
     fileSection.appendChild(fileHeader);
 
     for (const match of matches) {
       const line = document.createElement('div');
       line.className = 'search-match-line';
+      line.addEventListener('click', () => {
+        if (!S.activeSessionId) return;
+        wsSend({ type: 'file_read', sessionId: S.activeSessionId, filePath: file });
+      });
       const lineNum = document.createElement('span');
       lineNum.className = 'search-line-num';
       lineNum.textContent = match.line;
@@ -131,9 +189,18 @@ function renderResults() {
 
 function highlightMatch(text, query) {
   const escaped = escHtml(text.trim());
+  if (useRegex) {
+    try {
+      const flags = caseSensitive ? 'g' : 'gi';
+      return escaped.replace(new RegExp(`(${query})`, flags), '<mark class="search-highlight">$1</mark>');
+    } catch {
+      return escaped;
+    }
+  }
   const queryEscaped = escHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const flags = caseSensitive ? 'g' : 'gi';
   try {
-    return escaped.replace(new RegExp(`(${queryEscaped})`, 'gi'), '<mark class="search-highlight">$1</mark>');
+    return escaped.replace(new RegExp(`(${queryEscaped})`, flags), '<mark class="search-highlight">$1</mark>');
   } catch {
     return escaped;
   }
@@ -141,6 +208,6 @@ function highlightMatch(text, query) {
 
 export function onSearchSessionChange() {
   if (lastQuery) {
-    wsSend({ type: 'file_search', sessionId: S.activeSessionId, query: lastQuery });
+    wsSend({ type: 'file_search', sessionId: S.activeSessionId, query: lastQuery, caseSensitive, useRegex });
   }
 }
