@@ -17,10 +17,8 @@ export function initActivityBar() {
         return;
       }
       if (panel === activePanel) {
-        // 분할 상태에서 primary 클릭 → 분할 해제만 (사이드바는 유지)
-        if (secondaryPanel) {
-          closeSidebarSplit();
-        } else {
+        // 분할 상태에서 primary 클릭 → 무시
+        if (!secondaryPanel) {
           toggleSidebar();
         }
       } else {
