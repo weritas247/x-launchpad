@@ -42,6 +42,21 @@ function restoreIconOrder() {
 export function initActivityBar() {
   restoreIconOrder();
 
+  // Activate the first icon's panel on startup
+  const firstBtn = document.querySelector('#activity-bar .activity-btn[data-panel]');
+  if (firstBtn) {
+    const firstPanel = firstBtn.dataset.panel;
+    activePanel = firstPanel;
+    // Update active states
+    document.querySelectorAll('.activity-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.panel === firstPanel);
+    });
+    document.querySelectorAll('.sidebar-panel').forEach(p => {
+      p.classList.toggle('active', p.id === `panel-${firstPanel}`);
+    });
+    triggerPanelLoad(firstPanel);
+  }
+
   const buttons = document.querySelectorAll('.activity-btn');
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
