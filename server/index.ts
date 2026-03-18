@@ -15,6 +15,7 @@ import { execSync } from 'child_process';
 const execFileAsync = promisify(execFile);
 import * as gitService from './git-service';
 import * as db from './db';
+import * as userDb from './supabase';
 import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -218,20 +219,20 @@ const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
 const tokenAuthEnabled = AUTH_TOKEN.length > 0;
 
 function isAuthEnabled(): boolean {
-  return tokenAuthEnabled || db.getUserCount() > 0 || isSetupRequired();
+  return tokenAuthEnabled || userDb.getUserCount() > 0 || isSetupRequired();
 }
 
 function isSetupRequired(): boolean {
-  return db.getUserCount() === 0 && !tokenAuthEnabled;
+  return userDb.getUserCount() === 0 && !tokenAuthEnabled;
 }
 
 function isRegistrationAllowed(): boolean {
   if (ALLOW_REGISTRATION) return true;
-  return db.getUserCount() === 0;
+  return userDb.getUserCount() === 0;
 }
 
 function getAuthMode(): 'email' | 'token' | 'none' {
-  const hasUsers = db.getUserCount() > 0;
+  const hasUsers = userDb.getUserCount() > 0;
   if (hasUsers) return 'email';
   if (tokenAuthEnabled) return 'token';
   return 'none';
@@ -332,8 +333,6 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
 if (tokenAuthEnabled) {
   console.log('[auth] Legacy token authentication enabled');
 }
-console.log(`[auth] Email auth: ${db.getUserCount()} registered user(s), registration ${isRegistrationAllowed() ? 'allowed' : 'locked'}`);
-
 // ─── HTTP ─────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(authMiddleware);
@@ -362,7 +361,7 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'Email and password required' });
   }
 
-  const user = db.getUserByEmail(email);
+  const user = await userDb.getUserByEmail(email);
   if (!user) {
     recordAuthFailure(ip);
     return res.status(401).json({ ok: false, error: 'Invalid credentials' });
@@ -407,8 +406,9 @@ app.post('/api/auth/register', async (req, res) => {
 
   try {
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    const userId = db.createUser(email, hash, name || '');
-    const user = db.getUserById(userId)!;
+    const userId = await userDb.createUser(email, hash, name || '');
+    const user = await userDb.getUserById(userId);
+    if (!user) throw new Error('User creation failed');
     const jwtToken = issueJwt(user);
     console.log(`[auth] New user registered: ${email} (id: ${userId})`);
     res.json({
@@ -422,7 +422,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.get('/api/auth/check', (req, res) => {
+app.get('/api/auth/check', async (req, res) => {
   const authOn = isAuthEnabled();
   if (!authOn) return res.json({ ok: true, authEnabled: false, authMode: 'none', registrationAllowed: isRegistrationAllowed(), setupRequired: false });
 
@@ -441,7 +441,7 @@ app.get('/api/auth/check', (req, res) => {
   if (valid && token) {
     const payload = getTokenPayload(token);
     if (payload) {
-      const user = db.getUserById(payload.userId);
+      const user = await userDb.getUserById(payload.userId);
       if (user) {
         result.user = { id: user.id, email: user.email, name: user.name };
       }
@@ -1109,7 +1109,7 @@ function broadcastSessionList(exclude?: WebSocket) {
 // ─── RESTORE SESSIONS ON STARTUP ──────────────────────────────────
 // Map session names to their CLI commands
 const NAME_TO_CMD: Record<string, string> = {
-  claude: 'claude', gemini: 'gemini', codex: 'codex',
+  claude: 'claude --dangerously-skip-permissions', gemini: 'gemini', codex: 'codex',
   opencode: 'opencode', aider: 'aider', copilot: 'copilot',
 };
 
@@ -1770,19 +1770,28 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Super Terminal → http://localhost:${PORT}`);
-  // 로컬 네트워크 IP 표시
-  const nets = require('os').networkInterfaces();
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal) {
-        console.log(`  Network   → http://${net.address}:${PORT}`);
+async function startServer() {
+  try {
+    await userDb.initUserCount();
+    console.log(`[auth] Email auth: ${userDb.getUserCount()} registered user(s), registration ${isRegistrationAllowed() ? 'allowed' : 'locked'}`);
+  } catch (err) {
+    console.error('[supabase] Failed to initialize user count:', err);
+  }
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Super Terminal → http://localhost:${PORT}`);
+    // 로컬 네트워크 IP 표시
+    const nets = require('os').networkInterfaces();
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        if (net.family === 'IPv4' && !net.internal) {
+          console.log(`  Network   → http://${net.address}:${PORT}`);
+        }
       }
     }
-  }
-  restoreSessions();
-});
+    restoreSessions();
+  });
+}
+startServer();
 
 // Graceful shutdown — close database
 process.on('SIGTERM', () => { db.close(); process.exit(0); });
