@@ -152,6 +152,11 @@ function renderPreview(sessionId) {
       removeAttachment(sessionId, idx);
     });
 
+    thumb.addEventListener('click', e => {
+      if (e.target === closeBtn) return;
+      showImagePreview(item.objectUrl);
+    });
+
     thumb.appendChild(img);
     thumb.appendChild(closeBtn);
     bar.appendChild(thumb);
@@ -196,6 +201,34 @@ function adjustXtermForBar(entry, barHeight) {
     xtermEl.style.removeProperty('height');
   }
 }
+
+// ─── IMAGE PREVIEW MODAL ────────────────────────────────────────
+function showImagePreview(src) {
+  const overlay = document.getElementById('img-preview-overlay');
+  const img = document.getElementById('img-preview-img');
+  if (!overlay || !img) return;
+  img.src = src;
+  overlay.style.display = 'flex';
+  requestAnimationFrame(() => overlay.classList.add('active'));
+}
+
+function hideImagePreview() {
+  const overlay = document.getElementById('img-preview-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  setTimeout(() => { overlay.style.display = 'none'; }, 200);
+}
+
+// Wire up close handlers once DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('img-preview-overlay');
+  const closeBtn = document.getElementById('img-preview-close');
+  if (overlay) overlay.addEventListener('click', e => { if (e.target === overlay) hideImagePreview(); });
+  if (closeBtn) closeBtn.addEventListener('click', hideImagePreview);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && overlay?.classList.contains('active')) hideImagePreview();
+  });
+});
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
 export function setupTerminalImageHandlers(div, sessionId) {

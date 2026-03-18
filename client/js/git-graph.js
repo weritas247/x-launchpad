@@ -406,6 +406,10 @@ function relTime(iso) {
   return `${Math.floor(diff/604800)}w`;
 }
 
+function isWithinOneHour(iso) {
+  return (Date.now() - new Date(iso).getTime()) / 1000 < 3600;
+}
+
 function absTime(iso) {
   const d = new Date(iso);
   const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -590,7 +594,7 @@ function renderGraph(commits) {
       `<span class="gg-msg">${refs}${escHtml(c.message)}</span>` +
       `<span class="gg-author">${escHtml(c.author)}${coAuthorHtml}</span>` +
       `<span class="gg-hash" data-hash="${escHtml(c.hash)}">${escHtml(c.hash.slice(0,7))}</span>` +
-      `<span class="gg-time">${absTime(c.date)}</span>` +
+      `<span class="gg-time">${isWithinOneHour(c.date) ? relTime(c.date) + ' ago' : absTime(c.date)}</span>` +
       `</div>`;
   }).join('');
 }

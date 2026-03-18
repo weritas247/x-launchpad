@@ -38,10 +38,7 @@ function handleMessage(msg) {
     if (S.wsJustReconnected) {
       msg.sessions.forEach(s => {
         suppressTabStatus(s.id, 2000);
-        bypassStream(s.id);
-        setTimeout(() => unbypassStream(s.id), 3000);
-        // Request scrollback history to restore terminal content
-        requestScrollback(s.id);
+        // Scrollback is now auto-sent by per-session data WS on connect
       });
     }
     S.wsJustReconnected = false;

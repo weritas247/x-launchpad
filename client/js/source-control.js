@@ -13,9 +13,24 @@ let viewMode = 'list'; // 'list' | 'tree'
 let expandedTreeDirs = new Set();
 let selectedFile = null;
 let ctxTarget = null; // { path, staged, status }
+let worktreeCollapsed = true; // worktree section collapsed by default
+
+// ─── Multi-select state ──────────────────────────────
+let selectedItems = new Set(); // Set of "staged:path" or "unstaged:path"
+let lastClickedKey = null;     // for shift-click range select
+let allFileKeys = [];          // ordered list of keys for range select
+let dragSelecting = false;
+let dragStartY = 0;
+let dragCurrentY = 0;
+let dragStartX = 0;
+let dragCurrentX = 0;
+let dragContainer = null;
+let dragStartedInside = false;
+let dragMoved = false;
 
 export function initSourceControl() {
   initScContextMenu();
+  initDragSelect();
   const refreshBtn = document.getElementById('sc-refresh');
   if (refreshBtn) refreshBtn.addEventListener('click', requestGitStatus);
 
@@ -221,7 +236,24 @@ function renderSourceControl() {
   if (emptyEl) emptyEl.style.display = 'none';
 
   const staged = gitStatusFiles.filter(f => f.staged);
-  const changes = gitStatusFiles.filter(f => !f.staged);
+  const allUnstaged = gitStatusFiles.filter(f => !f.staged);
+
+  // Separate worktree files from regular changes
+  const isWorktreeFile = (f) => f.path.startsWith('.claude/worktrees/') || f.path.startsWith('.claude/worktrees\\');
+  const changes = allUnstaged.filter(f => !isWorktreeFile(f));
+  const worktreeFiles = allUnstaged.filter(f => isWorktreeFile(f));
+
+  // Build ordered key list for range select
+  allFileKeys = [
+    ...staged.map(f => makeKey(f, true)),
+    ...changes.map(f => makeKey(f, false)),
+    ...worktreeFiles.map(f => makeKey(f, false))
+  ];
+
+  // Clean up selection: remove keys that no longer exist
+  for (const k of [...selectedItems]) {
+    if (!allFileKeys.includes(k)) selectedItems.delete(k);
+  }
 
   container.innerHTML = '';
 
@@ -234,6 +266,13 @@ function renderSourceControl() {
     const section = createSection('CHANGES', changes, false);
     container.appendChild(section);
   }
+
+  if (worktreeFiles.length > 0) {
+    const section = createWorktreeSection('WORKTREES', worktreeFiles);
+    container.appendChild(section);
+  }
+
+  updateSelectionVisuals();
 }
 
 function createSection(title, files, isStaged) {
@@ -284,6 +323,73 @@ function createSection(title, files, isStaged) {
   }
 
   section.appendChild(list);
+  return section;
+}
+
+function createWorktreeSection(title, files) {
+  const section = document.createElement('div');
+  section.className = 'sc-section sc-worktree-section';
+
+  const header = document.createElement('div');
+  header.className = 'sc-section-header sc-worktree-header';
+
+  const leftGroup = document.createElement('div');
+  leftGroup.className = 'sc-section-header-left';
+  leftGroup.style.display = 'flex';
+  leftGroup.style.alignItems = 'center';
+  leftGroup.style.gap = '4px';
+  leftGroup.style.cursor = 'pointer';
+
+  const arrow = document.createElement('span');
+  arrow.className = 'sc-tree-arrow';
+  arrow.textContent = worktreeCollapsed ? '▸' : '▾';
+
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'sc-section-title';
+  titleSpan.textContent = title;
+
+  leftGroup.appendChild(arrow);
+  leftGroup.appendChild(titleSpan);
+
+  const actions = document.createElement('div');
+  actions.className = 'sc-section-actions';
+
+  const countSpan = document.createElement('span');
+  countSpan.className = 'sc-section-count';
+  countSpan.textContent = files.length;
+
+  // Stage all button
+  const allBtn = document.createElement('button');
+  allBtn.className = 'sc-action-btn';
+  allBtn.title = 'Stage all';
+  allBtn.textContent = '+';
+  allBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    for (const f of files) {
+      wsSend({ type: 'git_stage', sessionId: S.activeSessionId, filePath: f.path });
+    }
+  });
+
+  actions.appendChild(allBtn);
+  actions.appendChild(countSpan);
+  header.appendChild(leftGroup);
+  header.appendChild(actions);
+
+  // Toggle collapse on header click
+  leftGroup.addEventListener('click', () => {
+    worktreeCollapsed = !worktreeCollapsed;
+    renderSourceControl();
+  });
+
+  section.appendChild(header);
+
+  if (!worktreeCollapsed) {
+    const list = document.createElement('div');
+    list.className = 'sc-section-list';
+    renderListView(list, files, false);
+    section.appendChild(list);
+  }
+
   return section;
 }
 
@@ -412,27 +518,34 @@ function createFileItem(file, isStaged, treeDepth) {
   item.appendChild(nameSpan);
   item.appendChild(rightGroup);
 
+  const key = makeKey(file, isStaged);
+  item.dataset.fileKey = key;
+
   // Right-click context menu
   item.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    // If right-clicked item is not in selection, select it alone
+    if (!selectedItems.has(key)) {
+      selectedItems.clear();
+      selectedItems.add(key);
+      lastClickedKey = key;
+      updateSelectionVisuals();
+    }
     ctxTarget = { path: file.path, staged: isStaged, status: file.status };
     showScContextMenu(e.clientX, e.clientY);
   });
 
-  // Click for diff modal
-  item.addEventListener('click', () => {
-    selectedFile = file.path;
-    // Show modal with loading
-    const overlay = document.getElementById('diff-overlay');
-    const titleFile = document.getElementById('diff-title-file');
-    const diffContent = document.getElementById('diff-content');
-    const diffLoading = document.getElementById('diff-loading');
-    if (titleFile) titleFile.textContent = file.path;
-    if (diffContent) diffContent.innerHTML = '';
-    if (diffLoading) diffLoading.style.display = '';
-    if (overlay) overlay.classList.add('open');
-    wsSend({ type: 'git_diff', sessionId: S.activeSessionId, filePath: file.path, staged: isStaged });
+  // Click for select
+  item.addEventListener('click', (e) => {
+    if (e.target.closest('.sc-file-action')) return;
+    handleFileItemClick(e, file, isStaged, key);
+  });
+
+  // Double-click for diff modal
+  item.addEventListener('dblclick', (e) => {
+    if (e.target.closest('.sc-file-action')) return;
+    handleFileItemDblClick(file, isStaged);
   });
 
   item.title = file.path;
@@ -453,20 +566,200 @@ export function onSourceControlSessionChange() {
   requestGitStatus();
 }
 
+// ─── Multi-select helpers ────────────────────────────
+function makeKey(file, isStaged) {
+  return (isStaged ? 'staged:' : 'unstaged:') + file.path;
+}
+
+function parseKey(key) {
+  const staged = key.startsWith('staged:');
+  const path = key.replace(/^(staged|unstaged):/, '');
+  const file = gitStatusFiles.find(f => f.path === path && f.staged === staged);
+  return { path, staged, file };
+}
+
+function getSelectedFileInfos() {
+  return [...selectedItems].map(parseKey).filter(x => x.file);
+}
+
+function clearSelection() {
+  selectedItems.clear();
+  lastClickedKey = null;
+  updateSelectionVisuals();
+}
+
+function updateSelectionVisuals() {
+  const container = document.getElementById('sc-file-list');
+  if (!container) return;
+  container.querySelectorAll('.sc-file-item').forEach(el => {
+    const key = el.dataset.fileKey;
+    if (key && selectedItems.has(key)) {
+      el.classList.add('sc-selected');
+    } else {
+      el.classList.remove('sc-selected');
+    }
+  });
+}
+
+function getKeysInRange(key1, key2) {
+  const i1 = allFileKeys.indexOf(key1);
+  const i2 = allFileKeys.indexOf(key2);
+  if (i1 === -1 || i2 === -1) return [key2];
+  const start = Math.min(i1, i2);
+  const end = Math.max(i1, i2);
+  return allFileKeys.slice(start, end + 1);
+}
+
+function handleFileItemClick(e, _file, _isStaged, key) {
+  const isMeta = e.metaKey || e.ctrlKey;
+  const isShift = e.shiftKey;
+
+  if (isShift && lastClickedKey) {
+    // Range select
+    const range = getKeysInRange(lastClickedKey, key);
+    if (!isMeta) selectedItems.clear();
+    range.forEach(k => selectedItems.add(k));
+  } else if (isMeta) {
+    // Toggle individual
+    if (selectedItems.has(key)) selectedItems.delete(key);
+    else selectedItems.add(key);
+    lastClickedKey = key;
+  } else {
+    // Single select (don't open diff, just select)
+    selectedItems.clear();
+    selectedItems.add(key);
+    lastClickedKey = key;
+  }
+  updateSelectionVisuals();
+}
+
+function handleFileItemDblClick(file, isStaged) {
+  selectedFile = file.path;
+  const overlay = document.getElementById('diff-overlay');
+  const titleFile = document.getElementById('diff-title-file');
+  const diffContent = document.getElementById('diff-content');
+  const diffLoading = document.getElementById('diff-loading');
+  if (titleFile) titleFile.textContent = file.path;
+  if (diffContent) diffContent.innerHTML = '';
+  if (diffLoading) diffLoading.style.display = '';
+  if (overlay) overlay.classList.add('open');
+  wsSend({ type: 'git_diff', sessionId: S.activeSessionId, filePath: file.path, staged: isStaged });
+}
+
+// Drag-select: rubber band
+function initDragSelect() {
+  const container = document.getElementById('sc-file-list');
+  if (!container) return;
+
+  // Create lasso overlay
+  let lasso = document.getElementById('sc-lasso');
+  if (!lasso) {
+    lasso = document.createElement('div');
+    lasso.id = 'sc-lasso';
+    document.body.appendChild(lasso);
+  }
+
+  container.addEventListener('mousedown', (e) => {
+    // Only left button, ignore buttons/actions
+    if (e.button !== 0) return;
+    if (e.target.closest('.sc-file-action, .sc-action-btn, .sc-section-header, .sc-tree-dir')) return;
+
+    dragStartedInside = true;
+    dragContainer = container;
+    dragStartY = e.clientY;
+    dragStartX = e.clientX;
+    dragCurrentY = e.clientY;
+    dragCurrentX = e.clientX;
+    dragMoved = false;
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragStartedInside) return;
+
+    const dx = Math.abs(e.clientX - dragStartX);
+    const dy = Math.abs(e.clientY - dragStartY);
+    if (!dragSelecting && (dx > 4 || dy > 4)) {
+      dragSelecting = true;
+      if (!e.metaKey && !e.ctrlKey) selectedItems.clear();
+    }
+
+    if (!dragSelecting) return;
+
+    dragCurrentY = e.clientY;
+    dragCurrentX = e.clientX;
+
+    // Update lasso visual
+    const top = Math.min(dragStartY, dragCurrentY);
+    const bottom = Math.max(dragStartY, dragCurrentY);
+    const left = Math.min(dragStartX, dragCurrentX);
+    const right = Math.max(dragStartX, dragCurrentX);
+    lasso.style.display = 'block';
+    lasso.style.top = top + 'px';
+    lasso.style.left = left + 'px';
+    lasso.style.width = (right - left) + 'px';
+    lasso.style.height = (bottom - top) + 'px';
+
+    // Check which items are in the lasso rect
+    const items = dragContainer.querySelectorAll('.sc-file-item');
+    items.forEach(el => {
+      const rect = el.getBoundingClientRect();
+      const overlaps = rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right;
+      const key = el.dataset.fileKey;
+      if (!key) return;
+      if (overlaps) {
+        selectedItems.add(key);
+      } else if (!e.metaKey && !e.ctrlKey) {
+        selectedItems.delete(key);
+      }
+    });
+    updateSelectionVisuals();
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (dragSelecting) {
+      lasso.style.display = 'none';
+      dragSelecting = false;
+    }
+    dragStartedInside = false;
+  });
+}
+
 // ─── Source Control Context Menu ─────────────────────
 function showScContextMenu(x, y) {
   const menu = document.getElementById('sc-ctx-menu');
   if (!menu || !ctxTarget) return;
 
+  const sel = getSelectedFileInfos();
+  const hasUnstaged = sel.some(s => !s.staged);
+  const hasStaged = sel.some(s => s.staged);
+  const hasDiscardable = sel.some(s => !s.staged && s.file && s.file.status !== 'U' && s.file.status !== '?');
+  const multiCount = sel.length;
+
   // Show/hide items based on context
   const stageItem = document.getElementById('sctx-stage');
   const unstageItem = document.getElementById('sctx-unstage');
   const discardItem = document.getElementById('sctx-discard');
+  const diffItem = document.getElementById('sctx-diff');
+  const deleteItem = document.getElementById('sctx-delete');
 
-  if (stageItem) stageItem.style.display = ctxTarget.staged ? 'none' : '';
-  if (unstageItem) unstageItem.style.display = ctxTarget.staged ? '' : 'none';
-  // Discard only for unstaged tracked files
-  if (discardItem) discardItem.style.display = (!ctxTarget.staged && ctxTarget.status !== 'U' && ctxTarget.status !== '?') ? '' : 'none';
+  if (stageItem) {
+    stageItem.style.display = hasUnstaged ? '' : 'none';
+    stageItem.textContent = multiCount > 1 ? `+ Stage (${multiCount})` : '+ Stage';
+  }
+  if (unstageItem) {
+    unstageItem.style.display = hasStaged ? '' : 'none';
+    unstageItem.textContent = multiCount > 1 ? `− Unstage (${multiCount})` : '− Unstage';
+  }
+  if (discardItem) {
+    discardItem.style.display = hasDiscardable ? '' : 'none';
+    discardItem.textContent = multiCount > 1 ? `↩ Discard Changes (${multiCount})` : '↩ Discard Changes';
+  }
+  if (diffItem) {
+    diffItem.style.display = multiCount <= 1 ? '' : 'none';
+  }
+  if (deleteItem) {
+    deleteItem.textContent = multiCount > 1 ? `✕ Delete Files (${multiCount})` : '✕ Delete File';
+  }
 
   menu.style.left = x + 'px';
   menu.style.top = y + 'px';
@@ -495,26 +788,57 @@ function initScContextMenu() {
   });
 
   document.getElementById('sctx-stage')?.addEventListener('click', () => {
-    if (!ctxTarget || !S.activeSessionId) return;
-    wsSend({ type: 'git_stage', sessionId: S.activeSessionId, filePath: ctxTarget.path });
+    if (!S.activeSessionId) return;
+    const sel = getSelectedFileInfos().filter(s => !s.staged);
+    if (sel.length === 0 && ctxTarget) {
+      wsSend({ type: 'git_stage', sessionId: S.activeSessionId, filePath: ctxTarget.path });
+    } else {
+      for (const s of sel) {
+        wsSend({ type: 'git_stage', sessionId: S.activeSessionId, filePath: s.path });
+      }
+    }
+    clearSelection();
   });
 
   document.getElementById('sctx-unstage')?.addEventListener('click', () => {
-    if (!ctxTarget || !S.activeSessionId) return;
-    wsSend({ type: 'git_unstage', sessionId: S.activeSessionId, filePath: ctxTarget.path });
+    if (!S.activeSessionId) return;
+    const sel = getSelectedFileInfos().filter(s => s.staged);
+    if (sel.length === 0 && ctxTarget) {
+      wsSend({ type: 'git_unstage', sessionId: S.activeSessionId, filePath: ctxTarget.path });
+    } else {
+      for (const s of sel) {
+        wsSend({ type: 'git_unstage', sessionId: S.activeSessionId, filePath: s.path });
+      }
+    }
+    clearSelection();
   });
 
   document.getElementById('sctx-discard')?.addEventListener('click', () => {
-    if (!ctxTarget || !S.activeSessionId) return;
-    wsSend({ type: 'git_discard', sessionId: S.activeSessionId, filePath: ctxTarget.path });
+    if (!S.activeSessionId) return;
+    const sel = getSelectedFileInfos().filter(s => !s.staged && s.file && s.file.status !== 'U' && s.file.status !== '?');
+    if (sel.length === 0 && ctxTarget) {
+      wsSend({ type: 'git_discard', sessionId: S.activeSessionId, filePath: ctxTarget.path });
+    } else {
+      for (const s of sel) {
+        wsSend({ type: 'git_discard', sessionId: S.activeSessionId, filePath: s.path });
+      }
+    }
+    clearSelection();
   });
 
   document.getElementById('sctx-delete')?.addEventListener('click', () => {
-    if (!ctxTarget || !S.activeSessionId) return;
-    const confirmed = confirm(`Delete "${ctxTarget.path}"?`);
-    if (!confirmed) return;
-    wsSend({ type: 'file_delete', sessionId: S.activeSessionId, filePath: ctxTarget.path });
-    // Refresh after short delay to let server process
+    if (!S.activeSessionId) return;
+    const sel = getSelectedFileInfos();
+    const paths = sel.length > 0 ? sel.map(s => s.path) : (ctxTarget ? [ctxTarget.path] : []);
+    if (paths.length === 0) return;
+    const msg = paths.length === 1
+      ? `Delete "${paths[0]}"?`
+      : `Delete ${paths.length} files?\n${paths.join('\n')}`;
+    if (!confirm(msg)) return;
+    for (const p of paths) {
+      wsSend({ type: 'file_delete', sessionId: S.activeSessionId, filePath: p });
+    }
+    clearSelection();
     setTimeout(requestGitStatus, 300);
   });
 }

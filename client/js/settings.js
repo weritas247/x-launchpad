@@ -74,12 +74,12 @@ export function applyTerminalOptions(term, s) {
 
 export function applySectionFontSizes(ap) {
   const root = document.documentElement;
-  root.style.setProperty('--sidebar-font-size', (ap.sidebarFontSize || 12) + 'px');
-  root.style.setProperty('--statusbar-font-size', (ap.statusBarFontSize || 11) + 'px');
-  root.style.setProperty('--tabbar-font-size', (ap.tabBarFontSize || 12) + 'px');
-  root.style.setProperty('--input-panel-font-size', (ap.inputPanelFontSize || 11) + 'px');
-  root.style.setProperty('--file-viewer-font-size', (ap.fileViewerFontSize || 13) + 'px');
-  root.style.setProperty('--git-graph-font-size', (ap.gitGraphFontSize || 12) + 'px');
+  root.style.setProperty('--sidebar-font-size', (ap.sidebarFontSize ?? 12) + 'px');
+  root.style.setProperty('--statusbar-font-size', (ap.statusBarFontSize ?? 11) + 'px');
+  root.style.setProperty('--tabbar-font-size', (ap.tabBarFontSize ?? 12) + 'px');
+  root.style.setProperty('--input-panel-font-size', (ap.inputPanelFontSize ?? 11) + 'px');
+  root.style.setProperty('--file-viewer-font-size', (ap.fileViewerFontSize ?? 13) + 'px');
+  root.style.setProperty('--git-graph-font-size', (ap.gitGraphFontSize ?? 12) + 'px');
 }
 
 export function openSettings() {
