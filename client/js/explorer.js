@@ -3,117 +3,135 @@ import { S, sessionMeta, escHtml } from './state.js';
 import { wsSend } from './websocket.js';
 import { showToast } from './toast.js';
 import { openFileTab } from './file-viewer.js';
-import { ContextMenu } from './context-menu.js';
 
 let explorerTree = [];
 let expandedDirs = new Set();
 let currentDir = '';
 let gitStatusMap = {}; // { relativePath: status }
 
-const isDir = (ctx) => ctx.type === 'directory';
+let ctxTargetPath = '';
+let ctxTargetType = ''; // 'file' | 'directory'
 
-const explorerMenu = new ContextMenu([
-  { label: '📄 New File',            action: 'new-file' },
-  { label: '📁 New Folder',          action: 'new-folder' },
-  '---',
-  { label: '▶ Open Terminal Here',   action: 'open-terminal',  when: isDir },
-  { label: '▶ Open with Claude',     action: 'open-claude',    when: isDir },
-  { label: '▶ Open with OpenCode',   action: 'open-opencode',  when: isDir },
-  { label: '▶ Open with Gemini',     action: 'open-gemini',    when: isDir },
-  { label: '▶ Open with Codex',      action: 'open-codex',     when: isDir },
-  '---',
-  { label: '📋 Copy Path',           action: 'copy-path' },
-  { label: '📑 Duplicate',           action: 'duplicate' },
-  '---',
-  { label: '✎ Rename',              action: 'rename' },
-  { label: '✕ Delete',              action: 'delete', danger: true },
-], handleExplorerAction);
+export function initExplorer() {
+  // Explorer context menu
+  const ctxMenu = document.getElementById('explorer-ctx-menu');
+  document.addEventListener('click', () => { if (ctxMenu) ctxMenu.style.display = 'none'; });
 
-function getAbsPath(relPath) {
-  const meta = sessionMeta.get(S.activeSessionId);
-  if (!meta?.cwd) return relPath;
-  return meta.cwd.replace(/\/+$/, '') + '/' + relPath;
+  document.getElementById('ectx-new-file')?.addEventListener('click', () => {
+    const name = prompt('New file name:');
+    if (!name || !S.activeSessionId) return;
+    const dir = ctxTargetType === 'directory' ? ctxTargetPath : ctxTargetPath.split('/').slice(0, -1).join('/');
+    const filePath = dir ? `${dir}/${name}` : name;
+    wsSend({ type: 'file_create', sessionId: S.activeSessionId, filePath, isDir: false });
+  });
+
+  document.getElementById('ectx-new-folder')?.addEventListener('click', () => {
+    const name = prompt('New folder name:');
+    if (!name || !S.activeSessionId) return;
+    const dir = ctxTargetType === 'directory' ? ctxTargetPath : ctxTargetPath.split('/').slice(0, -1).join('/');
+    const filePath = dir ? `${dir}/${name}` : name;
+    wsSend({ type: 'file_create', sessionId: S.activeSessionId, filePath, isDir: true });
+  });
+
+  document.getElementById('ectx-rename')?.addEventListener('click', () => {
+    const oldName = ctxTargetPath.split('/').pop();
+    const newName = prompt('Rename to:', oldName);
+    if (!newName || newName === oldName || !S.activeSessionId) return;
+    const dir = ctxTargetPath.split('/').slice(0, -1).join('/');
+    const newPath = dir ? `${dir}/${newName}` : newName;
+    wsSend({ type: 'file_rename', sessionId: S.activeSessionId, oldPath: ctxTargetPath, newPath });
+  });
+
+  document.getElementById('ectx-delete')?.addEventListener('click', () => {
+    const name = ctxTargetPath.split('/').pop();
+    if (!confirm(`Delete "${name}"?`) || !S.activeSessionId) return;
+    wsSend({ type: 'file_delete', sessionId: S.activeSessionId, filePath: ctxTargetPath });
+  });
+
+  document.getElementById('ectx-download')?.addEventListener('click', () => {
+    if (!ctxTargetPath || ctxTargetType !== 'file' || !S.activeSessionId) return;
+    downloadFile(ctxTargetPath);
+  });
+
+  // Upload button
+  const uploadBtn = document.getElementById('explorer-upload');
+  const uploadInput = document.getElementById('explorer-upload-input');
+  uploadBtn?.addEventListener('click', () => uploadInput?.click());
+  uploadInput?.addEventListener('change', async () => {
+    if (!uploadInput.files?.length || !S.activeSessionId) return;
+    for (const file of uploadInput.files) {
+      await uploadFile(file);
+    }
+    uploadInput.value = '';
+    requestFileTree();
+  });
+
+  // Drag & drop upload on explorer tree
+  const treeEl = document.getElementById('explorer-tree');
+  treeEl?.addEventListener('dragover', (e) => {
+    if (e.dataTransfer?.types.includes('Files')) {
+      e.preventDefault();
+      treeEl.classList.add('drop-target');
+    }
+  });
+  treeEl?.addEventListener('dragleave', () => treeEl.classList.remove('drop-target'));
+  treeEl?.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    treeEl.classList.remove('drop-target');
+    if (!e.dataTransfer?.files.length || !S.activeSessionId) return;
+    for (const file of e.dataTransfer.files) {
+      await uploadFile(file);
+    }
+    requestFileTree();
+  });
 }
 
-function getDirPath(path, type) {
-  return type === 'directory' ? path : path.split('/').slice(0, -1).join('/');
-}
-
-function handleExplorerAction(action, ctx) {
+async function uploadFile(file) {
   if (!S.activeSessionId) return;
-
-  switch (action) {
-    case 'new-file': {
-      const name = prompt('New file name:');
-      if (!name) return;
-      const dir = getDirPath(ctx.path, ctx.type);
-      const filePath = dir ? `${dir}/${name}` : name;
-      wsSend({ type: 'file_create', sessionId: S.activeSessionId, filePath, isDir: false });
-      break;
+  if (file.size > 50 * 1024 * 1024) {
+    showToast(`File too large: ${file.name} (>50MB)`, 'error');
+    return;
+  }
+  try {
+    const buf = await file.arrayBuffer();
+    const params = new URLSearchParams({ sessionId: S.activeSessionId, filename: file.name });
+    const res = await fetch(`/api/upload?${params}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: buf,
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(`Uploaded: ${file.name}`, 'success');
+    } else {
+      showToast(`Upload failed: ${data.error}`, 'error');
     }
-    case 'new-folder': {
-      const name = prompt('New folder name:');
-      if (!name) return;
-      const dir = getDirPath(ctx.path, ctx.type);
-      const filePath = dir ? `${dir}/${name}` : name;
-      wsSend({ type: 'file_create', sessionId: S.activeSessionId, filePath, isDir: true });
-      break;
-    }
-    case 'open-terminal': {
-      const absPath = getAbsPath(ctx.path);
-      wsSend({ type: 'session_create', name: 'Shell', cwd: absPath });
-      break;
-    }
-    case 'open-claude': {
-      const absPath = getAbsPath(ctx.path);
-      wsSend({ type: 'session_create', name: 'Claude', cwd: absPath, cmd: 'claude' });
-      break;
-    }
-    case 'open-opencode': {
-      const absPath = getAbsPath(ctx.path);
-      wsSend({ type: 'session_create', name: 'OpenCode', cwd: absPath, cmd: 'opencode' });
-      break;
-    }
-    case 'open-gemini': {
-      const absPath = getAbsPath(ctx.path);
-      wsSend({ type: 'session_create', name: 'Gemini', cwd: absPath, cmd: 'gemini' });
-      break;
-    }
-    case 'open-codex': {
-      const absPath = getAbsPath(ctx.path);
-      wsSend({ type: 'session_create', name: 'Codex', cwd: absPath, cmd: 'codex' });
-      break;
-    }
-    case 'copy-path': {
-      const absPath = getAbsPath(ctx.path);
-      navigator.clipboard.writeText(absPath).catch(() => {});
-      showToast('Path copied', 'success');
-      break;
-    }
-    case 'duplicate': {
-      wsSend({ type: 'file_duplicate', sessionId: S.activeSessionId, filePath: ctx.path });
-      break;
-    }
-    case 'rename': {
-      const oldName = ctx.path.split('/').pop();
-      const newName = prompt('Rename to:', oldName);
-      if (!newName || newName === oldName) return;
-      const dir = ctx.path.split('/').slice(0, -1).join('/');
-      const newPath = dir ? `${dir}/${newName}` : newName;
-      wsSend({ type: 'file_rename', sessionId: S.activeSessionId, oldPath: ctx.path, newPath });
-      break;
-    }
-    case 'delete': {
-      const name = ctx.path.split('/').pop();
-      if (!confirm(`Delete "${name}"?`)) return;
-      wsSend({ type: 'file_delete', sessionId: S.activeSessionId, filePath: ctx.path });
-      break;
-    }
+  } catch (e) {
+    showToast(`Upload error: ${e.message}`, 'error');
   }
 }
 
-export function initExplorer() {
-  // No static menu setup needed — ContextMenu handles everything dynamically
+function downloadFile(filePath) {
+  if (!S.activeSessionId) return;
+  const params = new URLSearchParams({ sessionId: S.activeSessionId, path: filePath });
+  const a = document.createElement('a');
+  a.href = `/api/download?${params}`;
+  a.download = filePath.split('/').pop() || 'file';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function showExplorerCtx(e, path, type) {
+  e.preventDefault();
+  e.stopPropagation();
+  ctxTargetPath = path;
+  ctxTargetType = type;
+  const menu = document.getElementById('explorer-ctx-menu');
+  if (!menu) return;
+  menu.style.display = 'block';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
 }
 
 export function requestFileTree() {
@@ -174,7 +192,7 @@ function renderTreeLevel(parent, entries, depth) {
         }
         renderExplorer();
       });
-      item.addEventListener('contextmenu', (e) => explorerMenu.show(e, { path: entry.path, type: 'directory' }));
+      item.addEventListener('contextmenu', (e) => showExplorerCtx(e, entry.path, 'directory'));
       parent.appendChild(item);
 
       if (isExpanded && entry.children) {
@@ -192,7 +210,7 @@ function renderTreeLevel(parent, entries, depth) {
         if (!S.activeSessionId) return;
         wsSend({ type: 'file_read', sessionId: S.activeSessionId, filePath: entry.path });
       });
-      item.addEventListener('contextmenu', (e) => explorerMenu.show(e, { path: entry.path, type: 'file' }));
+      item.addEventListener('contextmenu', (e) => showExplorerCtx(e, entry.path, 'file'));
       parent.appendChild(item);
     }
   }

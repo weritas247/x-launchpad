@@ -8,8 +8,10 @@ import * as os from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
+import { execSync } from 'child_process';
 const execFileAsync = promisify(execFile);
 import * as gitService from './git-service';
+import * as db from './db';
 
 const app = express();
 const server = http.createServer(app);
@@ -17,6 +19,66 @@ const wss = new WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
 const SETTINGS_PATH  = path.join(__dirname, '../../settings.json');
 const SESSIONS_PATH  = path.join(__dirname, '../../sessions.json');
+
+// ─── TMUX INTEGRATION ────────────────────────────────────────────
+const TMUX_SOCKET = path.join(os.tmpdir(), 'super-terminal-tmux');
+let tmuxAvailable = false;
+try {
+  execSync('tmux -V', { stdio: 'ignore' });
+  tmuxAvailable = true;
+  console.log(`[tmux] Available — socket: ${TMUX_SOCKET}`);
+} catch {
+  console.log('[tmux] Not found — falling back to direct PTY');
+}
+
+function tmuxExec(args: string[], timeout = 3000): string {
+  return execSync(`tmux -S "${TMUX_SOCKET}" ${args.join(' ')}`, {
+    encoding: 'utf-8', timeout,
+  }).trim();
+}
+
+function tmuxSessionExists(name: string): boolean {
+  try {
+    tmuxExec(['has-session', '-t', name]);
+    return true;
+  } catch { return false; }
+}
+
+function tmuxCreateSession(name: string, cwd: string, shell: string): void {
+  const safeCwd = fs.existsSync(cwd) ? cwd : (process.env.HOME || '/');
+  tmuxExec(['new-session', '-d', '-s', name, '-c', safeCwd, shell]);
+  // Hide all tmux chrome — our UI provides its own
+  try { tmuxExec(['set-option', '-t', name, 'status', 'off']); } catch {}
+  try { tmuxExec(['set-option', '-t', name, 'pane-border-status', 'off']); } catch {}
+  try { tmuxExec(['set-option', '-t', name, 'set-titles', 'off']); } catch {}
+  // Disable tmux prefix key to avoid capturing user shortcuts
+  try { tmuxExec(['set-option', '-t', name, 'prefix', 'None']); } catch {}
+  try { tmuxExec(['set-option', '-t', name, 'prefix2', 'None']); } catch {}
+}
+
+function tmuxKillSession(name: string): void {
+  try { tmuxExec(['kill-session', '-t', name]); } catch {}
+}
+
+function tmuxGetCwd(name: string): string | null {
+  try {
+    return tmuxExec(['display-message', '-t', name, '-p', '#{pane_current_path}']);
+  } catch { return null; }
+}
+
+function tmuxGetPanePid(name: string): number | null {
+  try {
+    const pid = tmuxExec(['display-message', '-t', name, '-p', '#{pane_pid}']);
+    return parseInt(pid) || null;
+  } catch { return null; }
+}
+
+function tmuxListSessions(): string[] {
+  try {
+    const out = tmuxExec(['list-sessions', '-F', '#{session_name}']);
+    return out.split('\n').filter(Boolean);
+  } catch { return []; }
+}
 
 // ─── DEFAULT SETTINGS ─────────────────────────────────────────────
 const DEFAULT_SETTINGS = {
@@ -88,24 +150,127 @@ function deepMerge(defaults: any, saved: any): any {
 }
 
 function loadSettings(): typeof DEFAULT_SETTINGS {
+  // Try SQLite first
+  try {
+    const dbSettings = db.getSettings();
+    if (dbSettings) return deepMerge(DEFAULT_SETTINGS, dbSettings as any);
+  } catch {}
+  // Fall back to JSON file (and migrate to SQLite)
   try {
     if (fs.existsSync(SETTINGS_PATH)) {
       const raw = fs.readFileSync(SETTINGS_PATH, 'utf-8');
-      return deepMerge(DEFAULT_SETTINGS, JSON.parse(raw));
+      const settings = deepMerge(DEFAULT_SETTINGS, JSON.parse(raw));
+      try { db.saveSettings(settings); } catch {} // migrate
+      return settings;
     }
   } catch {}
   return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 }
 
 function saveSettings(s: typeof DEFAULT_SETTINGS): void {
-  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(s, null, 2), 'utf-8');
+  db.saveSettings(s);
+  // Also write JSON file for backwards compatibility
+  try { fs.writeFileSync(SETTINGS_PATH, JSON.stringify(s, null, 2), 'utf-8'); } catch {}
 }
 
 let currentSettings = loadSettings();
 
+// ─── AUTHENTICATION ──────────────────────────────────────────────
+import { timingSafeEqual } from 'crypto';
+const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
+const authEnabled = AUTH_TOKEN.length > 0;
+
+// Rate limiting for auth failures
+const authFailures = new Map<string, { count: number; resetAt: number }>();
+const AUTH_MAX_FAILURES = 5;
+const AUTH_WINDOW_MS = 60_000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = authFailures.get(ip);
+  if (!entry || now > entry.resetAt) {
+    authFailures.set(ip, { count: 0, resetAt: now + AUTH_WINDOW_MS });
+    return true;
+  }
+  return entry.count < AUTH_MAX_FAILURES;
+}
+
+function recordAuthFailure(ip: string): void {
+  const entry = authFailures.get(ip);
+  if (entry) entry.count++;
+}
+
+function verifyToken(token: string): boolean {
+  if (!authEnabled) return true;
+  if (!token || token.length !== AUTH_TOKEN.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(token), Buffer.from(AUTH_TOKEN));
+  } catch {
+    return false;
+  }
+}
+
+function extractToken(req: express.Request): string {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7);
+  return (req.query.token as string) || '';
+}
+
+// Auth middleware — skip for login page and static assets
+function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  if (!authEnabled) return next();
+  // Allow login endpoint and static assets without auth
+  if (req.path === '/api/auth/login' || req.path === '/api/auth/check') return next();
+  // Allow the login page itself
+  if (req.path === '/login' || req.path === '/login.html') return next();
+
+  const token = extractToken(req);
+  if (verifyToken(token)) return next();
+
+  // For API calls, return 401; for page loads, redirect to login
+  if (req.path.startsWith('/api/')) {
+    res.status(401).json({ error: 'Unauthorized' });
+  } else if (req.path === '/' || req.path === '/index.html') {
+    res.redirect('/login');
+  } else {
+    // Allow static assets (CSS, JS, icons) without auth so login page works
+    next();
+  }
+}
+
+if (authEnabled) {
+  console.log('[auth] Token authentication enabled');
+}
+
 // ─── HTTP ─────────────────────────────────────────────────────────
 app.use(express.json());
+app.use(authMiddleware);
 app.use(express.static(path.join(__dirname, '../../client')));
+
+// Auth endpoints
+app.post('/api/auth/login', (req, res) => {
+  const ip = req.ip || 'unknown';
+  if (!checkRateLimit(ip)) {
+    return res.status(429).json({ ok: false, error: 'Too many attempts. Try again later.' });
+  }
+  const token = req.body?.token as string;
+  if (verifyToken(token)) {
+    res.json({ ok: true });
+  } else {
+    recordAuthFailure(ip);
+    res.status(401).json({ ok: false, error: 'Invalid token' });
+  }
+});
+
+app.get('/api/auth/check', (req, res) => {
+  if (!authEnabled) return res.json({ ok: true, authEnabled: false });
+  const token = extractToken(req);
+  res.json({ ok: verifyToken(token), authEnabled: true });
+});
+
+app.get('/login', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../../client/login.html'));
+});
 
 app.get('/api/settings', (_req, res) => {
   res.json(currentSettings);
@@ -184,6 +349,48 @@ app.post('/api/reveal-in-finder', (req, res) => {
     res.json({ ok: true });
   });
 });
+
+// ─── FILE DOWNLOAD ───────────────────────────────────────────────
+app.get('/api/download', (req, res) => {
+  const sessionId = req.query.sessionId as string;
+  const filePath = req.query.path as string;
+  if (!sessionId || !filePath) return res.status(400).json({ ok: false, error: 'Missing params' });
+  const session = sessions.get(sessionId);
+  if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
+  const cwd = session.cwd || process.env.HOME || '/tmp';
+  const fullPath = path.resolve(cwd, filePath);
+  if (!fullPath.startsWith(path.resolve(cwd))) return res.status(403).json({ ok: false, error: 'Access denied' });
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ ok: false, error: 'File not found' });
+  const stat = fs.statSync(fullPath);
+  if (stat.isDirectory()) return res.status(400).json({ ok: false, error: 'Cannot download directory' });
+  if (stat.size > 50 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'File too large (>50MB)' });
+  res.download(fullPath);
+});
+
+// ─── FILE UPLOAD ─────────────────────────────────────────────────
+app.post('/api/upload',
+  express.raw({ type: 'application/octet-stream', limit: '50mb' }),
+  (req, res) => {
+    const sessionId = req.query.sessionId as string;
+    const fileName = req.query.filename as string;
+    const targetDir = req.query.dir as string | undefined;
+    if (!sessionId || !fileName) return res.status(400).json({ ok: false, error: 'Missing params' });
+    const session = sessions.get(sessionId);
+    if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
+    const cwd = session.cwd || process.env.HOME || '/tmp';
+    const dir = targetDir ? path.resolve(cwd, targetDir) : cwd;
+    if (!dir.startsWith(path.resolve(cwd))) return res.status(403).json({ ok: false, error: 'Access denied' });
+    const safeName = path.basename(fileName); // strip directory components
+    const fullPath = path.join(dir, safeName);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(fullPath, req.body);
+      res.json({ ok: true, filename: safeName, fullPath });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String(e) });
+    }
+  }
+);
 
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../../client/index.html'));
@@ -307,6 +514,8 @@ function getClaudeUsage(cwd: string): ClaudeUsage | null {
 }
 
 // ─── SESSION MANAGEMENT ───────────────────────────────────────────
+const SCROLLBACK_LIMIT = 128 * 1024; // keep last 128KB of output per session
+
 interface Session {
   id: string;
   name: string;
@@ -318,6 +527,8 @@ interface Session {
   cwdTimer?: ReturnType<typeof setInterval>;
   pendingCmd?: string;
   resized?: boolean;
+  scrollback: string; // ring buffer of recent output
+  tmuxName?: string;  // tmux session name (if tmux-backed)
 }
 
 const sessions = new Map<string, Session>();
@@ -338,14 +549,37 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   };
   const cwd0 = restoreCwd || s.startDirectory || process.env.HOME || '/';
 
-  const ptyProcess = pty.spawn(shellPath, ['-i'], {
-    name: 'xterm-256color',
-    cols: 80,
-    rows: 24,
-    cwd: fs.existsSync(cwd0) ? cwd0 : (process.env.HOME || '/'),
-    env: mergedEnv,
-  });
-  const session: Session = { id, name, pty: ptyProcess, createdAt: Date.now(), cwd: cwd0, ai: null, cmd: restoreCmd };
+  // Sanitize tmux session name: replace dots/colons which tmux doesn't like
+  const tmuxName = id.replace(/[.:]/g, '-');
+  const useTmux = tmuxAvailable;
+
+  let ptyProcess: pty.IPty;
+  if (useTmux) {
+    // Create tmux session if it doesn't already exist (survives server restart)
+    if (!tmuxSessionExists(tmuxName)) {
+      tmuxCreateSession(tmuxName, cwd0, shellPath);
+      console.log(`[tmux] Created session: ${tmuxName}`);
+    } else {
+      console.log(`[tmux] Reattaching to existing session: ${tmuxName}`);
+    }
+    // Attach to tmux session via PTY
+    ptyProcess = pty.spawn('tmux', ['-S', TMUX_SOCKET, 'attach-session', '-t', tmuxName], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: fs.existsSync(cwd0) ? cwd0 : (process.env.HOME || '/'),
+      env: mergedEnv,
+    });
+  } else {
+    ptyProcess = pty.spawn(shellPath, ['-i'], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: fs.existsSync(cwd0) ? cwd0 : (process.env.HOME || '/'),
+      env: mergedEnv,
+    });
+  }
+  const session: Session = { id, name, pty: ptyProcess, createdAt: Date.now(), cwd: cwd0, ai: null, cmd: restoreCmd, scrollback: '', tmuxName: useTmux ? tmuxName : undefined };
   sessions.set(id, session);
 
   // PTY output → clients with this session active OR subscribed
@@ -354,10 +588,24 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
   const FLUSH_DELAY = 16; // ms — batch within one animation frame
 
+  // Pre-compute binary header for this session's output frames
+  const sessionIdBuf = Buffer.from(id, 'utf-8');
+  const binHeader = Buffer.alloc(1 + 2 + sessionIdBuf.length);
+  binHeader[0] = 0x01; // type: terminal output
+  binHeader.writeUInt16BE(sessionIdBuf.length, 1);
+  sessionIdBuf.copy(binHeader, 3);
+
   function flushOutput() {
     flushTimer = null;
     if (!outputBuf) return;
-    const msg = JSON.stringify({ type: 'output', sessionId: id, data: outputBuf });
+    // Accumulate scrollback for reconnect replay
+    session.scrollback += outputBuf;
+    if (session.scrollback.length > SCROLLBACK_LIMIT) {
+      session.scrollback = session.scrollback.slice(-SCROLLBACK_LIMIT);
+    }
+    // Build binary frame: [0x01][sessionId-len:u16][sessionId][data]
+    const dataBuf = Buffer.from(outputBuf, 'utf-8');
+    const frame = Buffer.concat([binHeader, dataBuf]);
     const byteLen = outputBuf.length;
     outputBuf = '';
     let sentCount = 0;
@@ -366,7 +614,7 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
       if (cws.readyState !== WebSocket.OPEN) return;
       const active = wsSession.get(cws) === id;
       const subscribed = wsSubscriptions.get(cws)?.has(id) ?? false;
-      if (active || subscribed) { cws.send(msg); sentCount++; }
+      if (active || subscribed) { cws.send(frame); sentCount++; }
     });
     if (sentCount === 0 && wss.clients.size > 0) {
       console.warn(`[pty:${id.slice(-6)}] Output dropped (${byteLen}B) — no active/subscribed client`);
@@ -400,6 +648,13 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   ptyProcess.onExit(({ exitCode }) => {
     console.log(`[session] ${id} exited: ${exitCode}`);
     if (session.cwdTimer) clearInterval(session.cwdTimer);
+    // For tmux sessions, only remove if tmux session itself is gone
+    // (PTY exit just means detach — the shell survives)
+    if (session.tmuxName && tmuxSessionExists(session.tmuxName)) {
+      console.log(`[tmux] PTY detached but tmux session '${session.tmuxName}' still alive — keeping`);
+      // Re-attach on next client connect via restoreSessions logic
+      return;
+    }
     sessions.delete(id);
     broadcastSessionList();
   });
@@ -407,15 +662,25 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   // Poll CWD + detect running AI every 2s (non-blocking)
   session.cwdTimer = setInterval(async () => {
     try {
-      const pid = ptyProcess.pid;
       let newCwd = cwd0;
-      try {
-        const { stdout } = await execFileAsync('lsof', ['-p', String(pid), '-a', '-d', 'cwd', '-Fn'], {
-          encoding: 'utf-8', timeout: 500,
-        });
-        const match = stdout.match(/\nn(.+)/);
-        if (match) newCwd = match[1].trim();
-      } catch {}
+      let shellPid = ptyProcess.pid;
+
+      if (session.tmuxName) {
+        // tmux: get CWD and pane PID directly from tmux
+        const tmuxCwd = tmuxGetCwd(session.tmuxName);
+        if (tmuxCwd) newCwd = tmuxCwd;
+        const panePid = tmuxGetPanePid(session.tmuxName);
+        if (panePid) shellPid = panePid;
+      } else {
+        // Direct PTY: use lsof
+        try {
+          const { stdout } = await execFileAsync('lsof', ['-p', String(shellPid), '-a', '-d', 'cwd', '-Fn'], {
+            encoding: 'utf-8', timeout: 500,
+          });
+          const match = stdout.match(/\nn(.+)/);
+          if (match) newCwd = match[1].trim();
+        } catch {}
+      }
 
       let newAi: string | null = null;
       try {
@@ -434,7 +699,7 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
             cmdOf.set(p, m[3]);
           }
         }
-        const rootPid = pid;
+        const rootPid = shellPid;
         const descendants = new Set<number>([rootPid]);
         for (const [p, pp] of parentOf) {
           let cur = pp;
@@ -472,12 +737,12 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
 }
 
 function persistSessions() {
-  try {
-    const data = Array.from(sessions.values()).map(s => ({
-      id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd, cmd: s.cmd,
-    }));
-    fs.writeFileSync(SESSIONS_PATH, JSON.stringify(data, null, 2), 'utf-8');
-  } catch {}
+  const data = Array.from(sessions.values()).map(s => ({
+    id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd, cmd: s.cmd,
+  }));
+  try { db.saveSessions(data); } catch {}
+  // Also write JSON file for backwards compatibility
+  try { fs.writeFileSync(SESSIONS_PATH, JSON.stringify(data, null, 2), 'utf-8'); } catch {}
 }
 
 function stripEscape(s: string): string {
@@ -558,19 +823,42 @@ function cmdForSession(s: { name: string; cmd?: string }): string | undefined {
 
 function restoreSessions() {
   try {
-    if (!fs.existsSync(SESSIONS_PATH)) return;
-    const raw = fs.readFileSync(SESSIONS_PATH, 'utf-8');
-    const saved: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string }> = JSON.parse(raw);
+    // Try SQLite first, fall back to JSON file
+    let saved: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string }>;
+    const dbSessions = db.listSessions();
+    if (dbSessions.length > 0) {
+      saved = dbSessions.map(r => ({ id: r.id, name: r.name, createdAt: r.created_at, cwd: r.cwd, cmd: r.cmd || undefined }));
+    } else if (fs.existsSync(SESSIONS_PATH)) {
+      const raw = fs.readFileSync(SESSIONS_PATH, 'utf-8');
+      saved = JSON.parse(raw);
+    } else {
+      return;
+    }
     if (!Array.isArray(saved) || saved.length === 0) return;
+
+    // Get list of live tmux sessions (if tmux is available)
+    const liveTmux = tmuxAvailable ? new Set(tmuxListSessions()) : new Set<string>();
+
     console.log(`[session] Restoring ${saved.length} session(s) from disk...`);
     for (const s of saved) {
-      const cmd = cmdForSession(s);
-      const sess = createSession(s.id, s.name, s.cwd, cmd);
-      if (cmd) {
-        console.log(`[session] Will run '${cmd}' in restored session '${s.name}' after first resize`);
-        // Store as pending — will be executed when client sends first resize (correct terminal size)
-        sess.pendingCmd = cmd;
+      const tmuxName = s.id.replace(/[.:]/g, '-');
+      const tmuxAlive = liveTmux.has(tmuxName);
+
+      if (tmuxAvailable && tmuxAlive) {
+        // tmux session survived server restart — just reattach (no need to re-run command)
+        console.log(`[session] Reattaching to live tmux session: ${s.name} (${tmuxName})`);
+        const sess = createSession(s.id, s.name, s.cwd);
+        // Don't set pendingCmd — the process is still running inside tmux
         sess.resized = false;
+      } else {
+        // No tmux or tmux session is gone — recreate with command
+        const cmd = cmdForSession(s);
+        const sess = createSession(s.id, s.name, s.cwd, cmd);
+        if (cmd) {
+          console.log(`[session] Will run '${cmd}' in restored session '${s.name}' after first resize`);
+          sess.pendingCmd = cmd;
+          sess.resized = false;
+        }
       }
     }
   } catch (e) {
@@ -581,7 +869,17 @@ function restoreSessions() {
 // ─── WEBSOCKET ────────────────────────────────────────────────────
 let clientCounter = 0;
 
-wss.on('connection', (ws: WebSocket) => {
+wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
+  // Authenticate WebSocket connections
+  if (authEnabled) {
+    const url = new URL(req.url || '', `http://${req.headers.host}`);
+    const token = url.searchParams.get('token') || '';
+    if (!verifyToken(token)) {
+      ws.close(4001, 'Unauthorized');
+      return;
+    }
+  }
+
   const clientId = ++clientCounter;
   const clientTag = `[ws:client-${clientId}]`;
   console.log(`${clientTag} Client connected (total: ${wss.clients.size})`);
@@ -656,6 +954,20 @@ wss.on('connection', (ws: WebSocket) => {
       const sess = sessions.get(id)!;
       ws.send(JSON.stringify({ type: 'session_info', sessionId: id, cwd: sess.cwd, ai: sess.ai }));
 
+    } else if (parsed.type === 'scrollback_request') {
+      const id = parsed.sessionId as string;
+      const session = sessions.get(id);
+      if (session && session.scrollback) {
+        // Send scrollback via binary frame (same format as output)
+        const sidBuf = Buffer.from(id, 'utf-8');
+        const hdr = Buffer.alloc(1 + 2 + sidBuf.length);
+        hdr[0] = 0x02; // type: scrollback replay
+        hdr.writeUInt16BE(sidBuf.length, 1);
+        sidBuf.copy(hdr, 3);
+        const dataBuf = Buffer.from(session.scrollback, 'utf-8');
+        ws.send(Buffer.concat([hdr, dataBuf]));
+      }
+
     } else if (parsed.type === 'session_rename') {
       const id = parsed.sessionId as string;
       const session = sessions.get(id);
@@ -670,6 +982,7 @@ wss.on('connection', (ws: WebSocket) => {
       if (session) {
         if (session.cwdTimer) clearInterval(session.cwdTimer);
         session.pty.kill();
+        if (session.tmuxName) tmuxKillSession(session.tmuxName);
         sessions.delete(id);
         broadcastSessionList();
       }
@@ -1020,3 +1333,7 @@ server.listen(PORT, () => {
   console.log(`Super Terminal → http://localhost:${PORT}`);
   restoreSessions();
 });
+
+// Graceful shutdown — close database
+process.on('SIGTERM', () => { db.close(); process.exit(0); });
+process.on('SIGINT', () => { db.close(); process.exit(0); });

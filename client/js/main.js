@@ -1,6 +1,6 @@
 import { S, terminalMap, sessionMeta, sbClock, tabAddBtn, settingsOverlay } from './state.js';
 import { THEMES } from './constants.js';
-import { connect, wsSend, setOnInputSend } from './websocket.js';
+import { connect, wsSend, setOnInputSend, requestScrollback } from './websocket.js';
 import { initThemeSwatches } from './themes.js';
 import { activateSession, updateStatusBar, setOnSessionChangeSidePanels } from './session.js';
 import { initSplitDnD, refitAllPanes, updateSidebarSplitGroup } from './split-pane.js';
@@ -19,6 +19,7 @@ import { initExplorer, handleFileTreeData, handleFileReadData, handleFileOpAck, 
 import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange } from './source-control.js';
 import { initSearch, handleSearchResults, handleReplaceAck, onSearchSessionChange } from './search.js';
 import { setActivateSessionFn } from './file-viewer.js';
+import { initPlanPanel, handlePlanFileData, onPlanSessionChange } from './plan-panel.js';
 
 S.currentTheme = THEMES[0];
 
@@ -39,6 +40,8 @@ function handleMessage(msg) {
         suppressTabStatus(s.id, 2000);
         bypassStream(s.id);
         setTimeout(() => unbypassStream(s.id), 3000);
+        // Request scrollback history to restore terminal content
+        requestScrollback(s.id);
       });
     }
     S.wsJustReconnected = false;
@@ -86,6 +89,13 @@ function handleMessage(msg) {
       aiNotifyCheck(msg.sessionId, msg.data);
       tabStatusCheck(msg.sessionId, msg.data);
     }
+  } else if (msg.type === 'scrollback') {
+    // Replay scrollback history directly to terminal (bypass stream writer)
+    const entry = terminalMap.get(msg.sessionId);
+    if (entry && msg.data) {
+      entry.term.write(msg.data);
+      entry.term.scrollToBottom();
+    }
   } else if (msg.type === 'git_graph_data') {
     handleGitGraphData(msg);
   } else if (msg.type === 'git_file_list_data') {
@@ -120,6 +130,10 @@ function handleMessage(msg) {
     handleReplaceAck(msg);
   } else if (msg.type === 'file_read_data') {
     handleFileReadData(msg);
+    // Also route to plan panel for .md files
+    if (msg.filePath && /\.(md|markdown)$/i.test(msg.filePath)) {
+      handlePlanFileData(msg);
+    }
   } else if (msg.type === 'file_op_ack') {
     handleFileOpAck(msg);
   }
@@ -280,6 +294,7 @@ initSidebarResize();
 initExplorer();
 initSourceControl();
 initSearch();
+initPlanPanel();
 
 // Wire up file viewer's lazy dependency
 setActivateSessionFn(activateSession);

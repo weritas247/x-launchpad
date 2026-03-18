@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SUPER TERMINAL — Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{width:100%;height:100vh;background:#050508;color:#e8e8ff;font-family:'JetBrains Mono',monospace;
+      display:flex;align-items:center;justify-content:center}
+    .login-box{background:#0d0d18;border:1px solid #1e1e38;border-radius:8px;padding:40px;width:360px;
+      box-shadow:0 0 40px rgba(0,255,229,.05)}
+    .login-logo{text-align:center;margin-bottom:24px;font-size:14px;font-weight:600;letter-spacing:.15em;color:#00ffe5}
+    .login-title{text-align:center;font-size:12px;color:#7777aa;margin-bottom:20px}
+    .login-input{width:100%;background:#111120;color:#e8e8ff;border:1px solid #1e1e38;border-radius:4px;
+      padding:10px 12px;font-family:inherit;font-size:13px;outline:none;margin-bottom:12px;transition:border .2s}
+    .login-input:focus{border-color:#00ffe5;box-shadow:0 0 6px rgba(0,255,229,.2)}
+    .login-input::placeholder{color:#7777aa}
+    .login-btn{width:100%;background:#00ffe520;color:#00ffe5;border:1px solid #00ffe530;border-radius:4px;
+      padding:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.05em}
+    .login-btn:hover{background:#00ffe5;color:#050508}
+    .login-error{color:#ff3366;font-size:11px;text-align:center;margin-top:12px;min-height:16px}
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <div class="login-logo">SUPER / TERMINAL</div>
+    <div class="login-title">Enter your access token to continue</div>
+    <form id="login-form">
+      <input type="password" class="login-input" id="token-input" placeholder="Access token" autocomplete="off" autofocus/>
+      <button type="submit" class="login-btn">LOGIN</button>
+    </form>
+    <div class="login-error" id="login-error"></div>
+  </div>
+  <script>
+    const form = document.getElementById('login-form');
+    const input = document.getElementById('token-input');
+    const error = document.getElementById('login-error');
+
+    // Check if already authed
+    const saved = localStorage.getItem('super-terminal-token');
+    if (saved) {
+      fetch('/api/auth/check?token=' + encodeURIComponent(saved))
+        .then(r => r.json())
+        .then(d => { if (d.ok) window.location.href = '/?token=' + encodeURIComponent(saved); });
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      error.textContent = '';
+      const token = input.value.trim();
+      if (!token) return;
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          localStorage.setItem('super-terminal-token', token);
+          window.location.href = '/?token=' + encodeURIComponent(token);
+        } else {
+          error.textContent = data.error || 'Authentication failed';
+          input.select();
+        }
+      } catch (err) {
+        error.textContent = 'Connection error';
+      }
+    });
+  </script>
+</body>
+</html>

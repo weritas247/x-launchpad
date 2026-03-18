@@ -29,6 +29,15 @@
         <div class="meta-dot" id="conn-dot"></div>
         <span id="conn-label">OFFLINE</span>
       </div>
+      <div class="meta-item latency-indicator" id="latency-indicator" title="Network latency">
+        <div class="signal-bars">
+          <div class="signal-bar" data-bar="1"></div>
+          <div class="signal-bar" data-bar="2"></div>
+          <div class="signal-bar" data-bar="3"></div>
+          <div class="signal-bar" data-bar="4"></div>
+        </div>
+        <span class="latency-value" id="latency-value">—</span>
+      </div>
       <div class="meta-item">SYN <span id="hdr-session-count" class="sb-accent">0</span></div>
       <div class="meta-item" id="hdr-restore-badge" style="display:none;color:var(--accent);animation:pulse 1s infinite">⟳ RESTORING</div>
       <div class="meta-item" id="hdr-time"></div>
@@ -49,6 +58,9 @@
     </button>
     <button class="activity-btn" data-panel="source-control" title="Source Control">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M12 8.5V12M12 12C12 14 6 14 6 15.5M12 12C12 14 18 14 18 15.5"/></svg>
+    </button>
+    <button class="activity-btn" data-panel="plan" title="Plan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
     </button>
   </nav>
 
@@ -102,9 +114,11 @@
       <div class="sidebar-header">
         <span class="sidebar-title-text">EXPLORER</span>
         <div class="sidebar-header-actions">
+          <button class="btn-icon-sm" id="explorer-upload" title="Upload file">↑</button>
           <button class="btn-icon-sm" id="explorer-refresh" title="Refresh">↻</button>
         </div>
       </div>
+      <input type="file" id="explorer-upload-input" multiple style="display:none">
       <div class="explorer-path-bar">
         <span class="explorer-path-label" id="explorer-path" title="">—</span>
       </div>
@@ -147,6 +161,31 @@
           <button class="btn-icon-sm" id="sc-diff-close" title="Close">✕</button>
         </div>
         <div class="sc-diff-content" id="sc-diff-content"></div>
+      </div>
+    </div>
+
+    <!-- PLAN PANEL -->
+    <div class="sidebar-panel" id="panel-plan">
+      <div class="sidebar-header">
+        <span class="sidebar-title-text">PLAN</span>
+        <div class="sidebar-header-actions">
+          <button class="btn-icon-sm" id="plan-open-file" title="Open markdown file">📄</button>
+          <button class="btn-icon-sm" id="plan-refresh" title="Refresh">↻</button>
+        </div>
+      </div>
+      <div class="plan-file-bar" id="plan-file-bar" style="display:none">
+        <span class="plan-file-name" id="plan-file-name">—</span>
+        <button class="btn-icon-sm" id="plan-file-close" title="Close">✕</button>
+      </div>
+      <div class="plan-content" id="plan-content">
+        <div class="plan-empty">No plan file loaded.<br/>Click 📄 to open a markdown file.</div>
+      </div>
+      <div class="plan-annotations" id="plan-annotations" style="display:none">
+        <div class="plan-annot-header">
+          <span>ANNOTATIONS</span>
+          <button class="btn-icon-sm" id="plan-annot-add" title="Add annotation">+</button>
+        </div>
+        <div class="plan-annot-list" id="plan-annot-list"></div>
       </div>
     </div>
   </aside>
@@ -305,6 +344,16 @@
   <div class="ctx-item danger" id="ctx-close">✕ Close</div>
 </div>
 
+<!-- EXPLORER CONTEXT MENU -->
+<div class="ctx-menu" id="explorer-ctx-menu">
+  <div class="ctx-item" id="ectx-new-file">📄 New File</div>
+  <div class="ctx-item" id="ectx-new-folder">📁 New Folder</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" id="ectx-rename">✎ Rename</div>
+  <div class="ctx-item" id="ectx-download">↓ Download</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" id="ectx-delete">✕ Delete</div>
+</div>
 
 <!-- ═══════════════════════════════════════════════════
      SETTINGS MODAL
