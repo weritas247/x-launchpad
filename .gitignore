@@ -9,3 +9,4 @@ data.db-shm
 .worktrees/
 .superpowers/
 .env.dev
+pasted-image-*.png
