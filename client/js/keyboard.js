@@ -63,6 +63,7 @@ export function matchCombo(combo) {
 export function tryKeybinding(e) {
   if (!S.settings) return false;
   if (e.type !== 'keydown') return false;
+  if (e._kbHandled) return true;   // already executed by xterm handler
 
   const combo = buildCombo(e);
   const action = matchCombo(combo);
@@ -71,6 +72,7 @@ export function tryKeybinding(e) {
   const fn = actionMap.get(action);
   if (fn) {
     e.preventDefault();
+    e._kbHandled = true;
     showShortcutOverlay(combo, action);
     fn();
     return true;
