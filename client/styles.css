@@ -299,6 +299,10 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .input-entry-num{color:var(--text-ghost);font-size:10px;min-width:18px;text-align:right;flex-shrink:0}
 .input-entry-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono)}
 .input-entry-time{color:var(--text-ghost);font-size:9px;flex-shrink:0}
+.claude-prompt-entry .input-entry-text{white-space:normal;word-break:break-word;line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.claude-prompt-entry{cursor:copy}
+.claude-prompt-entry.copied{background:var(--accent-dim);transition:background .15s}
+.input-entry-empty{padding:16px 10px;font-size:11px;color:var(--text-ghost);text-align:center}
 .term-pane{position:absolute;inset:0;padding:6px 8px;display:none}
 .term-pane.active{display:block}
 .term-pane .xterm{height:100%}

@@ -2,20 +2,25 @@
 // Tracks user input (Enter presses) per session and displays
 // them in the right panel. Clicking an entry scrolls the
 // terminal to that line.
+// For Claude Code sessions, fetches actual prompts from JSONL files.
 
-import { S, terminalMap, stripAnsi } from './state.js';
+import { S, terminalMap, sessionMeta, stripAnsi } from './state.js';
+import { wsSend } from './websocket.js';
 
 const panelList = document.getElementById('input-panel-list');
 const panel = document.getElementById('input-panel');
 const toggle = document.getElementById('input-panel-toggle');
 const clearBtn = document.getElementById('input-panel-clear');
+const titleEl = panel.querySelector('.input-panel-title');
 
 // sessionId → [ { text, bufferLine, time } ]
 const historyMap = new Map();
 // Per-session input buffer (accumulates typed chars until Enter)
 const inputBuffers = new Map();
-
-let counter = 0;
+// sessionId → [ { text, timestamp } ] (Claude prompts from JSONL)
+const claudePromptsMap = new Map();
+// Polling timer for Claude prompts
+let claudePollTimer = null;
 
 export function initInputPanel() {
   toggle.addEventListener('click', () => {
@@ -26,9 +31,40 @@ export function initInputPanel() {
   clearBtn.addEventListener('click', () => {
     if (S.activeSessionId) {
       historyMap.delete(S.activeSessionId);
+      claudePromptsMap.delete(S.activeSessionId);
     }
     renderPanel();
   });
+}
+
+function isClaudeSession(sessionId) {
+  const meta = sessionMeta.get(sessionId);
+  return meta && meta.ai === 'claude';
+}
+
+/** Request Claude prompts from server */
+function fetchClaudePrompts(sessionId) {
+  wsSend({ type: 'claude_prompts', sessionId });
+}
+
+/** Handle claude_prompts_data from server */
+export function handleClaudePrompts(msg) {
+  if (!msg.sessionId || !msg.prompts) return;
+  claudePromptsMap.set(msg.sessionId, msg.prompts);
+  if (msg.sessionId === S.activeSessionId) renderPanel();
+}
+
+function startClaudePoll() {
+  stopClaudePoll();
+  claudePollTimer = setInterval(() => {
+    if (S.activeSessionId && isClaudeSession(S.activeSessionId)) {
+      fetchClaudePrompts(S.activeSessionId);
+    }
+  }, 5000);
+}
+
+function stopClaudePoll() {
+  if (claudePollTimer) { clearInterval(claudePollTimer); claudePollTimer = null; }
 }
 
 /** Call this when user types data in the terminal (from term.onData) */
@@ -65,7 +101,7 @@ export function trackInput(sessionId, data) {
     // Keep max 200 entries per session
     if (entries.length > 200) entries.shift();
 
-    if (sessionId === S.activeSessionId) renderPanel();
+    if (sessionId === S.activeSessionId && !isClaudeSession(sessionId)) renderPanel();
     inputBuffers.set(sessionId, '');
   } else if (data === '\x7f') {
     // Backspace
@@ -91,6 +127,47 @@ export function renderPanel() {
   panelList.innerHTML = '';
   if (!S.activeSessionId) return;
 
+  if (isClaudeSession(S.activeSessionId)) {
+    renderClaudePrompts();
+  } else {
+    renderInputHistory();
+  }
+}
+
+function renderClaudePrompts() {
+  if (titleEl) titleEl.textContent = 'CLAUDE PROMPTS';
+  const prompts = claudePromptsMap.get(S.activeSessionId) || [];
+  if (prompts.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'input-entry-empty';
+    empty.textContent = 'No prompts yet...';
+    panelList.appendChild(empty);
+    return;
+  }
+
+  prompts.forEach((p, i) => {
+    const el = document.createElement('div');
+    el.className = 'input-entry claude-prompt-entry';
+    const timeStr = p.timestamp ? new Date(p.timestamp).toTimeString().slice(0, 5) : '';
+    const preview = p.text.length > 120 ? p.text.slice(0, 120) + '…' : p.text;
+    el.innerHTML = `
+      <span class="input-entry-num">${i + 1}</span>
+      <span class="input-entry-text" title="${escAttr(p.text)}">${escHtml(preview)}</span>
+      <span class="input-entry-time">${timeStr}</span>
+    `;
+    el.addEventListener('click', () => {
+      navigator.clipboard.writeText(p.text).catch(() => {});
+      el.classList.add('copied');
+      setTimeout(() => el.classList.remove('copied'), 600);
+    });
+    panelList.appendChild(el);
+  });
+
+  panelList.scrollTop = panelList.scrollHeight;
+}
+
+function renderInputHistory() {
+  if (titleEl) titleEl.textContent = 'INPUT HISTORY';
   const entries = historyMap.get(S.activeSessionId) || [];
   entries.forEach((entry, i) => {
     const el = document.createElement('div');
@@ -105,7 +182,6 @@ export function renderPanel() {
     panelList.appendChild(el);
   });
 
-  // Auto-scroll panel to bottom
   panelList.scrollTop = panelList.scrollHeight;
 }
 
@@ -113,7 +189,6 @@ function scrollToEntry(entry) {
   const termEntry = terminalMap.get(S.activeSessionId);
   if (!termEntry) return;
   const term = termEntry.term;
-  // scrollToLine expects a line index relative to the scrollback buffer
   const targetLine = Math.max(0, entry.bufferLine - Math.floor(term.rows / 2));
   term.scrollToLine(targetLine);
 }
@@ -128,5 +203,11 @@ function escAttr(s) {
 
 /** Call when active session changes to refresh the panel */
 export function onSessionChange() {
+  if (S.activeSessionId && isClaudeSession(S.activeSessionId)) {
+    fetchClaudePrompts(S.activeSessionId);
+    startClaudePoll();
+  } else {
+    stopClaudePoll();
+  }
   renderPanel();
 }

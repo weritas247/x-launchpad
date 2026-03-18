@@ -687,28 +687,48 @@ function getClaudeUsage(cwd: string): ClaudeUsage | null {
   }
 }
 
-function getClaudePrompts(cwd: string): { text: string; timestamp: string }[] {
+function getClaudePrompts(cwd: string, aiPid: number | null): { text: string; timestamp: string }[] {
   try {
     const projectKey = cwdToProjectDir(cwd);
     const projectDir = path.join(CLAUDE_PROJECTS_DIR, projectKey);
     if (!fs.existsSync(projectDir)) return [];
 
-    // Find active session from ~/.claude/sessions/
+    // Find active session: prefer PID-based lookup, fall back to CWD match
     let activeSessionId: string | null = null;
-    try {
-      const sessDir = path.join(CLAUDE_DIR, 'sessions');
-      if (fs.existsSync(sessDir)) {
-        const sessFiles = fs.readdirSync(sessDir).filter(f => f.endsWith('.json'));
-        for (const sf of sessFiles) {
-          try {
-            const raw = fs.readFileSync(path.join(sessDir, sf), 'utf-8');
-            const sess = JSON.parse(raw);
-            if (sess.cwd === cwd && sess.sessionId) activeSessionId = sess.sessionId;
-          } catch {}
-        }
-      }
-    } catch {}
+    const sessDir = path.join(CLAUDE_DIR, 'sessions');
 
+    // 1) PID-based: ~/.claude/sessions/{aiPid}.json → exact match
+    if (aiPid) {
+      try {
+        const pidFile = path.join(sessDir, `${aiPid}.json`);
+        console.log(`[claude_prompts] checking pidFile=${pidFile} exists=${fs.existsSync(pidFile)}`);
+        if (fs.existsSync(pidFile)) {
+          const sess = JSON.parse(fs.readFileSync(pidFile, 'utf-8'));
+          if (sess.sessionId) {
+            activeSessionId = sess.sessionId;
+            console.log(`[claude_prompts] PID match → sessionId=${activeSessionId}`);
+          }
+        }
+      } catch {}
+    }
+
+    // 2) Fallback: CWD match (last match wins)
+    if (!activeSessionId) {
+      try {
+        if (fs.existsSync(sessDir)) {
+          const sessFiles = fs.readdirSync(sessDir).filter(f => f.endsWith('.json'));
+          for (const sf of sessFiles) {
+            try {
+              const raw = fs.readFileSync(path.join(sessDir, sf), 'utf-8');
+              const sess = JSON.parse(raw);
+              if (sess.cwd === cwd && sess.sessionId) activeSessionId = sess.sessionId;
+            } catch {}
+          }
+        }
+      } catch {}
+    }
+
+    console.log(`[claude_prompts] resolved activeSessionId=${activeSessionId}`);
     let targetJsonl: string | null = null;
     if (activeSessionId) {
       const candidate = path.join(projectDir, `${activeSessionId}.jsonl`);
@@ -720,8 +740,10 @@ function getClaudePrompts(cwd: string): { text: string; timestamp: string }[] {
         .map(f => ({ name: f, mtime: fs.statSync(path.join(projectDir, f)).mtimeMs }))
         .sort((a, b) => b.mtime - a.mtime);
       if (jsonls.length > 0) targetJsonl = path.join(projectDir, jsonls[0].name);
+      console.log(`[claude_prompts] fallback to most recent jsonl`);
     }
     if (!targetJsonl) return [];
+    console.log(`[claude_prompts] reading ${path.basename(targetJsonl)}`);
 
     const content = fs.readFileSync(targetJsonl, 'utf-8');
     const lines = content.trim().split('\n');
@@ -742,8 +764,11 @@ function getClaudePrompts(cwd: string): { text: string; timestamp: string }[] {
             if (block.type === 'text' && block.text) { text = block.text; break; }
           }
         }
-        if (!text.trim()) continue;
-        prompts.push({ text: text.trim(), timestamp: entry.timestamp || '' });
+        const trimmed = text.trim();
+        if (!trimmed) continue;
+        // Skip system-generated command messages (e.g. /clear, /help)
+        if (trimmed.startsWith('<command-name>') || trimmed.startsWith('<local-command-caveat>')) continue;
+        prompts.push({ text: trimmed, timestamp: entry.timestamp || '' });
       } catch {}
     }
     return prompts;
@@ -762,6 +787,7 @@ interface Session {
   createdAt: number;
   cwd: string;
   ai: string | null;
+  aiPid: number | null;  // PID of detected AI process (e.g. Claude)
   cmd?: string;
   cwdTimer?: ReturnType<typeof setInterval>;
   pendingCmd?: string;
@@ -820,7 +846,7 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
       env: mergedEnv,
     });
   }
-  const session: Session = { id, name, pty: ptyProcess, createdAt: Date.now(), cwd: cwd0, ai: null, cmd: restoreCmd, scrollback: '', tmuxName: useTmux ? tmuxName : undefined };
+  const session: Session = { id, name, pty: ptyProcess, createdAt: Date.now(), cwd: cwd0, ai: null, aiPid: null, cmd: restoreCmd, scrollback: '', tmuxName: useTmux ? tmuxName : undefined };
   sessions.set(id, session);
 
   // PTY output → clients with this session active OR subscribed
@@ -927,6 +953,7 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
       }
 
       let newAi: string | null = null;
+      let newAiPid: number | null = null;
       try {
         const { stdout: psOut } = await execFileAsync('ps', ['-eo', 'pid,ppid,args'], {
           encoding: 'utf-8', timeout: 800,
@@ -954,22 +981,38 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
             cur = parentOf.get(cur) ?? 0;
           }
         }
+        // Collect all AI-matching PIDs (not just first) so we can pick the session-file PID
+        const aiCandidates: { pid: number; ai: string }[] = [];
         for (const dp of descendants) {
           const cmd = (cmdOf.get(dp) || '').toLowerCase();
-          if (/claude/.test(cmd)) { newAi = 'claude'; break; }
-          if (/chatgpt/.test(cmd)) { newAi = 'chatgpt'; break; }
-          if (/\/gemini(\s|$)/.test(cmd) || /bin\/gemini/.test(cmd)) { newAi = 'gemini'; break; }
-          if (/copilot/.test(cmd)) { newAi = 'copilot'; break; }
-          if (/aider/.test(cmd)) { newAi = 'aider'; break; }
-          if (/cursor/.test(cmd)) { newAi = 'cursor'; break; }
-          if (/opencode/.test(cmd)) { newAi = 'opencode'; break; }
-          if (/codex/.test(cmd)) { newAi = 'codex'; break; }
+          if (/claude/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'claude' });
+          else if (/chatgpt/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'chatgpt' });
+          else if (/\/gemini(\s|$)/.test(cmd) || /bin\/gemini/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'gemini' });
+          else if (/copilot/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'copilot' });
+          else if (/aider/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'aider' });
+          else if (/cursor/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'cursor' });
+          else if (/opencode/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'opencode' });
+          else if (/codex/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'codex' });
+        }
+        if (aiCandidates.length > 0) {
+          // For Claude: prefer the PID that has a session file in ~/.claude/sessions/
+          const claudeCandidates = aiCandidates.filter(c => c.ai === 'claude');
+          if (claudeCandidates.length > 0) {
+            newAi = 'claude';
+            const sessDir = path.join(CLAUDE_DIR, 'sessions');
+            const matched = claudeCandidates.find(c => fs.existsSync(path.join(sessDir, `${c.pid}.json`)));
+            newAiPid = matched ? matched.pid : claudeCandidates[0].pid;
+          } else {
+            newAi = aiCandidates[0].ai;
+            newAiPid = aiCandidates[0].pid;
+          }
         }
       } catch {}
 
-      if (newCwd !== session.cwd || newAi !== session.ai) {
+      if (newCwd !== session.cwd || newAi !== session.ai || newAiPid !== session.aiPid) {
         session.cwd = newCwd;
         session.ai = newAi;
+        session.aiPid = newAiPid;
         const msg = JSON.stringify({ type: 'session_info', sessionId: id, cwd: newCwd, ai: newAi });
         wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg); });
       }
@@ -1686,8 +1729,8 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       if (!id) return;
       const session = sessions.get(id);
       if (!session) return;
-      console.log(`[claude_prompts] sessionId=${id} cwd=${session.cwd} ai=${session.ai}`);
-      const prompts = getClaudePrompts(session.cwd);
+      console.log(`[claude_prompts] cwd=${session.cwd} aiPid=${session.aiPid}`);
+      const prompts = getClaudePrompts(session.cwd, session.aiPid);
       console.log(`[claude_prompts] found ${prompts.length} prompts`);
       ws.send(JSON.stringify({ type: 'claude_prompts_data', sessionId: id, prompts }));
     }

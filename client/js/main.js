@@ -12,7 +12,7 @@ import { initFolderDnD } from './folder.js';
 import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, handleGitPullAck, requestBranch, handleGitGraphKeydown } from './git-graph.js';
 import { streamWrite, bypassStream, unbypassStream } from './stream-writer.js';
 import { registerAction, buildCombo, matchCombo, tryKeybinding } from './keyboard.js';
-import { initInputPanel, onSessionChange as inputPanelSessionChange } from './input-panel.js';
+import { initInputPanel, onSessionChange as inputPanelSessionChange, handleClaudePrompts } from './input-panel.js';
 import { handleClaudeUsageData, startUsagePolling, onSessionChangeUsage, onAiChangeUsage } from './claude-usage.js';
 import { initActivityBar, getActivePanel, switchPanel, toggleSidebarExport, initSidebarResize } from './activity-bar.js';
 import { initExplorer, handleFileTreeData, handleFileReadData, handleFileOpAck, onExplorerSessionChange, requestFileTree } from './explorer.js';
@@ -75,6 +75,7 @@ function handleMessage(msg) {
     onAiChangeUsage(msg.sessionId, msg.ai);
     if (msg.sessionId === S.activeSessionId) {
       requestBranch(msg.sessionId);
+      inputPanelSessionChange();
       // Refresh all relevant side panels when CWD changes (e.g. worktree switch)
       const panel = getActivePanel();
       if (panel === 'explorer') onExplorerSessionChange();
@@ -101,6 +102,8 @@ function handleMessage(msg) {
     handleGitPullAck(msg);
   } else if (msg.type === 'claude_usage_data') {
     handleClaudeUsageData(msg);
+  } else if (msg.type === 'claude_prompts_data') {
+    handleClaudePrompts(msg);
   } else if (msg.type === 'file_tree_data') {
     handleFileTreeData(msg);
   } else if (msg.type === 'git_status_data') {
