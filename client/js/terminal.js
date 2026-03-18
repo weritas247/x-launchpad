@@ -323,6 +323,7 @@ export function updateSessionInfo(sessionId, cwd, ai) {
 
   if (S.activeSessionId === sessionId) {
     sbActiveName.textContent = `${baseName}  ${shortCwd}${ai ? `  [${ai}]` : ''}`;
+    updateBreadcrumb(cwd);
   }
 
   const metaObj = sessionMeta.get(sessionId);
@@ -463,4 +464,16 @@ export function initContextMenu() {
   document.getElementById('ctx-close').addEventListener('click', () => {
     if (S.ctxTargetId) closeSession(S.ctxTargetId);
   });
+}
+
+function updateBreadcrumb(cwd) {
+  const bar = document.getElementById('breadcrumb-bar');
+  if (!bar || !cwd) { if (bar) bar.innerHTML = ''; return; }
+  const home = (typeof process !== 'undefined' && process.env?.HOME) || '/Users';
+  let display = cwd;
+  if (display.startsWith(home)) display = '~' + display.slice(home.length);
+  const parts = display.split('/').filter(Boolean);
+  bar.innerHTML = parts.map(p =>
+    `<span class="breadcrumb-part">${escHtml(p)}</span>`
+  ).join('<span class="breadcrumb-sep">›</span>');
 }

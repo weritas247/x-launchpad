@@ -126,6 +126,34 @@ function toggleSidebar() {
 
 export { toggleSidebar as toggleSidebarExport };
 
+// ─── Sidebar resize ───
+export function initSidebarResize() {
+  const handle = document.getElementById('sidebar-resize');
+  if (!handle) return;
+  let startX = 0, startW = 0;
+
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w')) || 240;
+    handle.classList.add('dragging');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  function onMove(e) {
+    const delta = e.clientX - startX;
+    const newW = Math.max(150, Math.min(500, startW + delta));
+    document.documentElement.style.setProperty('--sidebar-w', newW + 'px');
+  }
+
+  function onUp() {
+    handle.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+}
+
 export function getActivePanel() {
   return activePanel;
 }
