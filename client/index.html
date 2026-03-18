@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
+<div id="screen-dim"></div>
 <div id="app">
   <!-- HEADER -->
   <header id="header">
@@ -655,6 +656,18 @@
                 <div class="range-row">
                   <input type="range" class="s-range" id="s-backgroundOpacity" min="0.1" max="1.0" step="0.05"/>
                   <span class="range-val" id="s-backgroundOpacity-val">1.0</span>
+                </div>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">
+                Screen Dim
+                <small>Darken entire screen (0 = off)</small>
+              </div>
+              <div class="field-control">
+                <div class="range-row">
+                  <input type="range" class="s-range" id="s-screenDimOpacity" min="0" max="0.9" step="0.05"/>
+                  <span class="range-val" id="s-screenDimOpacity-val">0</span>
                 </div>
               </div>
             </div>
