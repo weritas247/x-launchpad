@@ -1,6 +1,13 @@
 import { execFileSync } from 'child_process';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve, sep } from 'path';
+
+/** Check if fullPath is safely within cwd (prevents path traversal via startsWith prefix attack) */
+function isPathWithin(fullPath: string, cwd: string): boolean {
+  const resolvedCwd = resolve(cwd);
+  const resolvedPath = resolve(fullPath);
+  return resolvedPath === resolvedCwd || resolvedPath.startsWith(resolvedCwd + sep);
+}
 
 export interface CommitEntry {
   hash: string;
@@ -439,7 +446,7 @@ export function createFile(cwd: string, filePath: string, isDir: boolean): { ok:
   const path = require('path') as typeof import('path');
   const fs = require('fs') as typeof import('fs');
   const fullPath = path.resolve(cwd, filePath);
-  if (!fullPath.startsWith(path.resolve(cwd))) return { ok: false, error: 'Access denied' };
+  if (!isPathWithin(fullPath, cwd)) return { ok: false, error: 'Access denied' };
   try {
     if (isDir) {
       fs.mkdirSync(fullPath, { recursive: true });
@@ -459,7 +466,7 @@ export function renameFile(cwd: string, oldPath: string, newPath: string): { ok:
   const fs = require('fs') as typeof import('fs');
   const fullOld = path.resolve(cwd, oldPath);
   const fullNew = path.resolve(cwd, newPath);
-  if (!fullOld.startsWith(path.resolve(cwd)) || !fullNew.startsWith(path.resolve(cwd))) return { ok: false, error: 'Access denied' };
+  if (!isPathWithin(fullOld, cwd) || !isPathWithin(fullNew, cwd)) return { ok: false, error: 'Access denied' };
   try {
     fs.renameSync(fullOld, fullNew);
     return { ok: true };
@@ -472,7 +479,7 @@ export function deleteFile(cwd: string, filePath: string): { ok: boolean; error?
   const path = require('path') as typeof import('path');
   const fs = require('fs') as typeof import('fs');
   const fullPath = path.resolve(cwd, filePath);
-  if (!fullPath.startsWith(path.resolve(cwd))) return { ok: false, error: 'Access denied' };
+  if (!isPathWithin(fullPath, cwd)) return { ok: false, error: 'Access denied' };
   try {
     const stat = fs.statSync(fullPath);
     if (stat.isDirectory()) {
@@ -490,7 +497,7 @@ export function duplicateFile(cwd: string, filePath: string): { ok: boolean; err
   const path = require('path') as typeof import('path');
   const fs = require('fs') as typeof import('fs');
   const fullPath = path.resolve(cwd, filePath);
-  if (!fullPath.startsWith(path.resolve(cwd))) return { ok: false, error: 'Access denied' };
+  if (!isPathWithin(fullPath, cwd)) return { ok: false, error: 'Access denied' };
   try {
     if (!fs.existsSync(fullPath)) return { ok: false, error: 'File not found' };
     const stat = fs.statSync(fullPath);
@@ -543,7 +550,7 @@ export function readFileContent(cwd: string, filePath: string): { content?: stri
   const fullPath = path.resolve(cwd, filePath);
 
   // Security: ensure path is within cwd
-  if (!fullPath.startsWith(path.resolve(cwd))) {
+  if (!isPathWithin(fullPath, cwd)) {
     return { error: 'Access denied' };
   }
 
@@ -623,11 +630,20 @@ export function replaceInFile(cwd: string, filePath: string, query: string, repl
   const path = require('path') as typeof import('path');
   const fs = require('fs') as typeof import('fs');
   const fullPath = path.resolve(cwd, filePath);
-  if (!fullPath.startsWith(path.resolve(cwd))) return { ok: false, count: 0, error: 'Access denied' };
+  if (!isPathWithin(fullPath, cwd)) return { ok: false, count: 0, error: 'Access denied' };
   try {
     let content = fs.readFileSync(fullPath, 'utf-8');
     const flags = opts?.caseSensitive ? 'g' : 'gi';
-    const pattern = opts?.useRegex ? new RegExp(query, flags) : new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+    let pattern: RegExp;
+    if (opts?.useRegex) {
+      // Reject potentially catastrophic regex patterns (nested quantifiers)
+      if (/(\+|\*|\{)\s*(\+|\*|\?)/.test(query) || query.length > 500) {
+        return { ok: false, count: 0, error: 'Regex too complex or too long' };
+      }
+      pattern = new RegExp(query, flags);
+    } else {
+      pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+    }
     let count = 0;
     content = content.replace(pattern, () => { count++; return replacement; });
     fs.writeFileSync(fullPath, content, 'utf-8');

@@ -1593,8 +1593,10 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (!session) return;
       const filePath = parsed.filePath as string;
-      if (!filePath || filePath.includes('..')) return;
-      const fullPath = path.join(session.cwd, filePath);
+      if (!filePath) return;
+      const fullPath = path.resolve(session.cwd, filePath);
+      const resolvedCwd = path.resolve(session.cwd);
+      if (!fullPath.startsWith(resolvedCwd + path.sep) && fullPath !== resolvedCwd) return;
       execFile('open', ['-R', fullPath], (err) => {
         if (err) {
           ws.send(JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'reveal', ok: false, error: err.message }));
