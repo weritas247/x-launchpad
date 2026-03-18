@@ -63,16 +63,27 @@ export class ContextMenu {
     document.body.appendChild(menu);
     this._el = menu;
 
-    // Viewport boundary check
-    const rect = menu.getBoundingClientRect();
-    let x = event.clientX;
-    let y = event.clientY;
-    if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 4;
-    if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 4;
-    if (x < 0) x = 4;
-    if (y < 0) y = 4;
-    menu.style.left = x + 'px';
-    menu.style.top = y + 'px';
+    const isMobileView = window.matchMedia('(max-width: 768px)').matches;
+
+    if (isMobileView) {
+      // Action sheet style (bottom of screen)
+      menu.classList.add('mobile-action-sheet');
+      this._backdrop = document.createElement('div');
+      this._backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:8999';
+      this._backdrop.addEventListener('click', () => this.hide());
+      document.body.insertBefore(this._backdrop, menu);
+    } else {
+      // Desktop: viewport boundary check
+      const rect = menu.getBoundingClientRect();
+      let x = event.clientX;
+      let y = event.clientY;
+      if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 4;
+      if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 4;
+      if (x < 0) x = 4;
+      if (y < 0) y = 4;
+      menu.style.left = x + 'px';
+      menu.style.top = y + 'px';
+    }
 
     // Close on outside click (next tick to avoid immediate trigger)
     requestAnimationFrame(() => {
@@ -81,6 +92,10 @@ export class ContextMenu {
   }
 
   hide() {
+    if (this._backdrop) {
+      this._backdrop.remove();
+      this._backdrop = null;
+    }
     if (this._el) {
       this._el.remove();
       this._el = null;

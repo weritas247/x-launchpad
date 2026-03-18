@@ -20,6 +20,7 @@ import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCom
 import { initSearch, handleSearchResults, handleReplaceAck, onSearchSessionChange } from './search.js';
 import { setActivateSessionFn } from './file-viewer.js';
 import { initPlanPanel, handlePlanFileData, onPlanSessionChange } from './plan-panel.js';
+import './mobile.js'; // auto-initializes mobile UI
 
 S.currentTheme = THEMES[0];
 
