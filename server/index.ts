@@ -61,6 +61,8 @@ const DEFAULT_SETTINGS = {
     clearTerminal: 'Meta+k',
     splitSession: '',
     gitGraph: 'Ctrl+g',
+    toggleSidebar: 'Ctrl+b',
+    focusSearch: 'Ctrl+Shift+f',
   },
   advanced: {
     customCss: '',
@@ -862,6 +864,30 @@ wss.on('connection', (ws: WebSocket) => {
           ws.send(JSON.stringify({ type: 'git_push_ack', sessionId: id, ...pushResult }));
         }
       }
+
+    } else if (parsed.type === 'file_create') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const result = gitService.createFile(session.cwd, parsed.filePath as string, parsed.isDir as boolean);
+      ws.send(JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'create', ...result }));
+
+    } else if (parsed.type === 'file_rename') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const result = gitService.renameFile(session.cwd, parsed.oldPath as string, parsed.newPath as string);
+      ws.send(JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'rename', ...result }));
+
+    } else if (parsed.type === 'file_delete') {
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const result = gitService.deleteFile(session.cwd, parsed.filePath as string);
+      ws.send(JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'delete', ...result }));
 
     } else if (parsed.type === 'file_read') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);

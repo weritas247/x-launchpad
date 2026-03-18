@@ -14,8 +14,8 @@ import { streamWrite, bypassStream, unbypassStream } from './stream-writer.js';
 import { registerAction, buildCombo, matchCombo, tryKeybinding } from './keyboard.js';
 import { initInputPanel, onSessionChange as inputPanelSessionChange } from './input-panel.js';
 import { handleClaudeUsageData, startUsagePolling, onSessionChangeUsage, onAiChangeUsage } from './claude-usage.js';
-import { initActivityBar, getActivePanel } from './activity-bar.js';
-import { initExplorer, handleFileTreeData, handleFileReadData, onExplorerSessionChange, requestFileTree } from './explorer.js';
+import { initActivityBar, getActivePanel, switchPanel, toggleSidebarExport } from './activity-bar.js';
+import { initExplorer, handleFileTreeData, handleFileReadData, handleFileOpAck, onExplorerSessionChange, requestFileTree } from './explorer.js';
 import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange } from './source-control.js';
 import { initSearch, handleSearchResults, onSearchSessionChange } from './search.js';
 
@@ -117,6 +117,8 @@ function handleMessage(msg) {
     handleSearchResults(msg);
   } else if (msg.type === 'file_read_data') {
     handleFileReadData(msg);
+  } else if (msg.type === 'file_op_ack') {
+    handleFileOpAck(msg);
   }
 }
 
@@ -130,6 +132,8 @@ registerAction('prevTab',       () => switchTabBy(-1));
 registerAction('renameSession', () => { if (S.activeSessionId) promptRenameSession(S.activeSessionId); });
 registerAction('clearTerminal', () => clearActiveTerminal());
 registerAction('gitGraph',      () => { isGitGraphOpen() ? closeGitGraph() : openGitGraph(); });
+registerAction('toggleSidebar', () => toggleSidebarExport());
+registerAction('focusSearch',   () => switchPanel('search'));
 
 document.addEventListener('keydown', e => {
   if (!S.settings) return;

@@ -358,6 +358,58 @@ export function gitCommit(cwd: string, message: string): { ok: boolean; error?: 
   }
 }
 
+// ─── FILE OPERATIONS ─────────────────────────────────────────────
+export function createFile(cwd: string, filePath: string, isDir: boolean): { ok: boolean; error?: string } {
+  const path = require('path') as typeof import('path');
+  const fs = require('fs') as typeof import('fs');
+  const fullPath = path.resolve(cwd, filePath);
+  if (!fullPath.startsWith(path.resolve(cwd))) return { ok: false, error: 'Access denied' };
+  try {
+    if (isDir) {
+      fs.mkdirSync(fullPath, { recursive: true });
+    } else {
+      const dir = path.dirname(fullPath);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(fullPath, '', 'utf-8');
+    }
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message || String(e) };
+  }
+}
+
+export function renameFile(cwd: string, oldPath: string, newPath: string): { ok: boolean; error?: string } {
+  const path = require('path') as typeof import('path');
+  const fs = require('fs') as typeof import('fs');
+  const fullOld = path.resolve(cwd, oldPath);
+  const fullNew = path.resolve(cwd, newPath);
+  if (!fullOld.startsWith(path.resolve(cwd)) || !fullNew.startsWith(path.resolve(cwd))) return { ok: false, error: 'Access denied' };
+  try {
+    fs.renameSync(fullOld, fullNew);
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message || String(e) };
+  }
+}
+
+export function deleteFile(cwd: string, filePath: string): { ok: boolean; error?: string } {
+  const path = require('path') as typeof import('path');
+  const fs = require('fs') as typeof import('fs');
+  const fullPath = path.resolve(cwd, filePath);
+  if (!fullPath.startsWith(path.resolve(cwd))) return { ok: false, error: 'Access denied' };
+  try {
+    const stat = fs.statSync(fullPath);
+    if (stat.isDirectory()) {
+      fs.rmSync(fullPath, { recursive: true });
+    } else {
+      fs.unlinkSync(fullPath);
+    }
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message || String(e) };
+  }
+}
+
 // ─── FILE READ ───────────────────────────────────────────────────
 export function readFileContent(cwd: string, filePath: string): { content?: string; binary?: boolean; error?: string } {
   const path = require('path') as typeof import('path');

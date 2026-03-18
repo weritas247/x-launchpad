@@ -7,12 +7,62 @@ let expandedDirs = new Set();
 let currentDir = '';
 let gitStatusMap = {}; // { relativePath: status }
 
+let ctxTargetPath = '';
+let ctxTargetType = ''; // 'file' | 'directory'
+
 export function initExplorer() {
   const closeBtn = document.getElementById('explorer-preview-close');
   if (closeBtn) closeBtn.addEventListener('click', () => {
     const panel = document.getElementById('explorer-preview-panel');
     if (panel) panel.style.display = 'none';
   });
+
+  // Explorer context menu
+  const ctxMenu = document.getElementById('explorer-ctx-menu');
+  document.addEventListener('click', () => { if (ctxMenu) ctxMenu.style.display = 'none'; });
+
+  document.getElementById('ectx-new-file')?.addEventListener('click', () => {
+    const name = prompt('New file name:');
+    if (!name || !S.activeSessionId) return;
+    const dir = ctxTargetType === 'directory' ? ctxTargetPath : ctxTargetPath.split('/').slice(0, -1).join('/');
+    const filePath = dir ? `${dir}/${name}` : name;
+    wsSend({ type: 'file_create', sessionId: S.activeSessionId, filePath, isDir: false });
+  });
+
+  document.getElementById('ectx-new-folder')?.addEventListener('click', () => {
+    const name = prompt('New folder name:');
+    if (!name || !S.activeSessionId) return;
+    const dir = ctxTargetType === 'directory' ? ctxTargetPath : ctxTargetPath.split('/').slice(0, -1).join('/');
+    const filePath = dir ? `${dir}/${name}` : name;
+    wsSend({ type: 'file_create', sessionId: S.activeSessionId, filePath, isDir: true });
+  });
+
+  document.getElementById('ectx-rename')?.addEventListener('click', () => {
+    const oldName = ctxTargetPath.split('/').pop();
+    const newName = prompt('Rename to:', oldName);
+    if (!newName || newName === oldName || !S.activeSessionId) return;
+    const dir = ctxTargetPath.split('/').slice(0, -1).join('/');
+    const newPath = dir ? `${dir}/${newName}` : newName;
+    wsSend({ type: 'file_rename', sessionId: S.activeSessionId, oldPath: ctxTargetPath, newPath });
+  });
+
+  document.getElementById('ectx-delete')?.addEventListener('click', () => {
+    const name = ctxTargetPath.split('/').pop();
+    if (!confirm(`Delete "${name}"?`) || !S.activeSessionId) return;
+    wsSend({ type: 'file_delete', sessionId: S.activeSessionId, filePath: ctxTargetPath });
+  });
+}
+
+function showExplorerCtx(e, path, type) {
+  e.preventDefault();
+  e.stopPropagation();
+  ctxTargetPath = path;
+  ctxTargetType = type;
+  const menu = document.getElementById('explorer-ctx-menu');
+  if (!menu) return;
+  menu.style.display = 'block';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
 }
 
 export function requestFileTree() {
@@ -73,6 +123,7 @@ function renderTreeLevel(parent, entries, depth) {
         }
         renderExplorer();
       });
+      item.addEventListener('contextmenu', (e) => showExplorerCtx(e, entry.path, 'directory'));
       parent.appendChild(item);
 
       if (isExpanded && entry.children) {
@@ -87,10 +138,10 @@ function renderTreeLevel(parent, entries, depth) {
         `<span class="explorer-name${status ? ' explorer-git-' + getGitClass(status) + '-name' : ''}">${escHtml(entry.name)}</span>` +
         statusBadge;
       item.addEventListener('click', () => {
-        // Request file content preview
         if (!S.activeSessionId) return;
         wsSend({ type: 'file_read', sessionId: S.activeSessionId, filePath: entry.path });
       });
+      item.addEventListener('contextmenu', (e) => showExplorerCtx(e, entry.path, 'file'));
       parent.appendChild(item);
     }
   }
@@ -122,6 +173,10 @@ function getGitLabel(status) {
 function hasDirChanges(dirPath) {
   const prefix = dirPath + '/';
   return Object.keys(gitStatusMap).some(p => p === dirPath || p.startsWith(prefix));
+}
+
+export function handleFileOpAck(msg) {
+  if (msg.ok) requestFileTree(); // Refresh tree after file operation
 }
 
 export function handleFileReadData(msg) {

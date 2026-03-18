@@ -124,6 +124,8 @@ function toggleSidebar() {
   sidebar.classList.toggle('collapsed');
 }
 
+export { toggleSidebar as toggleSidebarExport };
+
 export function getActivePanel() {
   return activePanel;
 }
