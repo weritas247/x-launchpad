@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Fira+Code:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Source+Code+Pro:wght@300;400;500;600;700&family=Inconsolata:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Roboto+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/vs2015.min.css"/>
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
@@ -891,11 +892,30 @@
   </div><!-- /settings-modal -->
 </div><!-- /settings-overlay -->
 
+<!-- FLOATING SCROLL BUTTONS -->
+<div id="scroll-float">
+  <button id="scroll-top-btn" class="scroll-float-btn" title="Scroll to Top">▲</button>
+  <button id="scroll-bottom-btn" class="scroll-float-btn" title="Scroll to Bottom">▼</button>
+</div>
+
+<!-- GLOBAL CONFIRM MODAL -->
+<div id="global-confirm-overlay">
+  <div class="global-confirm-box">
+    <div class="global-confirm-message" id="global-confirm-message"></div>
+    <div class="global-confirm-actions">
+      <button class="global-confirm-ok" id="global-confirm-ok">OK</button>
+      <button class="global-confirm-cancel" id="global-confirm-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Custom CSS injection point -->
 <style id="custom-css-tag"></style>
 
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module" src="js/scroll-float.js"></script>
 <script type="module" src="js/mobile.js"></script>
 <script type="module" src="js/main.js"></script>
 </body>

@@ -461,7 +461,7 @@ export function duplicateFile(cwd: string, filePath: string): { ok: boolean; err
 }
 
 // ─── FILE READ ───────────────────────────────────────────────────
-export function readFileContent(cwd: string, filePath: string): { content?: string; binary?: boolean; error?: string } {
+export function readFileContent(cwd: string, filePath: string): { content?: string; binary?: boolean; isImage?: boolean; imageData?: string; imageMime?: string; error?: string } {
   const path = require('path') as typeof import('path');
   const fs = require('fs') as typeof import('fs');
   const fullPath = path.resolve(cwd, filePath);
@@ -471,8 +471,24 @@ export function readFileContent(cwd: string, filePath: string): { content?: stri
     return { error: 'Access denied' };
   }
 
+  const imageExts: Record<string, string> = {
+    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
+    '.bmp': 'image/bmp', '.ico': 'image/x-icon',
+  };
+
   try {
     const stat = fs.statSync(fullPath);
+    const ext = path.extname(fullPath).toLowerCase();
+    const mime = imageExts[ext];
+
+    // Image files: return base64 data (up to 5MB for images)
+    if (mime) {
+      if (stat.size > 5 * 1024 * 1024) return { error: 'Image too large (>5MB)' };
+      const buf = fs.readFileSync(fullPath);
+      return { binary: true, isImage: true, imageData: buf.toString('base64'), imageMime: mime };
+    }
+
     if (stat.size > 512 * 1024) return { error: 'File too large (>512KB)' };
 
     const buf = fs.readFileSync(fullPath);

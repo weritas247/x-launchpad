@@ -2,6 +2,7 @@
 import { S, sessionMeta, escHtml } from './state.js';
 import { wsSend } from './websocket.js';
 import { showToast } from './toast.js';
+import { confirmModal } from './confirm-modal.js';
 import { openFileTab } from './file-viewer.js';
 
 let explorerTree = [];
@@ -42,9 +43,9 @@ export function initExplorer() {
     wsSend({ type: 'file_rename', sessionId: S.activeSessionId, oldPath: ctxTargetPath, newPath });
   });
 
-  document.getElementById('ectx-delete')?.addEventListener('click', () => {
+  document.getElementById('ectx-delete')?.addEventListener('click', async () => {
     const name = ctxTargetPath.split('/').pop();
-    if (!confirm(`Delete "${name}"?`) || !S.activeSessionId) return;
+    if (!await confirmModal(`Delete "${name}"?`, 'Delete') || !S.activeSessionId) return;
     wsSend({ type: 'file_delete', sessionId: S.activeSessionId, filePath: ctxTargetPath });
   });
 
@@ -260,6 +261,9 @@ export function handleFileOpAck(msg) {
 export function handleFileReadData(msg) {
   openFileTab(msg.filePath || 'unknown', msg.content || '', {
     binary: msg.binary,
+    isImage: msg.isImage,
+    imageData: msg.imageData,
+    imageMime: msg.imageMime,
     error: msg.error,
   });
 }
