@@ -11,6 +11,7 @@ import { promisify } from 'util';
 import { execSync } from 'child_process';
 const execFileAsync = promisify(execFile);
 import * as gitService from './git-service';
+import * as db from './db';
 
 const app = express();
 const server = http.createServer(app);
@@ -142,17 +143,27 @@ function deepMerge(defaults: any, saved: any): any {
 }
 
 function loadSettings(): typeof DEFAULT_SETTINGS {
+  // Try SQLite first
+  try {
+    const dbSettings = db.getSettings();
+    if (dbSettings) return deepMerge(DEFAULT_SETTINGS, dbSettings as any);
+  } catch {}
+  // Fall back to JSON file (and migrate to SQLite)
   try {
     if (fs.existsSync(SETTINGS_PATH)) {
       const raw = fs.readFileSync(SETTINGS_PATH, 'utf-8');
-      return deepMerge(DEFAULT_SETTINGS, JSON.parse(raw));
+      const settings = deepMerge(DEFAULT_SETTINGS, JSON.parse(raw));
+      try { db.saveSettings(settings); } catch {} // migrate
+      return settings;
     }
   } catch {}
   return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 }
 
 function saveSettings(s: typeof DEFAULT_SETTINGS): void {
-  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(s, null, 2), 'utf-8');
+  db.saveSettings(s);
+  // Also write JSON file for backwards compatibility
+  try { fs.writeFileSync(SETTINGS_PATH, JSON.stringify(s, null, 2), 'utf-8'); } catch {}
 }
 
 let currentSettings = loadSettings();
@@ -626,12 +637,12 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
 }
 
 function persistSessions() {
-  try {
-    const data = Array.from(sessions.values()).map(s => ({
-      id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd, cmd: s.cmd,
-    }));
-    fs.writeFileSync(SESSIONS_PATH, JSON.stringify(data, null, 2), 'utf-8');
-  } catch {}
+  const data = Array.from(sessions.values()).map(s => ({
+    id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd, cmd: s.cmd,
+  }));
+  try { db.saveSessions(data); } catch {}
+  // Also write JSON file for backwards compatibility
+  try { fs.writeFileSync(SESSIONS_PATH, JSON.stringify(data, null, 2), 'utf-8'); } catch {}
 }
 
 function stripEscape(s: string): string {
@@ -712,9 +723,17 @@ function cmdForSession(s: { name: string; cmd?: string }): string | undefined {
 
 function restoreSessions() {
   try {
-    if (!fs.existsSync(SESSIONS_PATH)) return;
-    const raw = fs.readFileSync(SESSIONS_PATH, 'utf-8');
-    const saved: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string }> = JSON.parse(raw);
+    // Try SQLite first, fall back to JSON file
+    let saved: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string }>;
+    const dbSessions = db.listSessions();
+    if (dbSessions.length > 0) {
+      saved = dbSessions.map(r => ({ id: r.id, name: r.name, createdAt: r.created_at, cwd: r.cwd, cmd: r.cmd || undefined }));
+    } else if (fs.existsSync(SESSIONS_PATH)) {
+      const raw = fs.readFileSync(SESSIONS_PATH, 'utf-8');
+      saved = JSON.parse(raw);
+    } else {
+      return;
+    }
     if (!Array.isArray(saved) || saved.length === 0) return;
 
     // Get list of live tmux sessions (if tmux is available)
@@ -1196,3 +1215,7 @@ server.listen(PORT, () => {
   console.log(`Super Terminal → http://localhost:${PORT}`);
   restoreSessions();
 });
+
+// Graceful shutdown — close database
+process.on('SIGTERM', () => { db.close(); process.exit(0); });
+process.on('SIGINT', () => { db.close(); process.exit(0); });
