@@ -21,14 +21,20 @@ const SETTINGS_PATH  = path.join(__dirname, '../../settings.json');
 const SESSIONS_PATH  = path.join(__dirname, '../../sessions.json');
 
 // ─── TMUX INTEGRATION ────────────────────────────────────────────
+// tmux is opt-in: set ENABLE_TMUX=1 for remote/unstable network use
 const TMUX_SOCKET = path.join(os.tmpdir(), 'super-terminal-tmux');
 let tmuxAvailable = false;
-try {
-  execSync('tmux -V', { stdio: 'ignore' });
-  tmuxAvailable = true;
-  console.log(`[tmux] Available — socket: ${TMUX_SOCKET}`);
-} catch {
-  console.log('[tmux] Not found — falling back to direct PTY');
+const tmuxRequested = process.env.ENABLE_TMUX === '1';
+if (tmuxRequested) {
+  try {
+    execSync('tmux -V', { stdio: 'ignore' });
+    tmuxAvailable = true;
+    console.log(`[tmux] Enabled — socket: ${TMUX_SOCKET}`);
+  } catch {
+    console.log('[tmux] Requested but not found — falling back to direct PTY');
+  }
+} else {
+  console.log('[tmux] Disabled (set ENABLE_TMUX=1 to enable)');
 }
 
 function tmuxExec(args: string[], timeout = 3000): string {
@@ -604,7 +610,7 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   function flushOutput() {
     flushTimer = null;
     if (!outputBuf) return;
-    // Accumulate scrollback for reconnect replay
+    // Accumulate scrollback for reconnect replay (always, even if no client)
     session.scrollback += outputBuf;
     if (session.scrollback.length > SCROLLBACK_LIMIT) {
       session.scrollback = session.scrollback.slice(-SCROLLBACK_LIMIT);
@@ -612,19 +618,18 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     // Build binary frame: [0x01][sessionId-len:u16][sessionId][data]
     const dataBuf = Buffer.from(outputBuf, 'utf-8');
     const frame = Buffer.concat([binHeader, dataBuf]);
-    const byteLen = outputBuf.length;
     outputBuf = '';
-    let sentCount = 0;
+    // Only send to clients that have this session as ACTIVE (foreground tab).
+    // Non-active tabs get output via scrollback when user switches to them.
+    // This prevents N sessions × output from overwhelming a single WebSocket.
     wss.clients.forEach(c => {
       const cws = c as WebSocket;
       if (cws.readyState !== WebSocket.OPEN) return;
+      // Backpressure: skip if client's send buffer is already backed up (>1MB)
+      if ((cws as any).bufferedAmount > 1024 * 1024) return;
       const active = wsSession.get(cws) === id;
-      const subscribed = wsSubscriptions.get(cws)?.has(id) ?? false;
-      if (active || subscribed) { cws.send(frame); sentCount++; }
+      if (active) cws.send(frame);
     });
-    if (sentCount === 0 && wss.clients.size > 0) {
-      console.warn(`[pty:${id.slice(-6)}] Output dropped (${byteLen}B) — no active/subscribed client`);
-    }
   }
 
   ptyProcess.onData((chunk: string) => {
@@ -665,8 +670,17 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     broadcastSessionList();
   });
 
-  // Poll CWD + detect running AI every 2s (non-blocking)
+  // Poll CWD + detect running AI (active session: 2s, background: 10s)
+  const CWD_POLL_ACTIVE = 2000;
+  const CWD_POLL_BG = 10000;
+  let lastPollTime = 0;
   session.cwdTimer = setInterval(async () => {
+    // Throttle background sessions: only poll every 10s
+    const isActive = Array.from(wsSession.values()).includes(id);
+    const interval = isActive ? CWD_POLL_ACTIVE : CWD_POLL_BG;
+    const now = Date.now();
+    if (now - lastPollTime < interval) return;
+    lastPollTime = now;
     try {
       let newCwd = cwd0;
       let shellPid = ptyProcess.pid;
@@ -952,6 +966,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         ws.send(JSON.stringify({ type: 'error', message: `Session ${id} not found` }));
         return;
       }
+      const prevId = wsSession.get(ws);
       wsSession.set(ws, id);
       // Remove from subscriptions — active session gets output via wsSession
       wsSubscriptions.get(ws)?.delete(id);
@@ -959,6 +974,16 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       // Replay current CWD/AI info immediately
       const sess = sessions.get(id)!;
       ws.send(JSON.stringify({ type: 'session_info', sessionId: id, cwd: sess.cwd, ai: sess.ai }));
+      // If switching tabs, send scrollback so user sees latest output
+      if (prevId !== id && sess.scrollback) {
+        const sidBuf = Buffer.from(id, 'utf-8');
+        const hdr = Buffer.alloc(1 + 2 + sidBuf.length);
+        hdr[0] = 0x02; // scrollback replay
+        hdr.writeUInt16BE(sidBuf.length, 1);
+        sidBuf.copy(hdr, 3);
+        const dataBuf = Buffer.from(sess.scrollback, 'utf-8');
+        ws.send(Buffer.concat([hdr, dataBuf]));
+      }
 
     } else if (parsed.type === 'scrollback_request') {
       const id = parsed.sessionId as string;
