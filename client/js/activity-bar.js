@@ -11,16 +11,15 @@ export function initActivityBar() {
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
       const panel = btn.dataset.panel;
-      // secondary 패널 아이콘 클릭 → split 해제
-      if (panel === secondaryPanel) {
-        closeSidebarSplit();
+      if (secondaryPanel) {
+        // 분할 상태: primary/secondary 클릭 → 무시, 다른 아이콘 → secondary 교체
+        if (panel !== activePanel && panel !== secondaryPanel) {
+          replaceSplitSecondary(panel, false);
+        }
         return;
       }
       if (panel === activePanel) {
-        // 분할 상태에서 primary 클릭 → 무시
-        if (!secondaryPanel) {
-          toggleSidebar();
-        }
+        toggleSidebar();
       } else {
         switchPanel(panel);
       }
