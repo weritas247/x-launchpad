@@ -1,5 +1,5 @@
 import { S, terminalMap } from './state.js';
-import { wsSend } from './websocket.js';
+import { wsSend, apiFetch } from './websocket.js';
 
 // Per-session pending images (NOT uploaded yet): Map<sessionId, [{file, objectUrl}]>
 const attachments = new Map();
@@ -82,7 +82,7 @@ async function uploadAll(sessionId) {
   const results = [];
   for (const item of list) {
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/upload-image?sessionId=${encodeURIComponent(sessionId)}&filename=${encodeURIComponent(item.file.name || 'image.png')}`,
         { method: 'POST', headers: { 'Content-Type': item.file.type }, body: item.file }
       );

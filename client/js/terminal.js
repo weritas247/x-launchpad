@@ -1,6 +1,6 @@
 import { S, terminalMap, sessionMeta, tabBar, tabAddBtn, termWrapper, sbActiveName, sbSize, ctxMenu, escHtml } from './state.js';
 import { AI_REGISTRY } from './constants.js';
-import { wsSend, getAuthToken } from './websocket.js';
+import { wsSend, getAuthToken, apiFetch } from './websocket.js';
 import { xtermKeyHandler } from './keyboard.js';
 import { trackInput } from './prompt-history.js';
 import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session.js';
@@ -496,7 +496,7 @@ export function initContextMenu() {
   });
   document.getElementById('ctx-reveal').addEventListener('click', () => {
     if (!S.ctxTargetId) return;
-    fetch('/api/reveal-in-finder', {
+    apiFetch('/api/reveal-in-finder', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: S.ctxTargetId }),

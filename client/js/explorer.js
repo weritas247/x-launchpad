@@ -1,6 +1,6 @@
 // ─── FILE EXPLORER PANEL ─────────────────────────────────────────
 import { S, sessionMeta, escHtml } from './state.js';
-import { wsSend } from './websocket.js';
+import { wsSend, apiFetch } from './websocket.js';
 import { showToast } from './toast.js';
 import { confirmModal } from './confirm-modal.js';
 import { openFileTab } from './file-viewer.js';
@@ -96,7 +96,7 @@ async function uploadFile(file) {
   try {
     const buf = await file.arrayBuffer();
     const params = new URLSearchParams({ sessionId: S.activeSessionId, filename: file.name });
-    const res = await fetch(`/api/upload?${params}`, {
+    const res = await apiFetch(`/api/upload?${params}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream' },
       body: buf,
