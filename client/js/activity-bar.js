@@ -2,8 +2,9 @@
 import { requestFileTree } from './explorer.js';
 import { requestGitStatus } from './source-control.js';
 
-let activePanel = 'sessions'; // 'sessions' | 'explorer' | 'source-control'
-let secondaryPanel = null;     // split 시 하단 패널
+let activePanel = 'sessions'; // currently visible panel (or primary when split is shown)
+let splitConfig = null;       // { primary, secondary, ratio } — persists until explicitly closed
+let splitShown = false;       // true when the split view is currently displayed
 let dragSrcBtn = null;
 
 export function initActivityBar() {
@@ -11,14 +12,23 @@ export function initActivityBar() {
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
       const panel = btn.dataset.panel;
-      if (secondaryPanel) {
-        // 분할 상태: primary/secondary 클릭 → 무시, 다른 아이콘 → secondary 교체
-        if (panel !== activePanel && panel !== secondaryPanel) {
-          replaceSplitSecondary(panel, false);
+
+      // Split icon click → show/toggle split view
+      if (btn.classList.contains('activity-btn-split')) {
+        if (splitShown) {
+          toggleSidebar();
+        } else {
+          showSplitView();
         }
         return;
       }
-      if (panel === activePanel) {
+
+      // Normal icon click
+      if (splitShown) {
+        // Currently showing split → switch to single panel
+        hideSplitView();
+        switchPanel(panel);
+      } else if (panel === activePanel) {
         toggleSidebar();
       } else {
         switchPanel(panel);
@@ -104,9 +114,8 @@ export function initActivityBar() {
 
     // Case 1: Header drag → swap split panels
     const headerPanel = e.dataTransfer.getData('text/sidebar-panel');
-    if (headerPanel && secondaryPanel) {
-      // Only swap if dragged to opposite zone
-      const draggedIsPrimary = headerPanel === activePanel;
+    if (headerPanel && splitConfig) {
+      const draggedIsPrimary = headerPanel === splitConfig.primary;
       if ((draggedIsPrimary && !isTop) || (!draggedIsPrimary && isTop)) {
         swapSidebarSplit();
       }
@@ -115,21 +124,22 @@ export function initActivityBar() {
 
     // Case 2: Activity bar icon drag
     const panel = e.dataTransfer.getData('text/activity-panel');
-    if (!panel || panel === activePanel || panel === secondaryPanel) return;
+    if (!panel) return;
+    if (splitConfig && (panel === splitConfig.primary || panel === splitConfig.secondary)) return;
 
-    if (secondaryPanel) {
-      // Already split → replace secondary with new panel
+    if (splitConfig) {
+      // Already has split config → replace secondary
       replaceSplitSecondary(panel, isTop);
     } else {
-      // Not split → create split
-      openSidebarSplit(panel, isTop);
+      // Create new split
+      createSplit(panel, isTop);
     }
   });
 
   // ─── Panel header drag (for split rearranging) ───
   sidebar.addEventListener('dragstart', (e) => {
     const header = e.target.closest('.sidebar-header');
-    if (!header || !secondaryPanel) return;
+    if (!header || !splitConfig || !splitShown) return;
     const panel = header.closest('.sidebar-panel');
     if (!panel) return;
     const panelId = panel.id.replace('panel-', '');
@@ -147,12 +157,12 @@ export function initActivityBar() {
     // If successfully dropped on a target, don't close
     if (e.dataTransfer.dropEffect !== 'none') return;
     // If dropped outside sidebar, close split
-    if (!secondaryPanel) return;
+    if (!splitConfig || !splitShown) return;
     const sidebarRect = sidebar.getBoundingClientRect();
     const droppedOutside = e.clientX < sidebarRect.left || e.clientX > sidebarRect.right ||
                            e.clientY < sidebarRect.top || e.clientY > sidebarRect.bottom;
     if (droppedOutside) {
-      closeSidebarSplit();
+      destroySplit();
     }
   });
 
@@ -160,35 +170,50 @@ export function initActivityBar() {
   initSidebarSplitResize();
 }
 
-// ─── Sidebar Split ───
-function openSidebarSplit(panel, droppedOnTop) {
+// ─── Split Management ───
+
+/** Create a new split configuration and show it */
+function createSplit(panel, droppedOnTop) {
   const sidebar = document.getElementById('sidebar');
   sidebar.classList.remove('collapsed');
 
-  // If dropped on top half, the dragged panel becomes primary (top)
-  // and current primary moves to secondary (bottom)
-  if (droppedOnTop) {
-    secondaryPanel = activePanel;
-    activePanel = panel;
-  } else {
-    secondaryPanel = panel;
-  }
+  const primary = droppedOnTop ? panel : activePanel;
+  const secondary = droppedOnTop ? activePanel : panel;
 
-  // Update button active states — hide secondary icon, show only primary
+  splitConfig = { primary, secondary, ratio: 0.5 };
+  activePanel = primary;
+
+  // Create split icon in activity bar, hide original icons
+  createSplitButton(primary, secondary);
+
+  // Show the split view
+  showSplitView();
+}
+
+/** Show the split view (both panels stacked) */
+function showSplitView() {
+  if (!splitConfig) return;
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.remove('collapsed');
+  splitShown = true;
+  activePanel = splitConfig.primary;
+
+  // Update activity bar: split icon active, others not
   document.querySelectorAll('.activity-btn').forEach(btn => {
-    const p = btn.dataset.panel;
-    btn.classList.toggle('active', p === activePanel);
-    btn.classList.remove('active-secondary');
-    btn.style.display = (p === secondaryPanel) ? 'none' : '';
+    if (btn.classList.contains('activity-btn-split')) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
   });
 
-  // Show both panels
+  // Show both panels in split layout
   document.querySelectorAll('.sidebar-panel').forEach(p => {
     const id = p.id.replace('panel-', '');
-    if (id === activePanel) {
+    if (id === splitConfig.primary) {
       p.classList.add('active');
       p.classList.remove('sidebar-panel-secondary');
-    } else if (id === secondaryPanel) {
+    } else if (id === splitConfig.secondary) {
       p.classList.add('active');
       p.classList.add('sidebar-panel-secondary');
     } else {
@@ -197,13 +222,13 @@ function openSidebarSplit(panel, droppedOnTop) {
   });
 
   sidebar.classList.add('sidebar-split');
+  sidebar.style.setProperty('--sidebar-split-ratio', splitConfig.ratio);
 
-  // Reorder DOM: primary panel → resize handle → secondary panel
-  const primaryEl = document.getElementById(`panel-${activePanel}`);
-  const secondaryEl = document.getElementById(`panel-${secondaryPanel}`);
+  // Reorder DOM
+  const primaryEl = document.getElementById(`panel-${splitConfig.primary}`);
+  const secondaryEl = document.getElementById(`panel-${splitConfig.secondary}`);
   ensureSplitResizeHandle();
   const resizeHandle = sidebar.querySelector('.sidebar-split-resize');
-  // Move primary to front, then resize, then secondary
   sidebar.insertBefore(primaryEl, sidebar.firstChild);
   primaryEl.after(resizeHandle);
   resizeHandle.after(secondaryEl);
@@ -211,95 +236,201 @@ function openSidebarSplit(panel, droppedOnTop) {
   ensureSplitCloseBtn();
   setupSplitHeaderDrag();
 
-  // Trigger data loading for both panels
-  triggerPanelLoad(activePanel);
-  triggerPanelLoad(secondaryPanel);
+  triggerPanelLoad(splitConfig.primary);
+  triggerPanelLoad(splitConfig.secondary);
 }
 
-export function closeSidebarSplit() {
+/** Hide the split view (without destroying split config) */
+function hideSplitView() {
+  if (!splitShown) return;
   const sidebar = document.getElementById('sidebar');
+
+  // Save current ratio
+  const computed = getComputedStyle(sidebar).getPropertyValue('--sidebar-split-ratio');
+  if (splitConfig && computed) {
+    splitConfig.ratio = parseFloat(computed);
+  }
+
+  // Clean up split DOM
   sidebar.querySelectorAll('.sidebar-header[draggable]').forEach(h => {
     h.removeAttribute('draggable');
   });
   sidebar.classList.remove('sidebar-split');
-  // Reset split ratio
   sidebar.style.removeProperty('--sidebar-split-ratio');
 
-  secondaryPanel = null;
-
-  // Remove secondary classes
   document.querySelectorAll('.sidebar-panel').forEach(p => {
-    p.classList.remove('sidebar-panel-secondary');
-    p.classList.toggle('active', p.id === `panel-${activePanel}`);
+    p.classList.remove('sidebar-panel-secondary', 'active');
   });
 
-  document.querySelectorAll('.activity-btn').forEach(btn => {
-    btn.classList.remove('active-secondary');
-    btn.classList.toggle('active', btn.dataset.panel === activePanel);
-    btn.style.display = '';  // restore hidden secondary icon
-  });
-
-  // Remove close button and resize handle
   const closeBtn = sidebar.querySelector('.sidebar-split-close');
   if (closeBtn) closeBtn.remove();
   const resizeHandle = sidebar.querySelector('.sidebar-split-resize');
   if (resizeHandle) resizeHandle.remove();
+
+  // Deactivate split icon
+  const splitBtn = document.querySelector('.activity-btn-split');
+  if (splitBtn) splitBtn.classList.remove('active');
+
+  splitShown = false;
 }
 
+/** Permanently destroy the split — remove split icon, restore original icons */
+export function destroySplit() {
+  hideSplitView();
+
+  // Remove split button from activity bar
+  const splitBtn = document.querySelector('.activity-btn-split');
+  if (splitBtn) splitBtn.remove();
+
+  // Restore original icons
+  if (splitConfig) {
+    const primaryBtn = document.querySelector(`.activity-btn[data-panel="${splitConfig.primary}"]`);
+    const secondaryBtn = document.querySelector(`.activity-btn[data-panel="${splitConfig.secondary}"]`);
+    if (primaryBtn) primaryBtn.style.display = '';
+    if (secondaryBtn) secondaryBtn.style.display = '';
+  }
+
+  // Switch to primary panel
+  const panel = splitConfig ? splitConfig.primary : activePanel;
+  splitConfig = null;
+  switchPanel(panel);
+}
+
+// Keep closeSidebarSplit as alias for destroySplit (used by close button)
+export { destroySplit as closeSidebarSplit };
+
 function swapSidebarSplit() {
-  const temp = activePanel;
-  activePanel = secondaryPanel;
-  secondaryPanel = temp;
+  if (!splitConfig) return;
+  const temp = splitConfig.primary;
+  splitConfig.primary = splitConfig.secondary;
+  splitConfig.secondary = temp;
+  activePanel = splitConfig.primary;
 
-  // Update button states — hide secondary icon, show only primary
-  document.querySelectorAll('.activity-btn').forEach(btn => {
-    const p = btn.dataset.panel;
-    btn.classList.toggle('active', p === activePanel);
-    btn.classList.remove('active-secondary');
-    btn.style.display = (p === secondaryPanel) ? 'none' : '';
-  });
+  // Re-render the split view
+  if (splitShown) {
+    // Update panel classes
+    document.querySelectorAll('.sidebar-panel').forEach(p => {
+      const id = p.id.replace('panel-', '');
+      if (id === splitConfig.primary) {
+        p.classList.add('active');
+        p.classList.remove('sidebar-panel-secondary');
+      } else if (id === splitConfig.secondary) {
+        p.classList.add('active');
+        p.classList.add('sidebar-panel-secondary');
+      } else {
+        p.classList.remove('active', 'sidebar-panel-secondary');
+      }
+    });
 
-  // Update panel classes
-  document.querySelectorAll('.sidebar-panel').forEach(p => {
-    const id = p.id.replace('panel-', '');
-    if (id === activePanel) {
-      p.classList.add('active');
-      p.classList.remove('sidebar-panel-secondary');
-    } else if (id === secondaryPanel) {
-      p.classList.add('active');
-      p.classList.add('sidebar-panel-secondary');
-    } else {
-      p.classList.remove('active', 'sidebar-panel-secondary');
-    }
-  });
+    // Reorder DOM
+    const sidebar = document.getElementById('sidebar');
+    const primaryEl = document.getElementById(`panel-${splitConfig.primary}`);
+    const secondaryEl = document.getElementById(`panel-${splitConfig.secondary}`);
+    const resizeHandle = sidebar.querySelector('.sidebar-split-resize');
+    sidebar.insertBefore(primaryEl, sidebar.firstChild);
+    primaryEl.after(resizeHandle);
+    resizeHandle.after(secondaryEl);
 
-  // Reorder DOM
-  const sidebar = document.getElementById('sidebar');
-  const primaryEl = document.getElementById(`panel-${activePanel}`);
-  const secondaryEl = document.getElementById(`panel-${secondaryPanel}`);
-  const resizeHandle = sidebar.querySelector('.sidebar-split-resize');
-  sidebar.insertBefore(primaryEl, sidebar.firstChild);
-  primaryEl.after(resizeHandle);
-  resizeHandle.after(secondaryEl);
-
-  // Move close button to new secondary
-  const oldClose = sidebar.querySelector('.sidebar-split-close');
-  if (oldClose) oldClose.remove();
-  ensureSplitCloseBtn();
+    // Move close button
+    const oldClose = sidebar.querySelector('.sidebar-split-close');
+    if (oldClose) oldClose.remove();
+    ensureSplitCloseBtn();
+  }
 }
 
 function replaceSplitSecondary(newPanel, droppedOnTop) {
-  closeSidebarSplit();
-  openSidebarSplit(newPanel, droppedOnTop);
+  if (!splitConfig) return;
+
+  // Restore old secondary icon
+  const oldSecBtn = document.querySelector(`.activity-btn[data-panel="${splitConfig.secondary}"]`);
+  if (oldSecBtn) oldSecBtn.style.display = '';
+
+  // Also restore old primary if it's changing
+  if (droppedOnTop) {
+    const oldPriBtn = document.querySelector(`.activity-btn[data-panel="${splitConfig.primary}"]`);
+    if (oldPriBtn) oldPriBtn.style.display = '';
+    splitConfig.secondary = splitConfig.primary;
+    splitConfig.primary = newPanel;
+  } else {
+    splitConfig.secondary = newPanel;
+  }
+  activePanel = splitConfig.primary;
+
+  // Hide new panel icon
+  const newBtn = document.querySelector(`.activity-btn[data-panel="${newPanel}"]`);
+  if (newBtn) newBtn.style.display = 'none';
+
+  // Update split button
+  const splitBtn = document.querySelector('.activity-btn-split');
+  if (splitBtn) {
+    splitBtn.remove();
+  }
+  createSplitButton(splitConfig.primary, splitConfig.secondary);
+
+  if (splitShown) {
+    // Remove old split DOM and re-show
+    const sidebar = document.getElementById('sidebar');
+    sidebar.querySelectorAll('.sidebar-header[draggable]').forEach(h => h.removeAttribute('draggable'));
+    const closeBtn = sidebar.querySelector('.sidebar-split-close');
+    if (closeBtn) closeBtn.remove();
+    const resizeHandle = sidebar.querySelector('.sidebar-split-resize');
+    if (resizeHandle) resizeHandle.remove();
+    splitShown = false;
+    showSplitView();
+  }
 }
+
+// ─── Split Button in Activity Bar ───
+
+function createSplitButton(primary, secondary) {
+  const bar = document.getElementById('activity-bar');
+
+  // Hide original icons
+  const primaryBtn = document.querySelector(`.activity-btn[data-panel="${primary}"]`);
+  const secondaryBtn = document.querySelector(`.activity-btn[data-panel="${secondary}"]`);
+  if (primaryBtn) primaryBtn.style.display = 'none';
+  if (secondaryBtn) secondaryBtn.style.display = 'none';
+
+  // Remove existing split button if any
+  const existing = bar.querySelector('.activity-btn-split');
+  if (existing) existing.remove();
+
+  // Create split icon button
+  const splitBtn = document.createElement('button');
+  splitBtn.className = 'activity-btn activity-btn-split active';
+  splitBtn.title = `${primaryBtn?.title || primary} + ${secondaryBtn?.title || secondary}`;
+  splitBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <rect x="3" y="3" width="18" height="8" rx="1.5"/>
+    <rect x="3" y="13" width="18" height="8" rx="1.5"/>
+  </svg>`;
+
+  // Insert at the position of the first hidden button
+  const insertRef = primaryBtn || secondaryBtn;
+  if (insertRef) {
+    bar.insertBefore(splitBtn, insertRef);
+  } else {
+    bar.appendChild(splitBtn);
+  }
+
+  // Click handler — delegated via initActivityBar's existing handler won't catch this
+  // because it was created after forEach. Add directly.
+  splitBtn.addEventListener('click', () => {
+    if (splitShown) {
+      toggleSidebar();
+    } else {
+      showSplitView();
+    }
+  });
+}
+
+// ─── Helpers ───
 
 function ensureSplitResizeHandle() {
   const sidebar = document.getElementById('sidebar');
   if (!sidebar.querySelector('.sidebar-split-resize')) {
     const handle = document.createElement('div');
     handle.className = 'sidebar-split-resize';
-    // Insert after the primary panel
-    const primaryPanel = document.getElementById(`panel-${activePanel}`);
+    const primaryPanel = document.getElementById(`panel-${splitConfig.primary}`);
     if (primaryPanel && primaryPanel.nextSibling) {
       sidebar.insertBefore(handle, primaryPanel.nextSibling);
     } else {
@@ -320,7 +451,7 @@ function ensureSplitCloseBtn() {
   closeBtn.textContent = '✕';
   closeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    closeSidebarSplit();
+    destroySplit();
   });
 
   const actions = header.querySelector('.sidebar-header-actions');
@@ -384,17 +515,19 @@ function triggerPanelLoad(panel) {
 }
 
 export function switchPanel(panel) {
-  // If we're in split mode, close it first
-  if (secondaryPanel) {
-    closeSidebarSplit();
+  if (splitShown) {
+    hideSplitView();
   }
 
   activePanel = panel;
 
-  // Update active button (also restore any hidden icons from split)
+  // Update active button
   document.querySelectorAll('.activity-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.panel === panel);
-    btn.style.display = '';
+    if (btn.classList.contains('activity-btn-split')) {
+      btn.classList.remove('active');
+    } else {
+      btn.classList.toggle('active', btn.dataset.panel === panel);
+    }
   });
 
   // Update visible panel
