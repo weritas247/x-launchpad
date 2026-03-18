@@ -111,9 +111,11 @@
       <div class="sidebar-header">
         <span class="sidebar-title-text">EXPLORER</span>
         <div class="sidebar-header-actions">
+          <button class="btn-icon-sm" id="explorer-upload" title="Upload file">↑</button>
           <button class="btn-icon-sm" id="explorer-refresh" title="Refresh">↻</button>
         </div>
       </div>
+      <input type="file" id="explorer-upload-input" multiple style="display:none">
       <div class="explorer-path-bar">
         <span class="explorer-path-label" id="explorer-path" title="">—</span>
       </div>
@@ -320,6 +322,7 @@
   <div class="ctx-item" id="ectx-new-folder">📁 New Folder</div>
   <div class="ctx-sep"></div>
   <div class="ctx-item" id="ectx-rename">✎ Rename</div>
+  <div class="ctx-item" id="ectx-download">↓ Download</div>
   <div class="ctx-sep"></div>
   <div class="ctx-item danger" id="ectx-delete">✕ Delete</div>
 </div>

@@ -47,6 +47,79 @@ export function initExplorer() {
     if (!confirm(`Delete "${name}"?`) || !S.activeSessionId) return;
     wsSend({ type: 'file_delete', sessionId: S.activeSessionId, filePath: ctxTargetPath });
   });
+
+  document.getElementById('ectx-download')?.addEventListener('click', () => {
+    if (!ctxTargetPath || ctxTargetType !== 'file' || !S.activeSessionId) return;
+    downloadFile(ctxTargetPath);
+  });
+
+  // Upload button
+  const uploadBtn = document.getElementById('explorer-upload');
+  const uploadInput = document.getElementById('explorer-upload-input');
+  uploadBtn?.addEventListener('click', () => uploadInput?.click());
+  uploadInput?.addEventListener('change', async () => {
+    if (!uploadInput.files?.length || !S.activeSessionId) return;
+    for (const file of uploadInput.files) {
+      await uploadFile(file);
+    }
+    uploadInput.value = '';
+    requestFileTree();
+  });
+
+  // Drag & drop upload on explorer tree
+  const treeEl = document.getElementById('explorer-tree');
+  treeEl?.addEventListener('dragover', (e) => {
+    if (e.dataTransfer?.types.includes('Files')) {
+      e.preventDefault();
+      treeEl.classList.add('drop-target');
+    }
+  });
+  treeEl?.addEventListener('dragleave', () => treeEl.classList.remove('drop-target'));
+  treeEl?.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    treeEl.classList.remove('drop-target');
+    if (!e.dataTransfer?.files.length || !S.activeSessionId) return;
+    for (const file of e.dataTransfer.files) {
+      await uploadFile(file);
+    }
+    requestFileTree();
+  });
+}
+
+async function uploadFile(file) {
+  if (!S.activeSessionId) return;
+  if (file.size > 50 * 1024 * 1024) {
+    showToast(`File too large: ${file.name} (>50MB)`, 'error');
+    return;
+  }
+  try {
+    const buf = await file.arrayBuffer();
+    const params = new URLSearchParams({ sessionId: S.activeSessionId, filename: file.name });
+    const res = await fetch(`/api/upload?${params}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: buf,
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(`Uploaded: ${file.name}`, 'success');
+    } else {
+      showToast(`Upload failed: ${data.error}`, 'error');
+    }
+  } catch (e) {
+    showToast(`Upload error: ${e.message}`, 'error');
+  }
+}
+
+function downloadFile(filePath) {
+  if (!S.activeSessionId) return;
+  const params = new URLSearchParams({ sessionId: S.activeSessionId, path: filePath });
+  const a = document.createElement('a');
+  a.href = `/api/download?${params}`;
+  a.download = filePath.split('/').pop() || 'file';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 function showExplorerCtx(e, path, type) {

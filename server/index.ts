@@ -185,6 +185,48 @@ app.post('/api/reveal-in-finder', (req, res) => {
   });
 });
 
+// ─── FILE DOWNLOAD ───────────────────────────────────────────────
+app.get('/api/download', (req, res) => {
+  const sessionId = req.query.sessionId as string;
+  const filePath = req.query.path as string;
+  if (!sessionId || !filePath) return res.status(400).json({ ok: false, error: 'Missing params' });
+  const session = sessions.get(sessionId);
+  if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
+  const cwd = session.cwd || process.env.HOME || '/tmp';
+  const fullPath = path.resolve(cwd, filePath);
+  if (!fullPath.startsWith(path.resolve(cwd))) return res.status(403).json({ ok: false, error: 'Access denied' });
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ ok: false, error: 'File not found' });
+  const stat = fs.statSync(fullPath);
+  if (stat.isDirectory()) return res.status(400).json({ ok: false, error: 'Cannot download directory' });
+  if (stat.size > 50 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'File too large (>50MB)' });
+  res.download(fullPath);
+});
+
+// ─── FILE UPLOAD ─────────────────────────────────────────────────
+app.post('/api/upload',
+  express.raw({ type: 'application/octet-stream', limit: '50mb' }),
+  (req, res) => {
+    const sessionId = req.query.sessionId as string;
+    const fileName = req.query.filename as string;
+    const targetDir = req.query.dir as string | undefined;
+    if (!sessionId || !fileName) return res.status(400).json({ ok: false, error: 'Missing params' });
+    const session = sessions.get(sessionId);
+    if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
+    const cwd = session.cwd || process.env.HOME || '/tmp';
+    const dir = targetDir ? path.resolve(cwd, targetDir) : cwd;
+    if (!dir.startsWith(path.resolve(cwd))) return res.status(403).json({ ok: false, error: 'Access denied' });
+    const safeName = path.basename(fileName); // strip directory components
+    const fullPath = path.join(dir, safeName);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(fullPath, req.body);
+      res.json({ ok: true, filename: safeName, fullPath });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String(e) });
+    }
+  }
+);
+
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../../client/index.html'));
 });

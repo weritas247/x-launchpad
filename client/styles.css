@@ -658,6 +658,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .explorer-name{overflow:hidden;text-overflow:ellipsis;color:var(--text-main)}
 .explorer-item.is-dir .explorer-name{color:var(--text-dim);font-weight:500}
 .explorer-empty{padding:16px;font-size:11px;color:var(--text-ghost);text-align:center}
+.explorer-tree-container.drop-target{outline:2px dashed var(--accent);outline-offset:-2px;background:var(--accent-dim)}
 
 /* ═══ SEARCH PANEL ═══ */
 .search-input-bar{padding:8px 10px;display:flex;gap:4px;border-bottom:1px solid var(--border)}
