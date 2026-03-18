@@ -2,10 +2,11 @@ import { S, terminalMap, customCssTag, settingsOverlay, escHtml } from './state.
 import { confirmModal } from './confirm-modal.js';
 import { THEMES, KB_DEFS, normalizeKey } from './constants.js';
 import { applyTheme, updateSwatches } from './themes.js';
+import { apiFetch } from './websocket.js';
 
 export async function loadSettings() {
   try {
-    const r = await fetch('/api/settings');
+    const r = await apiFetch('/api/settings');
     S.settings = r.ok ? await r.json() : null;
   } catch {
     S.settings = null;
@@ -14,7 +15,7 @@ export async function loadSettings() {
 }
 
 export async function saveSettingsToServer(s) {
-  await fetch('/api/settings', {
+  await apiFetch('/api/settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(s),
@@ -60,6 +61,15 @@ export function applyEffects(ap) {
   let flickerStyle = document.getElementById('flicker-style');
   if (!flickerStyle) { flickerStyle = document.createElement('style'); flickerStyle.id='flicker-style'; document.head.appendChild(flickerStyle); }
   flickerStyle.textContent = flicker ? '' : '#terminal-wrapper { animation: none !important; }';
+
+  const dimOpacity = ap.screenDimOpacity ?? 0;
+  let dimStyle = document.getElementById('dim-style');
+  if (!dimStyle) {
+    dimStyle = document.createElement('style');
+    dimStyle.id = 'dim-style';
+    document.head.appendChild(dimStyle);
+  }
+  dimStyle.textContent = `#screen-dim { opacity: ${dimOpacity}; }`;
 }
 
 export function applyTerminalOptions(term, s) {
@@ -218,6 +228,7 @@ function populateForm(s) {
   document.getElementById('s-vignette').checked = ap.vignette !== false;
   setRangeValue('s-glowIntensity', ap.glowIntensity, '');
   setRangeValue('s-backgroundOpacity', ap.backgroundOpacity, '');
+  setRangeValue('s-screenDimOpacity', ap.screenDimOpacity ?? 0, '');
   updateFontPreview(ap.fontFamily, ap.fontSize);
 
   setRangeValue('s-sidebarFontSize', ap.sidebarFontSize ?? 12, 'px');
@@ -289,6 +300,7 @@ function readForm() {
   s.appearance.vignette = document.getElementById('s-vignette').checked;
   s.appearance.glowIntensity = parseFloat(document.getElementById('s-glowIntensity').value);
   s.appearance.backgroundOpacity = parseFloat(document.getElementById('s-backgroundOpacity').value);
+  s.appearance.screenDimOpacity = parseFloat(document.getElementById('s-screenDimOpacity').value);
 
   s.appearance.sidebarFontSize = parseInt(document.getElementById('s-sidebarFontSize')?.value) || 12;
   s.appearance.statusBarFontSize = parseInt(document.getElementById('s-statusBarFontSize')?.value) || 11;
@@ -375,7 +387,7 @@ export function initSettingsUI() {
 
   document.getElementById('btn-reset-settings').addEventListener('click', async () => {
     if (!await confirmModal('Reset ALL settings to defaults? This cannot be undone.', 'Reset')) return;
-    const r = await fetch('/api/settings/default');
+    const r = await apiFetch('/api/settings/default');
     const def = await r.json();
     S.pendingSettings = def;
     populateForm(def);
