@@ -364,13 +364,13 @@ export function handleGitFileListData(msg) {
 
 export function handleGitBranchData(msg) {
   if (msg.branch) {
-    sbBranch.style.display = '';
-    sbBrSep.style.display = '';
-    sbBrName.textContent = msg.branch;
+    if (sbBranch) sbBranch.style.display = '';
+    if (sbBrSep) sbBrSep.style.display = '';
+    if (sbBrName) sbBrName.textContent = msg.branch;
   } else {
-    sbBranch.style.display = 'none';
-    sbBrSep.style.display = 'none';
-    sbBrName.textContent = '';
+    if (sbBranch) sbBranch.style.display = 'none';
+    if (sbBrSep) sbBrSep.style.display = 'none';
+    if (sbBrName) sbBrName.textContent = '';
   }
 }
 
