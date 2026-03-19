@@ -27,7 +27,9 @@ function loadPlans() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) plans = JSON.parse(raw);
     // migrate old plans without category
-    plans.forEach(p => { if (!p.category) p.category = 'other'; });
+    let migrated = false;
+    plans.forEach(p => { if (!p.category) { p.category = 'other'; migrated = true; } });
+    if (migrated) savePlans();
   } catch { plans = []; }
 }
 
@@ -186,6 +188,7 @@ function formatDate(ts) {
 // ─── Modal open/close ───────────────────────────────
 export function openPlanModal() {
   loadPlans();
+  updateCount();
   if (activeId && !plans.find(p => p.id === activeId)) activeId = null;
   renderList();
   const filtered = filteredPlans();
