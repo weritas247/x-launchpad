@@ -5,7 +5,7 @@ import { requestGitStatus } from './source-control.js';
 const ICON_ORDER_KEY = 'super-terminal-activity-order';
 
 let activePanel = 'search';
-let splits = [];          // [{ id, primary, secondary, ratio, btnEl }]
+const splits = [];          // [{ id, primary, secondary, ratio, btnEl }]
 let activeSplitId = null;  // currently shown split's id (null = single panel view)
 let splitIdCounter = 0;
 let dragSrcBtn = null;
@@ -611,11 +611,11 @@ export function setActivityBadge(panel, count, opts) {
   // Remove existing badges
   btn.querySelectorAll('.activity-badge, .activity-badge-group').forEach(el => el.remove());
 
-  const total = (opts && opts.mainCount != null) ? count + opts.mainCount : count;
+  const total = (opts && opts.mainCount !== null && opts.mainCount !== undefined) ? count + opts.mainCount : count;
   if (total <= 0) return;
 
   // Dual badge: worktree + main branch
-  if (opts && opts.isInWorktree && opts.mainCount != null) {
+  if (opts && opts.isInWorktree && opts.mainCount !== null && opts.mainCount !== undefined) {
     const group = document.createElement('span');
     group.className = 'activity-badge-group';
 

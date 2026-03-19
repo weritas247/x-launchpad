@@ -189,7 +189,7 @@ export async function appendPlanLog(userId: number, log: { plan_id?: string; typ
     .select()
     .single();
   if (logErr) throw logErr;
-  let plan: PlanRow | null = null;
+  let plan: PlanRow | null;
   if (log.type === 'summary') {
     const { data: updated } = await supabase
       .from('plans')

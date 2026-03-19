@@ -6,7 +6,7 @@ import { confirmModal } from './confirm-modal.js';
 import { openFileTab } from './file-viewer.js';
 
 let explorerTree = [];
-let expandedDirs = new Set();
+const expandedDirs = new Set();
 let currentDir = '';
 let gitStatusMap = {}; // { relativePath: status }
 

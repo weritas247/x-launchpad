@@ -245,7 +245,6 @@ export function getFileTree(dirPath: string, depth = 3): TreeEntry[] {
     let entries: string[];
     try { entries = fs.readdirSync(dir); } catch { return []; }
 
-    const result: TreeEntry[] = [];
     const dirs: TreeEntry[] = [];
     const files: TreeEntry[] = [];
 

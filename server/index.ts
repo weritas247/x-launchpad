@@ -1064,7 +1064,7 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     // Strip inline image protocols that xterm.js cannot render:
     // - iTerm2 inline images: OSC 1337 ; File=... ST
     // - Sixel graphics: DCS ... ST
-    let filtered = chunk
+    const filtered = chunk
       .replace(/\x1b\]1337;[^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
       .replace(/\x1bP[pq][^\x1b]*\x1b\\/g, '');
     if (!filtered) return;
@@ -1656,7 +1656,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (!session) return;
       const branch = parsed.branch as string;
-      if (!branch || !/^[a-zA-Z0-9][a-zA-Z0-9/_.\-]*$/.test(branch)) {
+      if (!branch || !/^[a-zA-Z0-9][a-zA-Z0-9/_.\\-]*$/.test(branch)) {
         wsSend(ws, JSON.stringify({ type: 'git_checkout_ack', sessionId: id, error: 'Invalid branch name' }));
         return;
       }
@@ -1688,7 +1688,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       try {
         const tree = gitService.getFileTree(targetDir);
         // Include git status for explorer badges
-        let gitStatusMap: Record<string, string> = {};
+        const gitStatusMap: Record<string, string> = {};
         if (gitService.isGitRepo(targetDir)) {
           const files = gitService.getGitStatus(targetDir);
           for (const f of files) { gitStatusMap[f.path] = f.status; }

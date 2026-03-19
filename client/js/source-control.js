@@ -12,7 +12,7 @@ let scInitialized = false;
 let isGitRepo = false;
 let upstream = { ahead: 0, behind: 0 };
 let viewMode = 'list'; // 'list' | 'tree'
-let expandedTreeDirs = new Set();
+const expandedTreeDirs = new Set();
 let selectedFile = null;
 let ctxTarget = null; // { path, staged, status }
 let worktrees = [];
@@ -20,7 +20,7 @@ let currentWorktreePath = '';
 let worktreeCollapsed = true; // worktree section collapsed by default
 
 // ─── Multi-select state ──────────────────────────────
-let selectedItems = new Set(); // Set of "staged:path" or "unstaged:path"
+const selectedItems = new Set(); // Set of "staged:path" or "unstaged:path"
 let lastClickedKey = null;     // for shift-click range select
 let allFileKeys = [];          // ordered list of keys for range select
 let dragSelecting = false;
@@ -243,7 +243,7 @@ export function handleGitStatusData(msg) {
     // In worktree session: server provides mainBranchFileCount
     setActivityBadge('source-control', gitStatusFiles.length, {
       isInWorktree: true,
-      mainCount: msg.mainBranchFileCount != null ? msg.mainBranchFileCount : null,
+      mainCount: msg.mainBranchFileCount !== null && msg.mainBranchFileCount !== undefined ? msg.mainBranchFileCount : null,
     });
   } else {
     // On main branch: split worktree-tracking files from real changes client-side

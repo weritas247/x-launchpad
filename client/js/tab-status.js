@@ -31,7 +31,7 @@ const GENERAL_AI_PATTERNS = [
 const SHELL_PATTERNS = [
   { re: /\[y\/N\]|\[Y\/n\]|password:|Password:|passphrase/i,
     status: 'question', text: '입력 대기', lastLineOnly: true },
-  { re: /[\$❯›»#%]\s*$/, status: 'idle', text: '대기', lastLineOnly: true },
+  { re: /[$❯›»#%]\s*$/, status: 'idle', text: '대기', lastLineOnly: true },
 ];
 
 // ─── Internal state ──────────────────────────────────

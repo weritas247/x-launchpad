@@ -14,7 +14,7 @@ const AI_PATTERNS = [
   { re: /Done\.|Task complete|Finished/i,              ai:'gemini',   type:'done',     msg:'Gemini finished the task' },
   { re: /^aider>\s*$/im,                               ai:'aider',    type:'question', msg:'Aider is waiting for input' },
   { re: /^Tokens:|Applied edit/im,                     ai:'aider',    type:'done',     msg:'Aider finished editing' },
-  { re: /[\$❯›»]\s*$/m,                                ai:'any',      type:'question', msg:'Terminal is waiting for input' },
+  { re: /[$❯›»]\s*$/m,                                  ai:'any',      type:'question', msg:'Terminal is waiting for input' },
 ];
 
 function getAiIcon(aiKey) {
