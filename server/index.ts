@@ -490,6 +490,60 @@ app.get('/api/settings/default', (_req, res) => {
   res.json(DEFAULT_SETTINGS);
 });
 
+// ─── PLANS API ───────────────────────────────────────────────────
+app.get('/api/plans', async (req, res) => {
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
+  if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  try {
+    const plans = await userDb.getPlans(payload.userId);
+    res.json({ ok: true, plans });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.post('/api/plans', async (req, res) => {
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
+  if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  const { id, title, content, category } = req.body || {};
+  if (!id) return res.status(400).json({ ok: false, error: 'Missing id' });
+  try {
+    const plan = await userDb.createPlan(payload.userId, {
+      id, title: title || '', content: content || '', category: category || 'other',
+    });
+    res.json({ ok: true, plan });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.put('/api/plans/:id', async (req, res) => {
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
+  if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  const { title, content, category } = req.body || {};
+  try {
+    const plan = await userDb.updatePlan(payload.userId, req.params.id, { title, content, category });
+    res.json({ ok: true, plan });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.delete('/api/plans/:id', async (req, res) => {
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
+  if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  try {
+    await userDb.deletePlan(payload.userId, req.params.id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
 // ─── IMAGE UPLOAD ─────────────────────────────────────────────────
 app.post('/api/upload-image',
   express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], limit: '20mb' }),
