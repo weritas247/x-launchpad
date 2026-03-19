@@ -3,11 +3,25 @@
   "version": "1.0.0",
   "description": "Super Terminal — browser-based multi-session terminal with AI detection, themes, and xterm.js + node-pty",
   "main": "dist/server/index.js",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/weritas247/claude-web-terminal.git"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/server/index.js",
     "dev": "ts-node server/index.ts",
-    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper 2>/dev/null || true"
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm run format:check",
+    "postinstall": "npm rebuild node-pty && chmod +x node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper 2>/dev/null || true",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"server/**/*.ts\" \"client/**/*.{js,css,html}\"",
+    "format:check": "prettier --check \"server/**/*.ts\" \"client/**/*.{js,css,html}\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.2",
@@ -20,13 +34,19 @@
     "ws": "^8.16.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.11.5",
     "@types/ws": "^8.5.10",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.4.0",
+    "prettier": "^3.8.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.57.1"
   }
 }

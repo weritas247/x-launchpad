@@ -2,10 +2,10 @@
 // All keybinding matching & action execution in one place.
 // Called from both xterm custom key handler and document keydown.
 
-import { S, terminalMap, settingsOverlay } from './state.js';
+import { S } from './state.js';
 import { normalizeKey, KB_DEFS } from './constants.js';
 
-const actionMap = new Map();   // action name → callback
+const actionMap = new Map(); // action name → callback
 
 // ─── SHORTCUT OVERLAY ────────────────────────────────
 let overlayEl = null;
@@ -21,11 +21,13 @@ function getOverlay() {
 
 function showShortcutOverlay(combo, action) {
   const el = getOverlay();
-  const def = KB_DEFS.find(d => d.key === action);
+  const def = KB_DEFS.find((d) => d.key === action);
   const label = def ? def.label : action;
   const displayCombo = combo
-    .replace('Meta', '⌘').replace('Ctrl', '⌃')
-    .replace('Shift', '⇧').replace('Alt', '⌥')
+    .replace('Meta', '⌘')
+    .replace('Ctrl', '⌃')
+    .replace('Shift', '⇧')
+    .replace('Alt', '⌥')
     .replace(/\+/g, ' ');
   el.innerHTML = `<span class="shortcut-overlay-keys">${displayCombo}</span><span class="shortcut-overlay-label">${label}</span>`;
   el.classList.add('visible');
@@ -63,7 +65,7 @@ export function matchCombo(combo) {
 export function tryKeybinding(e) {
   if (!S.settings) return false;
   if (e.type !== 'keydown') return false;
-  if (e._kbHandled) return true;   // already executed by xterm handler
+  if (e._kbHandled) return true; // already executed by xterm handler
 
   const combo = buildCombo(e);
   const action = matchCombo(combo);
@@ -87,6 +89,6 @@ export function tryKeybinding(e) {
  */
 export function xtermKeyHandler(e) {
   if (e.type !== 'keydown') return true;
-  if (tryKeybinding(e)) return false;  // matched → don't let xterm handle it
-  return true;                          // not matched → let xterm handle it
+  if (tryKeybinding(e)) return false; // matched → don't let xterm handle it
+  return true; // not matched → let xterm handle it
 }

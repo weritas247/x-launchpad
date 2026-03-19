@@ -1,4 +1,13 @@
-import { S, terminalMap, sessionMeta, sessionList, termWrapper, tabBar, dropOverlay, dzZones } from './state.js';
+import {
+  S,
+  terminalMap,
+  sessionMeta,
+  sessionList,
+  termWrapper,
+  tabBar,
+  dropOverlay,
+  dzZones,
+} from './state.js';
 import { activateSession } from './session.js';
 import { wsSend } from './websocket.js';
 
@@ -7,7 +16,8 @@ export function updateSplitPaneTitle(el, sessionId) {
   if (!titleEl) {
     titleEl = document.createElement('div');
     titleEl.className = 'split-pane-title';
-    titleEl.innerHTML = '<span class="spt-dot"></span><span class="spt-name"></span><span class="spt-path"></span>';
+    titleEl.innerHTML =
+      '<span class="spt-dot"></span><span class="spt-name"></span><span class="spt-path"></span>';
     el.insertBefore(titleEl, el.firstChild);
   }
   const meta = sessionMeta.get(sessionId) || {};
@@ -22,9 +32,9 @@ export function renderSplitLayout(node, rect) {
   if (!S.splitRoot) return;
   if (node.type === 'pane') {
     const el = node.element;
-    el.style.left   = rect.left + '%';
-    el.style.top    = rect.top + '%';
-    el.style.width  = rect.width + '%';
+    el.style.left = rect.left + '%';
+    el.style.top = rect.top + '%';
+    el.style.width = rect.width + '%';
     el.style.height = rect.height + '%';
     updateSplitPaneTitle(el, node.sessionId);
     return;
@@ -33,17 +43,30 @@ export function renderSplitLayout(node, rect) {
   let r0, r1;
   if (direction === 'v') {
     r0 = { left: rect.left, top: rect.top, width: rect.width * ratio, height: rect.height };
-    r1 = { left: rect.left + rect.width * ratio, top: rect.top, width: rect.width * (1 - ratio), height: rect.height };
+    r1 = {
+      left: rect.left + rect.width * ratio,
+      top: rect.top,
+      width: rect.width * (1 - ratio),
+      height: rect.height,
+    };
   } else {
     r0 = { left: rect.left, top: rect.top, width: rect.width, height: rect.height * ratio };
-    r1 = { left: rect.left, top: rect.top + rect.height * ratio, width: rect.width, height: rect.height * (1 - ratio) };
+    r1 = {
+      left: rect.left,
+      top: rect.top + rect.height * ratio,
+      width: rect.width,
+      height: rect.height * (1 - ratio),
+    };
   }
   renderSplitLayout(children[0], r0);
   renderSplitLayout(children[1], r1);
-  attachDivider(node, direction === 'v'
-    ? { left: rect.left + rect.width * ratio, top: rect.top, width: 0, height: rect.height }
-    : { left: rect.left, top: rect.top + rect.height * ratio, width: rect.width, height: 0 },
-    rect);
+  attachDivider(
+    node,
+    direction === 'v'
+      ? { left: rect.left + rect.width * ratio, top: rect.top, width: 0, height: rect.height }
+      : { left: rect.left, top: rect.top + rect.height * ratio, width: rect.width, height: 0 },
+    rect
+  );
 }
 
 function attachDivider(node, pos, parentRect) {
@@ -52,22 +75,22 @@ function attachDivider(node, pos, parentRect) {
     d.className = `split-divider split-divider-${node.direction}`;
     S.splitRoot.appendChild(d);
     node._divider = d;
-    d.addEventListener('mousedown', e => startDividerDrag(e, node, parentRect));
+    d.addEventListener('mousedown', (e) => startDividerDrag(e, node, parentRect));
   }
   const d = node._divider;
   if (node.direction === 'v') {
-    d.style.left   = pos.left + '%';
-    d.style.top    = pos.top + '%';
+    d.style.left = pos.left + '%';
+    d.style.top = pos.top + '%';
     d.style.height = pos.height + '%';
-    d.style.width  = '8px';
+    d.style.width = '8px';
     d.style.marginLeft = '-4px';
-    d.style.marginTop  = '';
+    d.style.marginTop = '';
   } else {
-    d.style.left   = pos.left + '%';
-    d.style.top    = pos.top + '%';
-    d.style.width  = pos.width + '%';
+    d.style.left = pos.left + '%';
+    d.style.top = pos.top + '%';
+    d.style.width = pos.width + '%';
     d.style.height = '8px';
-    d.style.marginTop  = '-4px';
+    d.style.marginTop = '-4px';
     d.style.marginLeft = '';
   }
 }
@@ -76,16 +99,17 @@ function startDividerDrag(e, node, parentRect) {
   e.preventDefault();
   node._divider.classList.add('dragging');
   const wrapRect = termWrapper.getBoundingClientRect();
-  const parentSizePx = node.direction === 'v'
-    ? wrapRect.width  * parentRect.width  / 100
-    : wrapRect.height * parentRect.height / 100;
+  const parentSizePx =
+    node.direction === 'v'
+      ? (wrapRect.width * parentRect.width) / 100
+      : (wrapRect.height * parentRect.height) / 100;
   const startRatio = node.ratio;
   const startPos = node.direction === 'v' ? e.clientX : e.clientY;
 
-  const onMove = ev => {
+  const onMove = (ev) => {
     const delta = (node.direction === 'v' ? ev.clientX : ev.clientY) - startPos;
     node.ratio = Math.min(0.8, Math.max(0.2, startRatio + delta / parentSizePx));
-    renderSplitLayout(S.layoutTree, { left:0, top:0, width:100, height:100 });
+    renderSplitLayout(S.layoutTree, { left: 0, top: 0, width: 100, height: 100 });
     refitAllPanes();
   };
   const onUp = () => {
@@ -100,7 +124,9 @@ export function refitAllPanes() {
   if (!S.layoutTree || !S.splitRoot) return;
   terminalMap.forEach(({ fitAddon, div }) => {
     if (div.parentElement === S.splitRoot) {
-      try { fitAddon.fit(); } catch {}
+      try {
+        fitAddon.fit();
+      } catch {}
     }
   });
 }
@@ -120,7 +146,10 @@ export function enterSplitMode(existingSessionId) {
 
 export function collectPaneIds(node, out = []) {
   if (!node) return out;
-  if (node.type === 'pane') { out.push(node.sessionId); return out; }
+  if (node.type === 'pane') {
+    out.push(node.sessionId);
+    return out;
+  }
   collectPaneIds(node.children[0], out);
   collectPaneIds(node.children[1], out);
   return out;
@@ -129,7 +158,7 @@ export function collectPaneIds(node, out = []) {
 export function updateSidebarSplitGroup() {
   const existing = sessionList.querySelector('.split-group');
   if (existing) {
-    [...existing.querySelectorAll('.session-item')].forEach(el => sessionList.appendChild(el));
+    [...existing.querySelectorAll('.session-item')].forEach((el) => sessionList.appendChild(el));
     existing.remove();
   }
   if (!S.layoutTree) return;
@@ -141,7 +170,7 @@ export function updateSidebarSplitGroup() {
   group.className = 'split-group';
   group.innerHTML = `<div class="split-group-header"><span class="split-group-header-icon">⊞</span><span class="split-group-header-label">SPLIT</span><span class="split-group-badge">${paneIds.length}</span></div>`;
 
-  paneIds.forEach(id => {
+  paneIds.forEach((id) => {
     const entry = terminalMap.get(id);
     if (entry && entry.sidebarEl) group.appendChild(entry.sidebarEl);
   });
@@ -153,13 +182,16 @@ export function teardownSplitLayout() {
   if (!S.layoutTree) return;
   function removeDividers(node) {
     if (!node || node.type === 'pane') return;
-    if (node._divider) { node._divider.remove(); node._divider = null; }
+    if (node._divider) {
+      node._divider.remove();
+      node._divider = null;
+    }
     node.children.forEach(removeDividers);
   }
   removeDividers(S.layoutTree);
   S.layoutTree = null;
   if (S.splitRoot) {
-    [...S.splitRoot.querySelectorAll('.term-pane')].forEach(div => {
+    [...S.splitRoot.querySelectorAll('.term-pane')].forEach((div) => {
       div.classList.remove('split-active', 'split-inactive');
       termWrapper.appendChild(div);
     });
@@ -180,7 +212,10 @@ export function findParentNode(tree, target, parent = null) {
   if (!tree) return null;
   if (tree === target) return parent;
   if (tree.type === 'split') {
-    return findParentNode(tree.children[0], target, tree) || findParentNode(tree.children[1], target, tree);
+    return (
+      findParentNode(tree.children[0], target, tree) ||
+      findParentNode(tree.children[1], target, tree)
+    );
   }
   return null;
 }
@@ -196,8 +231,11 @@ export function removeSplitPane(sessionId) {
     teardownSplitLayout();
     return;
   }
-  const sibling = parent.children.find(c => c !== pane);
-  if (parent._divider) { parent._divider.remove(); parent._divider = null; }
+  const sibling = parent.children.find((c) => c !== pane);
+  if (parent._divider) {
+    parent._divider.remove();
+    parent._divider = null;
+  }
 
   const grandParent = findParentNode(S.layoutTree, parent);
   if (!grandParent) {
@@ -216,7 +254,7 @@ export function removeSplitPane(sessionId) {
       activateSession(lastId);
     }
   } else {
-    renderSplitLayout(S.layoutTree, { left:0, top:0, width:100, height:100 });
+    renderSplitLayout(S.layoutTree, { left: 0, top: 0, width: 100, height: 100 });
     refitAllPanes();
   }
 }
@@ -224,14 +262,22 @@ export function removeSplitPane(sessionId) {
 export function createSplitSession() {
   return new Promise((resolve, reject) => {
     let resolved = false;
-    const wrappedResolve = (id) => { resolved = true; resolve(id); };
+    const wrappedResolve = (id) => {
+      resolved = true;
+      resolve(id);
+    };
     S.pendingSplitQueue.push({ resolve: wrappedResolve });
     const currentMeta = S.activeSessionId ? sessionMeta.get(S.activeSessionId) : null;
     const baseName = currentMeta?.name || 'shell';
-    wsSend({ type: 'session_create', name: baseName, cmd: S.settings?.shell?.defaultShell || '', cwd: currentMeta?.cwd });
+    wsSend({
+      type: 'session_create',
+      name: baseName,
+      cmd: S.settings?.shell?.defaultShell || '',
+      cwd: currentMeta?.cwd,
+    });
     setTimeout(() => {
       if (!resolved) {
-        S.pendingSplitQueue = S.pendingSplitQueue.filter(p => p.resolve !== wrappedResolve);
+        S.pendingSplitQueue = S.pendingSplitQueue.filter((p) => p.resolve !== wrappedResolve);
         reject(new Error('split session timeout'));
       }
     }, 8000);
@@ -247,19 +293,19 @@ export function showDropZoneOverlay() {
 
 export function hideDropZoneOverlay() {
   dropOverlay.classList.remove('active');
-  dzZones.forEach(z => z.classList.remove('dz-hover'));
+  dzZones.forEach((z) => z.classList.remove('dz-hover'));
 }
 
 export function initSplitDnD() {
-  dzZones.forEach(zone => {
-    zone.addEventListener('dragover', e => {
+  dzZones.forEach((zone) => {
+    zone.addEventListener('dragover', (e) => {
       if (!e.dataTransfer.types.includes('text/split-tab')) return;
       e.preventDefault();
-      dzZones.forEach(z => z.classList.remove('dz-hover'));
+      dzZones.forEach((z) => z.classList.remove('dz-hover'));
       zone.classList.add('dz-hover');
     });
     zone.addEventListener('dragleave', () => zone.classList.remove('dz-hover'));
-    zone.addEventListener('drop', async e => {
+    zone.addEventListener('drop', async (e) => {
       e.preventDefault();
       hideDropZoneOverlay();
       const z = zone.dataset.zone;
@@ -269,30 +315,38 @@ export function initSplitDnD() {
       if (z === 'center') {
         try {
           const [id1, id2, id3] = await Promise.all([
-            createSplitSession(), createSplitSession(), createSplitSession()
+            createSplitSession(),
+            createSplitSession(),
+            createSplitSession(),
           ]);
           const existingEntry = terminalMap.get(existingId);
           if (!existingEntry) return;
           const existingPane = { type: 'pane', sessionId: existingId, element: existingEntry.div };
-          const e1 = terminalMap.get(id1), e2 = terminalMap.get(id2), e3 = terminalMap.get(id3);
+          const e1 = terminalMap.get(id1),
+            e2 = terminalMap.get(id2),
+            e3 = terminalMap.get(id3);
           if (!e1 || !e2 || !e3) return;
           const pane1 = { type: 'pane', sessionId: id1, element: e1.div };
           const pane2 = { type: 'pane', sessionId: id2, element: e2.div };
           const pane3 = { type: 'pane', sessionId: id3, element: e3.div };
           enterSplitMode(existingId);
-          [pane1, pane2, pane3].forEach(p => S.splitRoot.appendChild(p.element));
+          [pane1, pane2, pane3].forEach((p) => S.splitRoot.appendChild(p.element));
           S.layoutTree = {
-            type: 'split', direction: 'h', ratio: 0.5,
+            type: 'split',
+            direction: 'h',
+            ratio: 0.5,
             children: [
               { type: 'split', direction: 'v', ratio: 0.5, children: [existingPane, pane1] },
-              { type: 'split', direction: 'v', ratio: 0.5, children: [pane2, pane3] }
-            ]
+              { type: 'split', direction: 'v', ratio: 0.5, children: [pane2, pane3] },
+            ],
           };
-          renderSplitLayout(S.layoutTree, { left:0, top:0, width:100, height:100 });
+          renderSplitLayout(S.layoutTree, { left: 0, top: 0, width: 100, height: 100 });
           refitAllPanes();
           updateSidebarSplitGroup();
           activateSession(existingId);
-        } catch (err) { console.error('4-way split failed', err); }
+        } catch (err) {
+          console.error('4-way split failed', err);
+        }
         return;
       }
 
@@ -305,7 +359,7 @@ export function initSplitDnD() {
         const newPane = { type: 'pane', sessionId: newId, element: newEntry.div };
         newPane.element.classList.add('split-inactive');
 
-        const firstNew = (z === 'left' || z === 'top');
+        const firstNew = z === 'left' || z === 'top';
 
         if (!S.layoutTree) {
           enterSplitMode(existingId);
@@ -313,16 +367,20 @@ export function initSplitDnD() {
           if (!existingEntry) return;
           const existingPane = { type: 'pane', sessionId: existingId, element: existingEntry.div };
           S.layoutTree = {
-            type: 'split', direction, ratio: 0.5,
-            children: firstNew ? [newPane, existingPane] : [existingPane, newPane]
+            type: 'split',
+            direction,
+            ratio: 0.5,
+            children: firstNew ? [newPane, existingPane] : [existingPane, newPane],
           };
         } else {
           const existingPane = findPaneNode(S.layoutTree, existingId);
           if (!existingPane) return;
           const parent = findParentNode(S.layoutTree, existingPane);
           const newNode = {
-            type: 'split', direction, ratio: 0.5,
-            children: firstNew ? [newPane, existingPane] : [existingPane, newPane]
+            type: 'split',
+            direction,
+            ratio: 0.5,
+            children: firstNew ? [newPane, existingPane] : [existingPane, newPane],
           };
           if (!parent) {
             S.layoutTree = newNode;
@@ -332,11 +390,13 @@ export function initSplitDnD() {
           }
         }
         S.splitRoot.appendChild(newPane.element);
-        renderSplitLayout(S.layoutTree, { left:0, top:0, width:100, height:100 });
+        renderSplitLayout(S.layoutTree, { left: 0, top: 0, width: 100, height: 100 });
         refitAllPanes();
         updateSidebarSplitGroup();
         activateSession(newId);
-      } catch (err) { console.error('split failed', err); }
+      } catch (err) {
+        console.error('split failed', err);
+      }
     });
   });
 }

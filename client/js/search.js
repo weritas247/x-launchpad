@@ -29,10 +29,20 @@ export function initSearch() {
   const doSearch = () => {
     if (!input || !S.activeSessionId) return;
     const query = input.value.trim();
-    if (!query) { clearResults(); return; }
+    if (!query) {
+      clearResults();
+      return;
+    }
     lastQuery = query;
     const include = includeInput?.value.trim() || '';
-    wsSend({ type: 'file_search', sessionId: S.activeSessionId, query, caseSensitive, useRegex, include });
+    wsSend({
+      type: 'file_search',
+      sessionId: S.activeSessionId,
+      query,
+      caseSensitive,
+      useRegex,
+      include,
+    });
   };
 
   if (input) {
@@ -41,30 +51,37 @@ export function initSearch() {
       debounceTimer = setTimeout(doSearch, 300);
     });
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { clearTimeout(debounceTimer); doSearch(); }
+      if (e.key === 'Enter') {
+        clearTimeout(debounceTimer);
+        doSearch();
+      }
     });
   }
   if (btn) btn.addEventListener('click', doSearch);
-  if (clearBtn) clearBtn.addEventListener('click', () => {
-    if (input) input.value = '';
-    lastQuery = '';
-    clearResults();
-  });
+  if (clearBtn)
+    clearBtn.addEventListener('click', () => {
+      if (input) input.value = '';
+      lastQuery = '';
+      clearResults();
+    });
 
   // Toggle buttons
-  if (caseBtn) caseBtn.addEventListener('click', () => {
-    caseSensitive = !caseSensitive;
-    caseBtn.classList.toggle('active', caseSensitive);
-    if (lastQuery) doSearch();
-  });
-  if (regexBtn) regexBtn.addEventListener('click', () => {
-    useRegex = !useRegex;
-    regexBtn.classList.toggle('active', useRegex);
-    if (lastQuery) doSearch();
-  });
-  if (includeInput) includeInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && lastQuery) doSearch();
-  });
+  if (caseBtn)
+    caseBtn.addEventListener('click', () => {
+      caseSensitive = !caseSensitive;
+      caseBtn.classList.toggle('active', caseSensitive);
+      if (lastQuery) doSearch();
+    });
+  if (regexBtn)
+    regexBtn.addEventListener('click', () => {
+      useRegex = !useRegex;
+      regexBtn.classList.toggle('active', useRegex);
+      if (lastQuery) doSearch();
+    });
+  if (includeInput)
+    includeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && lastQuery) doSearch();
+    });
 
   // Replace toggle
   if (replaceToggle && replaceRow) {
@@ -76,22 +93,46 @@ export function initSearch() {
   }
 
   // Replace in file / Replace all
-  if (replaceBtn) replaceBtn.addEventListener('click', () => {
-    if (!lastQuery || !replaceInput || !S.activeSessionId) return;
-    const replacement = replaceInput.value;
-    // Replace in first matching file
-    if (searchResults.length > 0) {
-      const file = searchResults[0].file;
-      wsSend({ type: 'file_replace', sessionId: S.activeSessionId, query: lastQuery, replacement, filePath: file, caseSensitive, useRegex });
-    }
-  });
-  if (replaceAllBtn) replaceAllBtn.addEventListener('click', async () => {
-    if (!lastQuery || !replaceInput || !S.activeSessionId) return;
-    const replacement = replaceInput.value;
-    if (!await confirmModal(`Replace all occurrences of "${lastQuery}" with "${replacement}"?`, 'Replace All')) return;
-    const includeVal = includeInput?.value.trim() || '';
-    wsSend({ type: 'file_replace_all', sessionId: S.activeSessionId, query: lastQuery, replacement, caseSensitive, useRegex, include: includeVal });
-  });
+  if (replaceBtn)
+    replaceBtn.addEventListener('click', () => {
+      if (!lastQuery || !replaceInput || !S.activeSessionId) return;
+      const replacement = replaceInput.value;
+      // Replace in first matching file
+      if (searchResults.length > 0) {
+        const file = searchResults[0].file;
+        wsSend({
+          type: 'file_replace',
+          sessionId: S.activeSessionId,
+          query: lastQuery,
+          replacement,
+          filePath: file,
+          caseSensitive,
+          useRegex,
+        });
+      }
+    });
+  if (replaceAllBtn)
+    replaceAllBtn.addEventListener('click', async () => {
+      if (!lastQuery || !replaceInput || !S.activeSessionId) return;
+      const replacement = replaceInput.value;
+      if (
+        !(await confirmModal(
+          `Replace all occurrences of "${lastQuery}" with "${replacement}"?`,
+          'Replace All'
+        ))
+      )
+        return;
+      const includeVal = includeInput?.value.trim() || '';
+      wsSend({
+        type: 'file_replace_all',
+        sessionId: S.activeSessionId,
+        query: lastQuery,
+        replacement,
+        caseSensitive,
+        useRegex,
+        include: includeVal,
+      });
+    });
 }
 
 export function handleSearchResults(msg) {
@@ -105,7 +146,13 @@ export function handleReplaceAck(msg) {
     showToast(`Replaced ${msg.count || 0} occurrences`, 'success');
     // Re-search to refresh results
     if (lastQuery && S.activeSessionId) {
-      wsSend({ type: 'file_search', sessionId: S.activeSessionId, query: lastQuery, caseSensitive, useRegex });
+      wsSend({
+        type: 'file_search',
+        sessionId: S.activeSessionId,
+        query: lastQuery,
+        caseSensitive,
+        useRegex,
+      });
     }
   } else {
     showToast('Replace failed: ' + (msg.error || 'unknown'), 'error');
@@ -153,7 +200,8 @@ function renderResults() {
     fileHeader.className = 'search-file-header';
     const fileName = file.split('/').pop();
     const dirPath = file.includes('/') ? file.slice(0, file.lastIndexOf('/')) : '';
-    fileHeader.innerHTML = `<span class="search-file-name">${escHtml(fileName)}</span>` +
+    fileHeader.innerHTML =
+      `<span class="search-file-name">${escHtml(fileName)}</span>` +
       (dirPath ? `<span class="search-file-dir">${escHtml(dirPath)}</span>` : '') +
       `<span class="search-file-count">${matches.length}</span>`;
 
@@ -193,7 +241,10 @@ function highlightMatch(text, query) {
   if (useRegex) {
     try {
       const flags = caseSensitive ? 'g' : 'gi';
-      return escaped.replace(new RegExp(`(${query})`, flags), '<mark class="search-highlight">$1</mark>');
+      return escaped.replace(
+        new RegExp(`(${query})`, flags),
+        '<mark class="search-highlight">$1</mark>'
+      );
     } catch {
       return escaped;
     }
@@ -201,7 +252,10 @@ function highlightMatch(text, query) {
   const queryEscaped = escHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const flags = caseSensitive ? 'g' : 'gi';
   try {
-    return escaped.replace(new RegExp(`(${queryEscaped})`, flags), '<mark class="search-highlight">$1</mark>');
+    return escaped.replace(
+      new RegExp(`(${queryEscaped})`, flags),
+      '<mark class="search-highlight">$1</mark>'
+    );
   } catch {
     return escaped;
   }
@@ -209,6 +263,12 @@ function highlightMatch(text, query) {
 
 export function onSearchSessionChange() {
   if (lastQuery) {
-    wsSend({ type: 'file_search', sessionId: S.activeSessionId, query: lastQuery, caseSensitive, useRegex });
+    wsSend({
+      type: 'file_search',
+      sessionId: S.activeSessionId,
+      query: lastQuery,
+      caseSensitive,
+      useRegex,
+    });
   }
 }

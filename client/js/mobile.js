@@ -2,10 +2,11 @@
 import { switchPanel, getActivePanel } from './activity-bar.js';
 import { openSettings } from './settings.js';
 
-
 // ─── Mobile Detection ───
 const MQ = window.matchMedia('(max-width: 768px)');
-export function isMobile() { return MQ.matches; }
+export function isMobile() {
+  return MQ.matches;
+}
 
 // ─── DOM refs ───
 let bottomNav, overlay, overlayTitle, overlayContent, overlayClose;
@@ -13,10 +14,10 @@ let currentOverlayPanel = null;
 const panelParentMap = new Map();
 
 const PANEL_TITLES = {
-  'search': 'SEARCH',
-  'explorer': 'EXPLORER',
+  search: 'SEARCH',
+  explorer: 'EXPLORER',
   'source-control': 'SOURCE CONTROL',
-  'plan': 'PLAN',
+  plan: 'PLAN',
   'input-history': 'INPUT HISTORY',
 };
 
@@ -122,7 +123,7 @@ function restorePanel() {
 
 function updateBottomNavActive(panelName) {
   if (!bottomNav) return;
-  bottomNav.querySelectorAll('.bnav-btn').forEach(btn => {
+  bottomNav.querySelectorAll('.bnav-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.panel === panelName);
   });
 }
@@ -167,7 +168,9 @@ function onLeaveMobile() {
 }
 
 // ─── Touch Gestures ───
-let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+let touchStartX = 0,
+  touchStartY = 0,
+  touchStartTime = 0;
 
 function initTouchGestures() {
   document.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -238,23 +241,44 @@ function initViewportHandler() {
 
 // ─── Long Press Helper ───
 export function registerLongPress(element, callback, threshold = 350) {
-  let timer = null, startX, startY;
+  let timer = null,
+    startX,
+    startY;
 
-  element.addEventListener('touchstart', (e) => {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    timer = setTimeout(() => { callback(e); }, threshold);
-  }, { passive: true });
+  element.addEventListener(
+    'touchstart',
+    (e) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      timer = setTimeout(() => {
+        callback(e);
+      }, threshold);
+    },
+    { passive: true }
+  );
 
-  element.addEventListener('touchmove', (e) => {
-    if (!timer) return;
-    const dx = Math.abs(e.touches[0].clientX - startX);
-    const dy = Math.abs(e.touches[0].clientY - startY);
-    if (dx > 10 || dy > 10) { clearTimeout(timer); timer = null; }
-  }, { passive: true });
+  element.addEventListener(
+    'touchmove',
+    (e) => {
+      if (!timer) return;
+      const dx = Math.abs(e.touches[0].clientX - startX);
+      const dy = Math.abs(e.touches[0].clientY - startY);
+      if (dx > 10 || dy > 10) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    },
+    { passive: true }
+  );
 
-  element.addEventListener('touchend', () => { clearTimeout(timer); timer = null; });
-  element.addEventListener('touchcancel', () => { clearTimeout(timer); timer = null; });
+  element.addEventListener('touchend', () => {
+    clearTimeout(timer);
+    timer = null;
+  });
+  element.addEventListener('touchcancel', () => {
+    clearTimeout(timer);
+    timer = null;
+  });
 }
 
 // ─── Auto-init ───

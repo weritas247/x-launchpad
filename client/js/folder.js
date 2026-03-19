@@ -1,9 +1,8 @@
 import { S, terminalMap, folderMap, escHtml } from './state.js';
-import { makeSidebarItemDraggable } from './terminal.js';
 
 export function createFolder(name) {
-  const id = 'folder-' + (++S.folderCounter);
-  const folderName = (typeof name === 'string' && name) ? name : 'Folder ' + S.folderCounter;
+  const id = 'folder-' + ++S.folderCounter;
+  const folderName = typeof name === 'string' && name ? name : 'Folder ' + S.folderCounter;
 
   const el = document.createElement('div');
   el.className = 'folder-item open';
@@ -25,13 +24,13 @@ export function createFolder(name) {
   const countEl = el.querySelector('.folder-count');
   const closeBtn = el.querySelector('.folder-close-btn');
 
-  header.addEventListener('click', e => {
+  header.addEventListener('click', (e) => {
     if (e.target.closest('.folder-close-btn')) return;
     el.classList.toggle('open');
     el.querySelector('.folder-icon').textContent = el.classList.contains('open') ? '📂' : '📁';
   });
 
-  nameEl.addEventListener('dblclick', e => {
+  nameEl.addEventListener('dblclick', (e) => {
     e.stopPropagation();
     const input = document.createElement('input');
     input.className = 'folder-name-input';
@@ -46,31 +45,40 @@ export function createFolder(name) {
       span.textContent = newName;
       input.replaceWith(span);
       folderMap.get(id).name = newName;
-      span.addEventListener('dblclick', ev => { ev.stopPropagation(); nameEl.dispatchEvent(new Event('dblclick')); });
+      span.addEventListener('dblclick', (ev) => {
+        ev.stopPropagation();
+        nameEl.dispatchEvent(new Event('dblclick'));
+      });
     };
     input.addEventListener('blur', commit);
-    input.addEventListener('keydown', e => { if (e.key==='Enter') commit(); if (e.key==='Escape') { input.value=nameEl.textContent; commit(); } });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') commit();
+      if (e.key === 'Escape') {
+        input.value = nameEl.textContent;
+        commit();
+      }
+    });
   });
 
-  closeBtn.addEventListener('click', e => {
+  closeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     const sessionListEl = document.getElementById('session-list');
-    [...children.querySelectorAll('.session-item')].forEach(s => sessionListEl.appendChild(s));
+    [...children.querySelectorAll('.session-item')].forEach((s) => sessionListEl.appendChild(s));
     el.remove();
     folderMap.delete(id);
   });
 
-  el.addEventListener('dragover', e => {
+  el.addEventListener('dragover', (e) => {
     if (e.dataTransfer.types.includes('text/sidebar-session')) {
       e.preventDefault();
       e.stopPropagation();
       el.classList.add('drag-over');
     }
   });
-  el.addEventListener('dragleave', e => {
+  el.addEventListener('dragleave', (e) => {
     if (!el.contains(e.relatedTarget)) el.classList.remove('drag-over');
   });
-  el.addEventListener('drop', e => {
+  el.addEventListener('drop', (e) => {
     const srcId = e.dataTransfer.getData('text/sidebar-session');
     el.classList.remove('drag-over');
     if (!srcId) return;
@@ -98,16 +106,16 @@ export function updateFolderCount(countEl, children) {
 
 export function initFolderDnD() {
   const sessionListEl = document.getElementById('session-list');
-  sessionListEl.addEventListener('dragover', e => {
+  sessionListEl.addEventListener('dragover', (e) => {
     if (e.dataTransfer.types.includes('text/sidebar-session') && e.target === sessionListEl) {
       e.preventDefault();
       sessionListEl.classList.add('drag-over-root');
     }
   });
-  sessionListEl.addEventListener('dragleave', e => {
+  sessionListEl.addEventListener('dragleave', (e) => {
     if (!sessionListEl.contains(e.relatedTarget)) sessionListEl.classList.remove('drag-over-root');
   });
-  sessionListEl.addEventListener('drop', e => {
+  sessionListEl.addEventListener('drop', (e) => {
     const srcId = e.dataTransfer.getData('text/sidebar-session');
     sessionListEl.classList.remove('drag-over-root');
     if (!srcId) return;
@@ -115,7 +123,7 @@ export function initFolderDnD() {
     if (entry && entry.sidebarEl.closest('.folder-children')) {
       e.preventDefault();
       sessionListEl.insertBefore(entry.sidebarEl, document.getElementById('session-empty'));
-      document.querySelectorAll('.folder-children').forEach(fc => {
+      document.querySelectorAll('.folder-children').forEach((fc) => {
         const folder = fc.closest('.folder-item');
         if (folder) updateFolderCount(folder.querySelector('.folder-count'), fc);
       });

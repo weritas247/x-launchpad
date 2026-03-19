@@ -1,1056 +1,1427 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SUPER TERMINAL</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Fira+Code:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Source+Code+Pro:wght@300;400;500;600;700&family=Inconsolata:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Roboto+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css"/>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/vs2015.min.css"/>
-  <link rel="stylesheet" href="styles.css"/>
-</head>
-<body>
-<div id="screen-dim"></div>
-<div id="app">
-  <!-- HEADER -->
-  <header id="header">
-    <div class="header-logo">
-      <div class="logo-icon">
-        <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="1" y="1" width="26" height="26" rx="5" stroke="currentColor" stroke-width="1.5" fill="none"/>
-          <polyline points="9,6 5,14 12,14 8,22 19,11 13,11 17,6" fill="currentColor" stroke="none"/>
-        </svg>
-      </div>
-      <span class="logo-text-super">SUPER TERMINAL</span>
-    </div>
-    <div class="header-spacer"></div>
-    <div class="header-meta">
-      <div class="meta-item">
-        <div class="meta-dot" id="conn-dot"></div>
-        <span id="conn-label">OFFLINE</span>
-      </div>
-      <div class="meta-item latency-indicator" id="latency-indicator" title="Network latency">
-        <div class="signal-bars">
-          <div class="signal-bar" data-bar="1"></div>
-          <div class="signal-bar" data-bar="2"></div>
-          <div class="signal-bar" data-bar="3"></div>
-          <div class="signal-bar" data-bar="4"></div>
-        </div>
-        <span class="latency-value" id="latency-value">—</span>
-      </div>
-      <div class="meta-item">SYN <span id="hdr-session-count" class="sb-accent">0</span></div>
-      <div class="meta-item" id="hdr-restore-badge" style="display:none;color:var(--accent);animation:pulse 1s infinite">⟳ RESTORING</div>
-      <div class="meta-item" id="hdr-time"></div>
-    </div>
-    <button class="btn-icon" id="btn-settings" title="Settings (Ctrl+,)">⚙</button>
-  </header>
-
-  <!-- ACTIVITY BAR -->
-  <nav id="activity-bar">
-    <button class="activity-btn active" data-panel="search" title="Search">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M16 16l4.5 4.5"/></svg>
-    </button>
-    <button class="activity-btn" data-panel="explorer" title="Explorer">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7V5a2 2 0 012-2h4l2 2h8a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
-    </button>
-    <button class="activity-btn" data-panel="source-control" title="Source Control">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M12 8.5V12M12 12C12 14 6 14 6 15.5M12 12C12 14 18 14 18 15.5"/></svg>
-    </button>
-    <button class="activity-btn" data-panel="plan" title="Plan">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
-    </button>
-  </nav>
-
-  <!-- SIDEBAR -->
-  <aside id="sidebar">
-    <!-- Hidden session list container (internal use) -->
-    <div id="session-list" style="display:none">
-      <div id="session-empty" style="display:none"></div>
-    </div>
-
-    <!-- SEARCH PANEL -->
-    <div class="sidebar-panel active" id="panel-search">
-      <div class="sidebar-header">
-        <span class="sidebar-title-text">SEARCH</span>
-        <div class="sidebar-header-actions">
-          <button class="btn-icon-sm" id="search-clear" title="Clear">✕</button>
-        </div>
-      </div>
-      <div class="search-input-bar">
-        <button class="search-replace-toggle" id="search-replace-toggle" title="Toggle Replace">▸</button>
-        <input type="text" class="search-input" id="search-input" placeholder="Search in files..."/>
-        <button class="search-go-btn" id="search-btn" title="Search">→</button>
-      </div>
-      <div class="search-replace-row" id="search-replace-row" style="display:none">
-        <input type="text" class="search-input" id="search-replace-input" placeholder="Replace"/>
-        <button class="search-replace-btn" id="search-replace-btn" title="Replace in file">⇄</button>
-        <button class="search-replace-btn" id="search-replace-all-btn" title="Replace all">⇄All</button>
-      </div>
-      <div class="search-options">
-        <button class="search-opt-btn" id="search-opt-case" title="Match Case">Aa</button>
-        <button class="search-opt-btn" id="search-opt-regex" title="Use Regex">.*</button>
-        <input type="text" class="search-include" id="search-include" placeholder="Include (e.g. *.js, src/)"/>
-      </div>
-      <div class="search-count" id="search-count"></div>
-      <div class="search-results-container" id="search-results">
-        <div class="search-empty">Type to search in files</div>
-      </div>
-    </div>
-
-    <!-- EXPLORER PANEL -->
-    <div class="sidebar-panel" id="panel-explorer">
-      <div class="sidebar-header">
-        <span class="sidebar-title-text">EXPLORER</span>
-        <div class="sidebar-header-actions">
-          <button class="btn-icon-sm" id="explorer-upload" title="Upload file">↑</button>
-          <button class="btn-icon-sm" id="explorer-refresh" title="Refresh">↻</button>
-        </div>
-      </div>
-      <input type="file" id="explorer-upload-input" multiple style="display:none">
-      <div class="explorer-path-bar">
-        <span class="explorer-path-label" id="explorer-path" title="">—</span>
-      </div>
-      <div class="explorer-tree-container" id="explorer-tree"></div>
-    </div>
-
-    <!-- SOURCE CONTROL PANEL -->
-    <div class="sidebar-panel" id="panel-source-control">
-      <div class="sidebar-header">
-        <span class="sidebar-title-text">SOURCE CONTROL</span>
-        <div class="sidebar-header-actions">
-          <span class="sc-badge" id="sc-change-count"></span>
-          <button class="btn-icon-sm" id="sc-view-toggle" title="Tree view">≡</button>
-          <button class="btn-icon-sm" id="sc-refresh" title="Refresh">↻</button>
-        </div>
-      </div>
-      <div class="sc-branch-bar">
-        <span class="sc-branch-icon">⎇</span>
-        <span class="sc-branch-label" id="sc-branch-name">—</span>
-      </div>
-      <div class="sc-worktree-section" id="sc-worktree-section" style="display:none">
-        <div class="sc-worktree-header" id="sc-worktree-header">
-          <span class="sc-worktree-toggle">▾</span>
-          <span class="sc-worktree-title">WORKTREES</span>
-          <span class="sc-worktree-count" id="sc-worktree-count"></span>
-          <button class="btn-icon-sm" id="sc-worktree-add-btn" title="Add worktree">+</button>
-        </div>
-        <div class="sc-worktree-list" id="sc-worktree-list"></div>
-        <div class="sc-worktree-add-form" id="sc-worktree-add-form" style="display:none">
-          <input type="text" class="sc-worktree-input" id="sc-worktree-path" placeholder="Branch name or path"/>
-          <div class="sc-worktree-form-actions">
-            <label class="sc-worktree-label"><input type="checkbox" id="sc-worktree-new-branch"/> New branch</label>
-            <button class="sc-worktree-form-btn" id="sc-worktree-create">Create</button>
-            <button class="sc-worktree-form-btn sc-worktree-cancel-btn" id="sc-worktree-cancel">Cancel</button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SUPER TERMINAL</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Fira+Code:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Source+Code+Pro:wght@300;400;500;600;700&family=Inconsolata:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Roboto+Mono:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/vs2015.min.css"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="screen-dim"></div>
+    <div id="app">
+      <!-- HEADER -->
+      <header id="header">
+        <div class="header-logo">
+          <div class="logo-icon">
+            <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect
+                x="1"
+                y="1"
+                width="26"
+                height="26"
+                rx="5"
+                stroke="currentColor"
+                stroke-width="1.5"
+                fill="none"
+              />
+              <polyline
+                points="9,6 5,14 12,14 8,22 19,11 13,11 17,6"
+                fill="currentColor"
+                stroke="none"
+              />
+            </svg>
           </div>
+          <span class="logo-text-super">SUPER TERMINAL</span>
         </div>
-      </div>
-      <div class="sc-commit-bar">
-        <div class="sc-commit-input-wrap">
-          <input type="text" class="sc-commit-input" id="sc-commit-input" placeholder="Message (Enter to commit)"/>
-          <button class="sc-generate-btn" id="sc-generate-btn" title="Generate commit message">Generate ✦</button>
-        </div>
-        <div class="sc-commit-group">
-          <button class="sc-commit-btn" id="sc-commit-btn" title="Commit">✓ Commit</button>
-          <button class="sc-commit-dropdown" id="sc-commit-dropdown" title="More actions">▾</button>
-          <div class="sc-commit-menu" id="sc-commit-menu">
-            <div class="sc-commit-menu-item" data-action="commit-push">Commit & Push</div>
-            <div class="sc-commit-menu-item" data-action="push">Push</div>
+        <div class="header-spacer"></div>
+        <div class="header-meta">
+          <div class="meta-item">
+            <div class="meta-dot" id="conn-dot"></div>
+            <span id="conn-label">OFFLINE</span>
           </div>
-        </div>
-      </div>
-      <div class="sc-empty" id="sc-empty">No changes detected</div>
-      <div class="sc-file-list-container" id="sc-file-list"></div>
-    </div>
-
-    <!-- PLAN PANEL (moved to modal — see #plan-overlay) -->
-  </aside>
-
-  <!-- SIDEBAR RESIZE HANDLE -->
-  <div class="sidebar-resize" id="sidebar-resize"></div>
-
-  <!-- MAIN -->
-  <main id="main">
-    <div id="tab-bar">
-      <button class="tab-add-btn" id="tab-add-btn" title="New terminal">+</button>
-    </div>
-    <div class="breadcrumb-bar" id="breadcrumb-bar"></div>
-    <!-- SESSION PICKER OVERLAY -->
-    <div id="session-picker" style="display:none">
-      <div id="session-picker-box">
-        <div class="sp-title">NEW SESSION</div>
-        <div class="sp-grid">
-          <button class="sp-btn" data-cmd="claude" data-label="Claude">
-            <img src="icons/claude.webp" alt="Claude">
-            <span class="sp-name">Claude</span>
-          </button>
-          <button class="sp-btn" data-cmd="gemini" data-label="Gemini">
-            <img src="icons/gemini.svg" alt="Gemini">
-            <span class="sp-name">Gemini</span>
-          </button>
-          <button class="sp-btn" data-cmd="codex" data-label="Codex">
-            <img src="icons/codex.png" alt="Codex">
-            <span class="sp-name">Codex</span>
-          </button>
-          <button class="sp-btn" data-cmd="opencode" data-label="OpenCode">
-            <img src="icons/opencode.png" alt="OpenCode">
-            <span class="sp-name">OpenCode</span>
-          </button>
-          <button class="sp-btn sp-btn-shell" data-cmd="" data-label="">
-            <span class="sp-shell-icon">$_</span>
-            <span class="sp-name">Shell</span>
-          </button>
-        </div>
-        <button class="sp-close" id="sp-close">✕</button>
-      </div>
-    </div>
-
-    <div id="main-content">
-    <div id="terminal-wrapper">
-      <div id="drop-zone-overlay">
-        <div class="dz dz-top"    data-zone="top"></div>
-        <div class="dz dz-bottom" data-zone="bottom"></div>
-        <div class="dz dz-left"   data-zone="left"></div>
-        <div class="dz dz-right"  data-zone="right"></div>
-        <div class="dz dz-center" data-zone="center"></div>
-      </div>
-      <div id="empty-state">
-        <div class="empty-art">╔══════════════════╗
-║  SUPER TERMINAL   ║
-╚══════════════════╝</div>
-        <div class="empty-hint">Press <span>+</span> or click <span>New Session</span></div>
-        <button class="btn-start" id="btn-start-empty">INIT SESSION</button>
-        <div class="ai-quick-btns">
-          <button class="btn-ai-quick" data-ai="claude" data-cmd="claude" data-label="Claude"><img src="icons/claude.webp" alt="Claude">Claude</button>
-          <button class="btn-ai-quick" data-ai="gemini" data-cmd="gemini" data-label="Gemini"><img src="icons/gemini.svg" alt="Gemini">Gemini</button>
-          <button class="btn-ai-quick" data-ai="codex" data-cmd="codex" data-label="Codex"><img src="icons/codex.png" alt="Codex">Codex</button>
-          <button class="btn-ai-quick" data-ai="opencode" data-cmd="opencode" data-label="OpenCode"><img src="icons/opencode.png" alt="OpenCode">OpenCode</button>
-        </div>
-      </div>
-    </div>
-    <!-- RIGHT PANEL: Input History -->
-    <div id="input-panel" class="input-panel collapsed">
-      <div class="input-panel-toggle" id="input-panel-toggle" title="Input History">▸</div>
-      <div class="input-panel-content">
-        <div class="input-panel-header">
-          <span class="input-panel-title">INPUT HISTORY</span>
-          <button class="input-panel-clear" id="input-panel-clear" title="Clear">✕</button>
-        </div>
-        <div class="input-panel-list" id="input-panel-list"></div>
-      </div>
-    </div>
-    </div><!-- /main-content -->
-    <div id="statusbar">
-      <span class="sb-item" id="sb-project" style="display:none;cursor:default" title="Project"><span id="sb-project-name"></span></span>
-      <span class="sb-sep" id="sb-project-sep" style="display:none">│</span>
-      <span class="sb-item sb-plan" id="sb-plan" style="cursor:pointer" title="Plans (Ctrl+P)"><span class="sb-accent">📋</span> <span id="sb-plan-count">0</span></span>
-      <span class="sb-sep" id="sb-plan-sep">│</span>
-      <span class="sb-item" id="sb-ai-tasks" style="cursor:pointer" title="AI Tasks Dashboard">
-        <span class="sb-accent">🤖</span> <span id="sb-ai-tasks-count">0</span>
-      </span>
-      <span class="sb-sep" id="sb-ai-tasks-sep">│</span>
-      <span class="sb-item sb-branch sb-branch-group" id="sb-branch" style="display:none;cursor:pointer" title="Git Graph (Ctrl+G)"><span class="sb-accent">⎇</span> <span id="sb-branch-name"></span></span>
-      <span class="sb-sep sb-claude-group" id="sb-claude-sep" style="display:none">│</span>
-      <span class="sb-item sb-claude-group" id="sb-claude-usage" style="display:none;cursor:pointer" title="Claude Code Usage">
-        <span class="sb-accent">◆</span> <span id="sb-claude-tokens">—</span>
-      </span>
-      <span class="sb-spacer"></span>
-      <span class="sb-item" id="sb-clock">00:00:00</span>
-    </div>
-  </main>
-
-  <!-- BOTTOM NAV (mobile only) -->
-  <nav id="bottom-nav">
-    <button class="bnav-btn" data-panel="search" title="Search">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M16 16l4.5 4.5"/></svg>
-      <span class="bnav-label">Search</span>
-    </button>
-    <button class="bnav-btn" data-panel="explorer" title="Explorer">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7V5a2 2 0 012-2h4l2 2h8a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
-      <span class="bnav-label">Explorer</span>
-    </button>
-    <button class="bnav-btn" data-panel="source-control" title="Source Control">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M12 8.5V12M12 12C12 14 6 14 6 15.5M12 12C12 14 18 14 18 15.5"/></svg>
-      <span class="bnav-label">Git</span>
-    </button>
-    <button class="bnav-btn" data-panel="plan" title="Plan">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
-      <span class="bnav-label">Plan</span>
-    </button>
-    <button class="bnav-btn" data-panel="input-history" title="Input History">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
-      <span class="bnav-label">History</span>
-    </button>
-    <button class="bnav-btn" id="bnav-settings" title="Settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-      <span class="bnav-label">Settings</span>
-    </button>
-  </nav>
-
-  <!-- MOBILE SIDEBAR OVERLAY -->
-  <div id="mobile-sidebar-overlay">
-    <div class="mobile-sidebar-header">
-      <span class="mobile-sidebar-title">PANEL</span>
-      <button class="mobile-sidebar-close" id="mobile-sidebar-close">&#x2715;</button>
-    </div>
-    <div class="mobile-sidebar-content" id="mobile-sidebar-content"></div>
-  </div>
-</div>
-
-<!-- GIT GRAPH OVERLAY -->
-<div id="git-graph-overlay">
-  <div id="git-graph-modal" tabindex="-1">
-    <div class="gg-titlebar">
-      <span class="gg-title-icon">⎇</span>
-      <span class="gg-repo-name" id="gg-repo-name"></span>
-      <span class="gg-branch-badge" id="gg-branch-badge"></span>
-      <div class="gg-branch-dropdown" id="gg-branch-dropdown">
-        <button class="gg-branch-trigger" id="gg-branch-trigger">⎇ <span id="gg-branch-trigger-label">branches</span> ▾</button>
-        <div class="gg-branch-menu" id="gg-branch-menu"></div>
-      </div>
-      <button class="gg-search-toggle" id="gg-search-toggle" title="Search commits (Ctrl+F)">⌕</button>
-      <span style="flex:1"></span>
-      <button class="gg-pull-btn" id="gg-pull-btn" title="Git Pull">⬇ Pull</button>
-      <button class="gg-github-btn" id="gg-github-btn" style="display:none" title="Open on GitHub">GitHub ↗</button>
-      <button class="gg-close-btn" id="gg-close">✕</button>
-    </div>
-    <div class="gg-search-bar" id="gg-search-bar" style="display:none">
-      <div class="gg-search-input-wrap">
-        <span class="gg-search-icon">⌕</span>
-        <input type="text" class="gg-search-input" id="gg-search-input" placeholder="Search by message, author, or hash..." spellcheck="false" autocomplete="off">
-        <span class="gg-search-hint">Esc</span>
-      </div>
-    </div>
-    <div class="gg-body" id="gg-body">
-      <div class="gg-loading" id="gg-loading">
-        <div class="gg-spinner"></div>
-        <span>Loading git history...</span>
-      </div>
-      <div class="gg-error" id="gg-error" style="display:none"></div>
-      <div class="gg-content" id="gg-content" style="display:none">
-        <div class="gg-search-empty" id="gg-search-empty" style="display:none"></div>
-        <div class="gg-scroll" id="gg-scroll">
-          <svg class="gg-svg" id="gg-svg"></svg>
-          <div class="gg-commits" id="gg-commits"></div>
-          <div class="gg-load-more" id="gg-load-more" style="display:none">
-            <div class="gg-spinner"></div>
+          <div class="meta-item latency-indicator" id="latency-indicator" title="Network latency">
+            <div class="signal-bars">
+              <div class="signal-bar" data-bar="1"></div>
+              <div class="signal-bar" data-bar="2"></div>
+              <div class="signal-bar" data-bar="3"></div>
+              <div class="signal-bar" data-bar="4"></div>
+            </div>
+            <span class="latency-value" id="latency-value">—</span>
           </div>
-        </div>
-        <div class="gg-file-panel" id="gg-file-panel" style="display:none">
-          <div class="gg-file-header">
-            <span class="gg-file-title" id="gg-file-title">Changed files</span>
-            <button class="gg-file-close" id="gg-file-close">✕</button>
+          <div class="meta-item">SYN <span id="hdr-session-count" class="sb-accent">0</span></div>
+          <div
+            class="meta-item"
+            id="hdr-restore-badge"
+            style="display: none; color: var(--accent); animation: pulse 1s infinite"
+          >
+            ⟳ RESTORING
           </div>
-          <div class="gg-commit-body" id="gg-commit-body" style="display:none"></div>
-          <div class="gg-file-list" id="gg-file-list"></div>
+          <div class="meta-item" id="hdr-time"></div>
         </div>
-      </div>
-    </div>
-    <!-- CONFIRM DIALOG -->
-    <div class="gg-confirm" id="gg-confirm" style="display:none">
-      <div class="gg-confirm-box">
-        <div class="gg-confirm-message" id="gg-confirm-message"></div>
-        <div class="gg-confirm-actions">
-          <button class="gg-confirm-ok" id="gg-confirm-ok">Switch Branch</button>
-          <button class="gg-confirm-cancel" id="gg-confirm-cancel">Cancel</button>
-        </div>
-      </div>
-    </div>
-    <div class="gg-resize-handle" id="gg-resize-handle"></div>
-  </div>
-</div>
+        <button class="btn-icon" id="btn-settings" title="Settings (Ctrl+,)">⚙</button>
+      </header>
 
-<!-- DIFF MODAL -->
-<div id="diff-overlay">
-  <div id="diff-modal">
-    <div class="diff-titlebar">
-      <span class="diff-title-icon">±</span>
-      <span class="diff-title-file" id="diff-title-file">—</span>
-      <span class="diff-title-badge" id="diff-title-badge"></span>
-      <span style="flex:1"></span>
-      <button class="diff-close-btn" id="diff-close">✕</button>
-    </div>
-    <div class="diff-body" id="diff-body">
-      <div class="diff-loading" id="diff-loading" style="display:none">Loading diff...</div>
-      <div class="diff-content" id="diff-content"></div>
-    </div>
-  </div>
-</div>
-
-<!-- IMAGE PREVIEW MODAL -->
-<div id="img-preview-overlay">
-  <div id="img-preview-modal">
-    <img id="img-preview-img" src="" alt="preview">
-    <button id="img-preview-close" class="img-preview-close">✕</button>
-  </div>
-</div>
-
-<!-- CONTEXT MENU -->
-<div class="ctx-menu" id="ctx-menu">
-  <div class="ctx-item" id="ctx-rename">✎ Rename</div>
-  <div class="ctx-item" id="ctx-duplicate">⊕ Duplicate</div>
-  <div class="ctx-item" id="ctx-reveal">📂 Reveal in Finder</div>
-  <div class="ctx-sep"></div>
-  <div class="ctx-item danger" id="ctx-close">✕ Close</div>
-</div>
-
-<!-- SOURCE CONTROL CONTEXT MENU -->
-<div class="ctx-menu" id="sc-ctx-menu">
-  <div class="ctx-item" id="sctx-diff">± View Diff</div>
-  <div class="ctx-sep"></div>
-  <div class="ctx-item" id="sctx-stage">+ Stage</div>
-  <div class="ctx-item" id="sctx-unstage">− Unstage</div>
-  <div class="ctx-sep"></div>
-  <div class="ctx-item" id="sctx-discard">↩ Discard Changes</div>
-  <div class="ctx-item danger" id="sctx-delete">✕ Delete File</div>
-</div>
-
-<!-- EXPLORER CONTEXT MENU -->
-<div class="ctx-menu" id="explorer-ctx-menu">
-  <div class="ctx-item" id="ectx-new-file">📄 New File</div>
-  <div class="ctx-item" id="ectx-new-folder">📁 New Folder</div>
-  <div class="ctx-sep"></div>
-  <div class="ctx-item" id="ectx-rename">✎ Rename</div>
-  <div class="ctx-item" id="ectx-download">↓ Download</div>
-  <div class="ctx-item" id="ectx-reveal">🔍 Reveal in Finder</div>
-  <div class="ctx-sep"></div>
-  <div class="ctx-item danger" id="ectx-delete">✕ Delete</div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════
-     PLAN MODAL
-═══════════════════════════════════════════════════ -->
-<div id="plan-overlay">
-  <div id="plan-modal">
-    <div class="plan-titlebar">
-      <span class="plan-title-icon">📋</span>
-      <span class="plan-title-text">Plans</span>
-      <button class="plan-close" id="plan-modal-close">✕</button>
-    </div>
-    <div class="plan-category-tabs" id="plan-category-tabs">
-      <button class="plan-cat-tab active" data-cat="all">ALL<span class="plan-cat-count" id="plan-count-all">0</span></button>
-      <button class="plan-cat-tab" data-cat="feature">기능<span class="plan-cat-count" id="plan-count-feature">0</span></button>
-      <button class="plan-cat-tab" data-cat="bug">버그<span class="plan-cat-count" id="plan-count-bug">0</span></button>
-      <button class="plan-cat-tab" data-cat="other">기타<span class="plan-cat-count" id="plan-count-other">0</span></button>
-      <button class="plan-btn-new-global" id="plan-btn-new-global" title="New Plan">+ New</button>
-      <span class="plan-view-toggle" id="plan-view-toggle">
-        <button class="plan-view-btn active" data-view="list" title="List view">📋</button>
-        <button class="plan-view-btn" data-view="board" title="Board view">📊</button>
-      </span>
-    </div>
-    <div class="plan-body">
-      <!-- BOARD VIEW (kanban) -->
-      <div class="plan-board" id="plan-board" style="display:none">
-        <div class="plan-board-col" data-status="todo">
-          <div class="plan-board-col-header">TODO <span class="plan-board-count" id="plan-board-count-todo">0</span></div>
-          <div class="plan-board-cards" id="plan-board-todo"></div>
-        </div>
-        <div class="plan-board-col" data-status="doing">
-          <div class="plan-board-col-header">DOING <span class="plan-board-count" id="plan-board-count-doing">0</span></div>
-          <div class="plan-board-cards" id="plan-board-doing"></div>
-        </div>
-        <div class="plan-board-col" data-status="done">
-          <div class="plan-board-col-header">DONE <span class="plan-board-count" id="plan-board-count-done">0</span></div>
-          <div class="plan-board-cards" id="plan-board-done"></div>
-        </div>
-        <div class="plan-board-col" data-status="on_hold">
-          <div class="plan-board-col-header">ON HOLD <span class="plan-board-count" id="plan-board-count-on_hold">0</span></div>
-          <div class="plan-board-cards" id="plan-board-on_hold"></div>
-        </div>
-        <div class="plan-board-col" data-status="cancelled">
-          <div class="plan-board-col-header">CANCELLED <span class="plan-board-count" id="plan-board-count-cancelled">0</span></div>
-          <div class="plan-board-cards" id="plan-board-cancelled"></div>
-        </div>
-      </div>
-      <!-- BOARD DIVIDER (drag to resize board vs editor) -->
-      <div class="plan-board-divider" id="plan-board-divider" style="display:none"></div>
-      <!-- LEFT: Plan list -->
-      <div class="plan-list-col" id="plan-list-col">
-        <div class="plan-list-toolbar">
-          <button class="plan-btn-new" id="plan-btn-new" title="New Plan">+ New</button>
-        </div>
-        <div class="plan-list-items" id="plan-list-items"></div>
-      </div>
-      <!-- RIGHT: Editor -->
-      <div class="plan-editor-col" id="plan-editor-col">
-        <div class="plan-editor-empty" id="plan-editor-empty">
-          <div class="plan-editor-empty-icon">📝</div>
-          <div class="plan-editor-empty-text">Select a plan or create a new one</div>
-        </div>
-        <div class="plan-editor-area" id="plan-editor-area" style="display:none">
-          <button class="plan-editor-close" id="plan-editor-close" title="Close editor">✕</button>
-          <input class="plan-editor-title" id="plan-editor-title" placeholder="Plan title..." spellcheck="false" />
-          <textarea class="plan-editor-content" id="plan-editor-content" placeholder="Write your plan here..." spellcheck="false"></textarea>
-          <div class="plan-editor-footer">
-            <span class="plan-editor-date" id="plan-editor-date"></span>
-            <select class="plan-cat-select" id="plan-cat-select">
-              <option value="feature">기능</option>
-              <option value="bug">버그</option>
-              <option value="other">기타</option>
-            </select>
-            <select class="plan-status-select" id="plan-status-select">
-              <option value="todo">TODO</option>
-              <option value="doing">DOING</option>
-              <option value="done">DONE</option>
-              <option value="on_hold">ON HOLD</option>
-              <option value="cancelled">CANCELLED</option>
-            </select>
-            <button class="plan-btn-delete" id="plan-btn-delete" title="Delete plan">🗑 Delete</button>
-          </div>
-          <div class="plan-images" id="plan-images">
-            <div class="plan-images-header">Images <span class="plan-images-hint">(Ctrl+V to paste)</span></div>
-            <div class="plan-images-grid" id="plan-images-grid"></div>
-          </div>
-          <div class="plan-logs" id="plan-logs">
-            <div class="plan-logs-header">Activity Log</div>
-            <div class="plan-logs-list" id="plan-logs-list"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="plan-ctx-menu" id="plan-ctx-menu" style="display:none">
-  <div class="plan-ctx-item" data-action="edit">✏️ 편집</div>
-  <div class="plan-ctx-sep"></div>
-  <div class="plan-ctx-item" data-action="status" data-status="todo">📋 TODO</div>
-  <div class="plan-ctx-item" data-action="status" data-status="doing">🔨 DOING</div>
-  <div class="plan-ctx-item" data-action="status" data-status="done">✅ DONE</div>
-  <div class="plan-ctx-item" data-action="status" data-status="on_hold">⏸ ON HOLD</div>
-  <div class="plan-ctx-item" data-action="status" data-status="cancelled">❌ CANCELLED</div>
-  <div class="plan-ctx-sep"></div>
-  <div class="plan-ctx-item plan-ctx-danger" data-action="delete">🗑 삭제</div>
-  <div class="plan-ctx-sep"></div>
-  <div class="plan-ctx-item" data-action="ai-assign" data-ai="claude"><img src="icons/claude.webp" class="plan-ctx-ai-icon" alt=""> Claude</div>
-  <div class="plan-ctx-item" data-action="ai-assign" data-ai="gemini"><img src="icons/gemini.svg" class="plan-ctx-ai-icon" alt=""> Gemini</div>
-  <div class="plan-ctx-item" data-action="ai-assign" data-ai="codex"><img src="icons/codex.png" class="plan-ctx-ai-icon" alt=""> Codex</div>
-  <div class="plan-ctx-item" data-action="ai-assign" data-ai="opencode"><img src="icons/opencode.png" class="plan-ctx-ai-icon" alt=""> OpenCode</div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════
-     AI TASKS DASHBOARD
-═══════════════════════════════════════════════════ -->
-<div id="ai-dash-overlay">
-  <div id="ai-dash-modal">
-    <div id="ai-dash-header">
-      <span class="ai-dash-title">🤖 AI Tasks</span>
-      <button id="ai-dash-close" class="ai-dash-close-btn">✕</button>
-    </div>
-    <div id="ai-dash-body"></div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════
-     SETTINGS MODAL
-═══════════════════════════════════════════════════ -->
-<div id="settings-overlay">
-  <div id="settings-modal">
-    <div class="settings-titlebar">
-      <span class="settings-title-icon">⚙</span>
-      <span class="settings-title-text">Settings</span>
-      <button class="settings-close" id="settings-close">✕</button>
-    </div>
-    <div class="settings-body">
-      <!-- NAV -->
-      <nav class="settings-nav" id="settings-nav">
-        <div class="nav-item active" data-panel="appearance"><span class="nav-icon">◈</span>Appearance</div>
-        <div class="nav-item" data-panel="terminal"><span class="nav-icon">▸</span>Terminal</div>
-        <div class="nav-item" data-panel="shell"><span class="nav-icon">$</span>Shell</div>
-        <div class="nav-item" data-panel="keybindings"><span class="nav-icon">⌨</span>Keybindings</div>
-        <div class="nav-item" data-panel="advanced"><span class="nav-icon">⚡</span>Advanced</div>
-        <div class="nav-sep"></div>
-        <div class="nav-item" data-panel="importexport"><span class="nav-icon">⇅</span>Import/Export</div>
+      <!-- ACTIVITY BAR -->
+      <nav id="activity-bar">
+        <button class="activity-btn active" data-panel="search" title="Search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M16 16l4.5 4.5" />
+          </svg>
+        </button>
+        <button class="activity-btn" data-panel="explorer" title="Explorer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 7V5a2 2 0 012-2h4l2 2h8a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+          </svg>
+        </button>
+        <button class="activity-btn" data-panel="source-control" title="Source Control">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="6" r="2.5" />
+            <circle cx="6" cy="18" r="2.5" />
+            <circle cx="18" cy="18" r="2.5" />
+            <path d="M12 8.5V12M12 12C12 14 6 14 6 15.5M12 12C12 14 18 14 18 15.5" />
+          </svg>
+        </button>
+        <button class="activity-btn" data-panel="plan" title="Plan">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+            <rect x="9" y="3" width="6" height="4" rx="1" />
+            <path d="M9 12h6M9 16h4" />
+          </svg>
+        </button>
       </nav>
 
-      <!-- CONTENT -->
-      <div class="settings-content">
+      <!-- SIDEBAR -->
+      <aside id="sidebar">
+        <!-- Hidden session list container (internal use) -->
+        <div id="session-list" style="display: none">
+          <div id="session-empty" style="display: none"></div>
+        </div>
 
-        <!-- ── APPEARANCE ── -->
-        <div class="settings-panel active" id="panel-appearance">
-          <div class="panel-section">
-            <div class="section-title">Theme</div>
-            <div class="theme-grid" id="theme-grid"></div>
+        <!-- SEARCH PANEL -->
+        <div class="sidebar-panel active" id="panel-search">
+          <div class="sidebar-header">
+            <span class="sidebar-title-text">SEARCH</span>
+            <div class="sidebar-header-actions">
+              <button class="btn-icon-sm" id="search-clear" title="Clear">✕</button>
+            </div>
           </div>
+          <div class="search-input-bar">
+            <button class="search-replace-toggle" id="search-replace-toggle" title="Toggle Replace">
+              ▸
+            </button>
+            <input
+              type="text"
+              class="search-input"
+              id="search-input"
+              placeholder="Search in files..."
+            />
+            <button class="search-go-btn" id="search-btn" title="Search">→</button>
+          </div>
+          <div class="search-replace-row" id="search-replace-row" style="display: none">
+            <input
+              type="text"
+              class="search-input"
+              id="search-replace-input"
+              placeholder="Replace"
+            />
+            <button class="search-replace-btn" id="search-replace-btn" title="Replace in file">
+              ⇄
+            </button>
+            <button class="search-replace-btn" id="search-replace-all-btn" title="Replace all">
+              ⇄All
+            </button>
+          </div>
+          <div class="search-options">
+            <button class="search-opt-btn" id="search-opt-case" title="Match Case">Aa</button>
+            <button class="search-opt-btn" id="search-opt-regex" title="Use Regex">.*</button>
+            <input
+              type="text"
+              class="search-include"
+              id="search-include"
+              placeholder="Include (e.g. *.js, src/)"
+            />
+          </div>
+          <div class="search-count" id="search-count"></div>
+          <div class="search-results-container" id="search-results">
+            <div class="search-empty">Type to search in files</div>
+          </div>
+        </div>
 
-          <div class="panel-section">
-            <div class="section-title">Typography</div>
-            <div class="field-row">
-              <div class="field-label">Font Family</div>
-              <div class="field-control">
-                <select class="s-select" id="s-fontFamily">
-                  <optgroup label="— Google Fonts">
-                    <option value='"JetBrains Mono",monospace'>JetBrains Mono</option>
-                    <option value='"Fira Code",monospace'>Fira Code</option>
-                    <option value='"IBM Plex Mono",monospace'>IBM Plex Mono</option>
-                    <option value='"Source Code Pro",monospace'>Source Code Pro</option>
-                    <option value='"Roboto Mono",monospace'>Roboto Mono</option>
-                    <option value='"Inconsolata",monospace'>Inconsolata</option>
-                    <option value='"Space Mono",monospace'>Space Mono</option>
-                    <option value='"Share Tech Mono",monospace'>Share Tech Mono</option>
-                  </optgroup>
-                  <optgroup label="— System Fonts">
-                    <option value='"Cascadia Code",monospace'>Cascadia Code</option>
-                    <option value='"SF Mono",monospace'>SF Mono (macOS)</option>
-                    <option value='"Menlo",monospace'>Menlo (macOS)</option>
-                    <option value='"Monaco",monospace'>Monaco (macOS)</option>
-                    <option value='"Consolas",monospace'>Consolas (Windows)</option>
-                    <option value='"Courier New",monospace'>Courier New</option>
-                    <option value='monospace'>System Default</option>
-                  </optgroup>
-                </select>
-                <div class="font-preview" id="font-preview">$ claude --version<br>❯ The quick brown fox jumps<br>0123456789 !@#$%^&*()</div>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">Font Size</div>
-              <div class="field-control">
-                <div class="range-row">
-                  <input type="range" class="s-range" id="s-fontSize" min="8" max="32" step="1"/>
-                  <input type="number" class="s-input" id="s-fontSize-num" min="8" max="32" step="1" style="width:56px;padding:3px 6px;text-align:center;flex-shrink:0"/>
-                </div>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">Line Height</div>
-              <div class="field-control">
-                <div class="range-row">
-                  <input type="range" class="s-range" id="s-lineHeight" min="1.0" max="2.0" step="0.05"/>
-                  <span class="range-val" id="s-lineHeight-val">1.2</span>
-                </div>
-              </div>
+        <!-- EXPLORER PANEL -->
+        <div class="sidebar-panel" id="panel-explorer">
+          <div class="sidebar-header">
+            <span class="sidebar-title-text">EXPLORER</span>
+            <div class="sidebar-header-actions">
+              <button class="btn-icon-sm" id="explorer-upload" title="Upload file">↑</button>
+              <button class="btn-icon-sm" id="explorer-refresh" title="Refresh">↻</button>
             </div>
           </div>
+          <input type="file" id="explorer-upload-input" multiple style="display: none" />
+          <div class="explorer-path-bar">
+            <span class="explorer-path-label" id="explorer-path" title="">—</span>
+          </div>
+          <div class="explorer-tree-container" id="explorer-tree"></div>
+        </div>
 
-          <div class="panel-section">
-            <div class="section-title">Section Font Sizes</div>
-            <div class="field-row">
-              <div class="field-label">Sidebar<small>Sessions, Search, Explorer, SC, Plan</small></div>
-              <div class="field-control">
-                <div class="range-row">
-                  <input type="range" class="s-range" id="s-sidebarFontSize" min="8" max="20" step="1"/>
-                  <span class="range-val" id="s-sidebarFontSize-val">12</span>
-                </div>
-              </div>
+        <!-- SOURCE CONTROL PANEL -->
+        <div class="sidebar-panel" id="panel-source-control">
+          <div class="sidebar-header">
+            <span class="sidebar-title-text">SOURCE CONTROL</span>
+            <div class="sidebar-header-actions">
+              <span class="sc-badge" id="sc-change-count"></span>
+              <button class="btn-icon-sm" id="sc-view-toggle" title="Tree view">≡</button>
+              <button class="btn-icon-sm" id="sc-refresh" title="Refresh">↻</button>
             </div>
-            <div class="field-row">
-              <div class="field-label">Tab Bar</div>
-              <div class="field-control">
-                <div class="range-row">
-                  <input type="range" class="s-range" id="s-tabBarFontSize" min="8" max="20" step="1"/>
-                  <span class="range-val" id="s-tabBarFontSize-val">12</span>
-                </div>
-              </div>
+          </div>
+          <div class="sc-branch-bar">
+            <span class="sc-branch-icon">⎇</span>
+            <span class="sc-branch-label" id="sc-branch-name">—</span>
+          </div>
+          <div class="sc-worktree-section" id="sc-worktree-section" style="display: none">
+            <div class="sc-worktree-header" id="sc-worktree-header">
+              <span class="sc-worktree-toggle">▾</span>
+              <span class="sc-worktree-title">WORKTREES</span>
+              <span class="sc-worktree-count" id="sc-worktree-count"></span>
+              <button class="btn-icon-sm" id="sc-worktree-add-btn" title="Add worktree">+</button>
             </div>
-            <div class="field-row">
-              <div class="field-label">Status Bar</div>
-              <div class="field-control">
-                <div class="range-row">
-                  <input type="range" class="s-range" id="s-statusBarFontSize" min="8" max="20" step="1"/>
-                  <span class="range-val" id="s-statusBarFontSize-val">11</span>
-                </div>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">Input Panel<small>Input History</small></div>
-              <div class="field-control">
-                <div class="range-row">
-                  <input type="range" class="s-range" id="s-inputPanelFontSize" min="8" max="20" step="1"/>
-                  <span class="range-val" id="s-inputPanelFontSize-val">11</span>
-                </div>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">File Viewer</div>
-              <div class="field-control">
-                <div class="range-row">
-                  <input type="range" class="s-range" id="s-fileViewerFontSize" min="8" max="24" step="1"/>
-                  <span class="range-val" id="s-fileViewerFontSize-val">13</span>
-                </div>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">Git Graph</div>
-              <div class="field-control">
-                <div class="range-row">
-                  <input type="range" class="s-range" id="s-gitGraphFontSize" min="8" max="20" step="1"/>
-                  <span class="range-val" id="s-gitGraphFontSize-val">12</span>
-                </div>
+            <div class="sc-worktree-list" id="sc-worktree-list"></div>
+            <div class="sc-worktree-add-form" id="sc-worktree-add-form" style="display: none">
+              <input
+                type="text"
+                class="sc-worktree-input"
+                id="sc-worktree-path"
+                placeholder="Branch name or path"
+              />
+              <div class="sc-worktree-form-actions">
+                <label class="sc-worktree-label"
+                  ><input type="checkbox" id="sc-worktree-new-branch" /> New branch</label
+                >
+                <button class="sc-worktree-form-btn" id="sc-worktree-create">Create</button>
+                <button class="sc-worktree-form-btn sc-worktree-cancel-btn" id="sc-worktree-cancel">
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
+          <div class="sc-commit-bar">
+            <div class="sc-commit-input-wrap">
+              <input
+                type="text"
+                class="sc-commit-input"
+                id="sc-commit-input"
+                placeholder="Message (Enter to commit)"
+              />
+              <button class="sc-generate-btn" id="sc-generate-btn" title="Generate commit message">
+                Generate ✦
+              </button>
+            </div>
+            <div class="sc-commit-group">
+              <button class="sc-commit-btn" id="sc-commit-btn" title="Commit">✓ Commit</button>
+              <button class="sc-commit-dropdown" id="sc-commit-dropdown" title="More actions">
+                ▾
+              </button>
+              <div class="sc-commit-menu" id="sc-commit-menu">
+                <div class="sc-commit-menu-item" data-action="commit-push">Commit & Push</div>
+                <div class="sc-commit-menu-item" data-action="push">Push</div>
+              </div>
+            </div>
+          </div>
+          <div class="sc-empty" id="sc-empty">No changes detected</div>
+          <div class="sc-file-list-container" id="sc-file-list"></div>
+        </div>
 
-          <div class="panel-section">
-            <div class="section-title">Cursor</div>
-            <div class="field-row">
-              <div class="field-label">Cursor Style</div>
-              <div class="field-control">
-                <select class="s-select" id="s-cursorStyle">
-                  <option value="block">Block ▌</option>
-                  <option value="underline">Underline _</option>
-                  <option value="bar">Bar |</option>
-                </select>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">Cursor Blink</div>
-              <div class="field-control">
-                <label class="s-toggle">
-                  <input type="checkbox" id="s-cursorBlink"/>
-                  <div class="toggle-track"></div>
-                  <div class="toggle-thumb"></div>
-                </label>
-              </div>
-            </div>
-          </div>
+        <!-- PLAN PANEL (moved to modal — see #plan-overlay) -->
+      </aside>
 
-          <div class="panel-section">
-            <div class="section-title">Effects</div>
-            <div class="field-row">
-              <div class="field-label">CRT Scanlines</div>
-              <div class="field-control">
-                <label class="s-toggle">
-                  <input type="checkbox" id="s-crtScanlines"/>
-                  <div class="toggle-track"></div>
-                  <div class="toggle-thumb"></div>
-                </label>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">
-                Scanlines Intensity
-                <small>Higher = more visible</small>
-              </div>
-              <div class="field-control">
-                <div class="range-row">
-                  <input type="range" class="s-range" id="s-crtScanlinesIntensity" min="0" max="0.25" step="0.01"/>
-                  <span class="range-val" id="s-crtScanlinesIntensity-val">0.07</span>
-                </div>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">CRT Flicker</div>
-              <div class="field-control">
-                <label class="s-toggle">
-                  <input type="checkbox" id="s-crtFlicker"/>
-                  <div class="toggle-track"></div>
-                  <div class="toggle-thumb"></div>
-                </label>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">Vignette</div>
-              <div class="field-control">
-                <label class="s-toggle">
-                  <input type="checkbox" id="s-vignette"/>
-                  <div class="toggle-track"></div>
-                  <div class="toggle-thumb"></div>
-                </label>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">
-                Glow Intensity
-                <small>Accent color glow strength</small>
-              </div>
-              <div class="field-control">
-                <div class="range-row">
-                  <input type="range" class="s-range" id="s-glowIntensity" min="0" max="2" step="0.1"/>
-                  <span class="range-val" id="s-glowIntensity-val">1.0</span>
-                </div>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">
-                Background Opacity
-                <small>Terminal background transparency</small>
-              </div>
-              <div class="field-control">
-                <div class="range-row">
-                  <input type="range" class="s-range" id="s-backgroundOpacity" min="0.1" max="1.0" step="0.05"/>
-                  <span class="range-val" id="s-backgroundOpacity-val">1.0</span>
-                </div>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">
-                Screen Dim
-                <small>Darken entire screen (0 = off)</small>
-              </div>
-              <div class="field-control">
-                <div class="range-row">
-                  <input type="range" class="s-range" id="s-screenDimOpacity" min="0" max="0.9" step="0.05"/>
-                  <span class="range-val" id="s-screenDimOpacity-val">0</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div><!-- /appearance -->
+      <!-- SIDEBAR RESIZE HANDLE -->
+      <div class="sidebar-resize" id="sidebar-resize"></div>
 
-        <!-- ── TERMINAL ── -->
-        <div class="settings-panel" id="panel-terminal">
-          <div class="panel-section">
-            <div class="section-title">Scrollback & Buffer</div>
-            <div class="field-row">
-              <div class="field-label">
-                Scrollback Lines
-                <small>Max lines to keep in history</small>
-              </div>
-              <div class="field-control">
-                <input type="number" class="s-input" id="s-scrollback" min="100" max="100000" step="100"/>
-              </div>
+      <!-- MAIN -->
+      <main id="main">
+        <div id="tab-bar">
+          <button class="tab-add-btn" id="tab-add-btn" title="New terminal">+</button>
+        </div>
+        <div class="breadcrumb-bar" id="breadcrumb-bar"></div>
+        <!-- SESSION PICKER OVERLAY -->
+        <div id="session-picker" style="display: none">
+          <div id="session-picker-box">
+            <div class="sp-title">NEW SESSION</div>
+            <div class="sp-grid">
+              <button class="sp-btn" data-cmd="claude" data-label="Claude">
+                <img src="icons/claude.webp" alt="Claude" />
+                <span class="sp-name">Claude</span>
+              </button>
+              <button class="sp-btn" data-cmd="gemini" data-label="Gemini">
+                <img src="icons/gemini.svg" alt="Gemini" />
+                <span class="sp-name">Gemini</span>
+              </button>
+              <button class="sp-btn" data-cmd="codex" data-label="Codex">
+                <img src="icons/codex.png" alt="Codex" />
+                <span class="sp-name">Codex</span>
+              </button>
+              <button class="sp-btn" data-cmd="opencode" data-label="OpenCode">
+                <img src="icons/opencode.png" alt="OpenCode" />
+                <span class="sp-name">OpenCode</span>
+              </button>
+              <button class="sp-btn sp-btn-shell" data-cmd="" data-label="">
+                <span class="sp-shell-icon">$_</span>
+                <span class="sp-name">Shell</span>
+              </button>
             </div>
+            <button class="sp-close" id="sp-close">✕</button>
           </div>
-          <div class="panel-section">
-            <div class="section-title">Behavior</div>
-            <div class="field-row">
-              <div class="field-label">Bell Style</div>
-              <div class="field-control">
-                <select class="s-select" id="s-bellStyle">
-                  <option value="none">None (silent)</option>
-                  <option value="visual">Visual flash</option>
-                  <option value="sound">Sound</option>
-                  <option value="both">Both</option>
-                </select>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">
-                Copy on Select
-                <small>Auto-copy when text selected</small>
-              </div>
-              <div class="field-control">
-                <label class="s-toggle">
-                  <input type="checkbox" id="s-copyOnSelect"/>
-                  <div class="toggle-track"></div>
-                  <div class="toggle-thumb"></div>
-                </label>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">
-                Right-Click to Paste
-                <small>Right click pastes clipboard</small>
-              </div>
-              <div class="field-control">
-                <label class="s-toggle">
-                  <input type="checkbox" id="s-rightClickPaste"/>
-                  <div class="toggle-track"></div>
-                  <div class="toggle-thumb"></div>
-                </label>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">
-                Trim on Copy
-                <small>Strip trailing whitespace</small>
-              </div>
-              <div class="field-control">
-                <label class="s-toggle">
-                  <input type="checkbox" id="s-trimCopied"/>
-                  <div class="toggle-track"></div>
-                  <div class="toggle-thumb"></div>
-                </label>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">
-                Word Separators
-                <small>Characters that split words</small>
-              </div>
-              <div class="field-control">
-                <input type="text" class="s-input" id="s-wordSeparators"/>
-              </div>
-            </div>
-          </div>
-          <div class="panel-section">
-            <div class="section-title">Renderer</div>
-            <div class="field-row">
-              <div class="field-label">
-                Renderer Engine
-                <small>WebGL fastest, DOM most compatible</small>
-              </div>
-              <div class="field-control">
-                <select class="s-select" id="s-renderer">
-                  <option value="canvas">Canvas (default)</option>
-                  <option value="webgl">WebGL (fastest)</option>
-                  <option value="dom">DOM (compatible)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div><!-- /terminal -->
+        </div>
 
-        <!-- ── SHELL ── -->
-        <div class="settings-panel" id="panel-shell">
-          <div class="panel-section">
-            <div class="section-title">Shell Configuration</div>
-            <div class="field-row">
-              <div class="field-label">
-                Shell Path
-                <small>Full path to shell binary</small>
-              </div>
-              <div class="field-control">
-                <input type="text" class="s-input" id="s-shellPath" placeholder="/bin/zsh"/>
-              </div>
+        <div id="main-content">
+          <div id="terminal-wrapper">
+            <div id="drop-zone-overlay">
+              <div class="dz dz-top" data-zone="top"></div>
+              <div class="dz dz-bottom" data-zone="bottom"></div>
+              <div class="dz dz-left" data-zone="left"></div>
+              <div class="dz dz-right" data-zone="right"></div>
+              <div class="dz dz-center" data-zone="center"></div>
             </div>
-            <div class="field-row">
-              <div class="field-label">
-                Start Directory
-                <small>Working dir for new sessions</small>
+            <div id="empty-state">
+              <div class="empty-art">
+                ╔══════════════════╗ ║ SUPER TERMINAL ║ ╚══════════════════╝
               </div>
-              <div class="field-control">
-                <input type="text" class="s-input" id="s-startDirectory" placeholder="/home/user"/>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">
-                Session Name Format
-                <small>{n} = session number</small>
-              </div>
-              <div class="field-control">
-                <input type="text" class="s-input" id="s-sessionNameFormat" placeholder="shell-{n}"/>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">
-                Auto Reconnect
-                <small>Reconnect on disconnect</small>
-              </div>
-              <div class="field-control">
-                <label class="s-toggle">
-                  <input type="checkbox" id="s-autoReconnect"/>
-                  <div class="toggle-track"></div>
-                  <div class="toggle-thumb"></div>
-                </label>
+              <div class="empty-hint">Press <span>+</span> or click <span>New Session</span></div>
+              <button class="btn-start" id="btn-start-empty">INIT SESSION</button>
+              <div class="ai-quick-btns">
+                <button class="btn-ai-quick" data-ai="claude" data-cmd="claude" data-label="Claude">
+                  <img src="icons/claude.webp" alt="Claude" />Claude
+                </button>
+                <button class="btn-ai-quick" data-ai="gemini" data-cmd="gemini" data-label="Gemini">
+                  <img src="icons/gemini.svg" alt="Gemini" />Gemini
+                </button>
+                <button class="btn-ai-quick" data-ai="codex" data-cmd="codex" data-label="Codex">
+                  <img src="icons/codex.png" alt="Codex" />Codex
+                </button>
+                <button
+                  class="btn-ai-quick"
+                  data-ai="opencode"
+                  data-cmd="opencode"
+                  data-label="OpenCode"
+                >
+                  <img src="icons/opencode.png" alt="OpenCode" />OpenCode
+                </button>
               </div>
             </div>
           </div>
-          <div class="panel-section">
-            <div class="section-title">Environment Variables</div>
-            <div class="env-list" id="env-list"></div>
-            <button class="btn-add-env" id="btn-add-env">+ Add Variable</button>
+          <!-- RIGHT PANEL: Input History -->
+          <div id="input-panel" class="input-panel collapsed">
+            <div class="input-panel-toggle" id="input-panel-toggle" title="Input History">▸</div>
+            <div class="input-panel-content">
+              <div class="input-panel-header">
+                <span class="input-panel-title">INPUT HISTORY</span>
+                <button class="input-panel-clear" id="input-panel-clear" title="Clear">✕</button>
+              </div>
+              <div class="input-panel-list" id="input-panel-list"></div>
+            </div>
           </div>
-        </div><!-- /shell -->
+        </div>
+        <!-- /main-content -->
+        <div id="statusbar">
+          <span
+            class="sb-item"
+            id="sb-project"
+            style="display: none; cursor: default"
+            title="Project"
+            ><span id="sb-project-name"></span
+          ></span>
+          <span class="sb-sep" id="sb-project-sep" style="display: none">│</span>
+          <span class="sb-item sb-plan" id="sb-plan" style="cursor: pointer" title="Plans (Ctrl+P)"
+            ><span class="sb-accent">📋</span> <span id="sb-plan-count">0</span></span
+          >
+          <span class="sb-sep" id="sb-plan-sep">│</span>
+          <span class="sb-item" id="sb-ai-tasks" style="cursor: pointer" title="AI Tasks Dashboard">
+            <span class="sb-accent">🤖</span> <span id="sb-ai-tasks-count">0</span>
+          </span>
+          <span class="sb-sep" id="sb-ai-tasks-sep">│</span>
+          <span
+            class="sb-item sb-branch sb-branch-group"
+            id="sb-branch"
+            style="display: none; cursor: pointer"
+            title="Git Graph (Ctrl+G)"
+            ><span class="sb-accent">⎇</span> <span id="sb-branch-name"></span
+          ></span>
+          <span class="sb-sep sb-claude-group" id="sb-claude-sep" style="display: none">│</span>
+          <span
+            class="sb-item sb-claude-group"
+            id="sb-claude-usage"
+            style="display: none; cursor: pointer"
+            title="Claude Code Usage"
+          >
+            <span class="sb-accent">◆</span> <span id="sb-claude-tokens">—</span>
+          </span>
+          <span class="sb-spacer"></span>
+          <span class="sb-item" id="sb-clock">00:00:00</span>
+        </div>
+      </main>
 
-        <!-- ── KEYBINDINGS ── -->
-        <div class="settings-panel" id="panel-keybindings">
-          <div class="panel-section">
-            <div class="section-title">Keyboard Shortcuts</div>
-            <p style="font-size:10px;color:var(--text-dim);margin-bottom:12px;letter-spacing:.04em;line-height:1.6">Click a shortcut field and press the desired key combination to record it.</p>
-            <div id="kb-list"></div>
-          </div>
-        </div><!-- /keybindings -->
+      <!-- BOTTOM NAV (mobile only) -->
+      <nav id="bottom-nav">
+        <button class="bnav-btn" data-panel="search" title="Search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M16 16l4.5 4.5" />
+          </svg>
+          <span class="bnav-label">Search</span>
+        </button>
+        <button class="bnav-btn" data-panel="explorer" title="Explorer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 7V5a2 2 0 012-2h4l2 2h8a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+          </svg>
+          <span class="bnav-label">Explorer</span>
+        </button>
+        <button class="bnav-btn" data-panel="source-control" title="Source Control">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="6" r="2.5" />
+            <circle cx="6" cy="18" r="2.5" />
+            <circle cx="18" cy="18" r="2.5" />
+            <path d="M12 8.5V12M12 12C12 14 6 14 6 15.5M12 12C12 14 18 14 18 15.5" />
+          </svg>
+          <span class="bnav-label">Git</span>
+        </button>
+        <button class="bnav-btn" data-panel="plan" title="Plan">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+            <rect x="9" y="3" width="6" height="4" rx="1" />
+            <path d="M9 12h6M9 16h4" />
+          </svg>
+          <span class="bnav-label">Plan</span>
+        </button>
+        <button class="bnav-btn" data-panel="input-history" title="Input History">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 8v4l3 3" />
+            <circle cx="12" cy="12" r="9" />
+          </svg>
+          <span class="bnav-label">History</span>
+        </button>
+        <button class="bnav-btn" id="bnav-settings" title="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"
+            />
+          </svg>
+          <span class="bnav-label">Settings</span>
+        </button>
+      </nav>
 
-        <!-- ── ADVANCED ── -->
-        <div class="settings-panel" id="panel-advanced">
-          <div class="panel-section">
-            <div class="section-title">Custom CSS</div>
-            <div class="field-row top-align">
-              <div class="field-label">
-                Custom Styles
-                <small>Injected into &lt;style&gt; tag</small>
-              </div>
-              <div class="field-control">
-                <textarea class="s-textarea" id="s-customCss" rows="6" placeholder="/* Custom CSS here */\n.xterm { opacity: 0.95; }"></textarea>
-              </div>
-            </div>
-          </div>
-          <div class="panel-section">
-            <div class="section-title">Connection</div>
-            <div class="field-row">
-              <div class="field-label">
-                WS Reconnect Interval
-                <small>Milliseconds between retries</small>
-              </div>
-              <div class="field-control">
-                <input type="number" class="s-input" id="s-wsReconnectInterval" min="500" max="30000" step="500"/>
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field-label">Log Level</div>
-              <div class="field-control">
-                <select class="s-select" id="s-logLevel">
-                  <option value="debug">Debug (verbose)</option>
-                  <option value="info">Info</option>
-                  <option value="warn">Warn</option>
-                  <option value="error">Error only</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="panel-section">
-            <div class="section-title">Reset</div>
-            <div class="btn-row">
-              <button class="btn-danger" id="btn-reset-settings">⚠ Reset All Settings</button>
-            </div>
-          </div>
-        </div><!-- /advanced -->
-
-        <!-- ── IMPORT/EXPORT ── -->
-        <div class="settings-panel" id="panel-importexport">
-          <div class="panel-section">
-            <div class="section-title">Export</div>
-            <p style="font-size:11px;color:var(--text-dim);margin-bottom:14px;line-height:1.7">Download your current settings as a JSON file. Use this to backup or transfer your configuration.</p>
-            <div class="btn-row">
-              <button class="btn-action" id="btn-export">↓ Export settings.json</button>
-            </div>
-          </div>
-          <div class="panel-section">
-            <div class="section-title">Import</div>
-            <p style="font-size:11px;color:var(--text-dim);margin-bottom:14px;line-height:1.7">Import a previously exported settings JSON file. This will overwrite your current settings.</p>
-            <div class="btn-row">
-              <button class="btn-action" id="btn-import">↑ Import settings.json</button>
-              <input type="file" id="import-file-input" accept=".json" style="display:none"/>
-            </div>
-            <div id="import-status" style="margin-top:10px;font-size:11px;color:var(--ok);display:none"></div>
-          </div>
-        </div><!-- /importexport -->
-
-      </div><!-- /settings-content -->
-    </div><!-- /settings-body -->
-
-    <div class="settings-footer">
-      <span class="save-status" id="save-status">✓ Saved</span>
-      <button class="btn-cancel" id="btn-cancel-settings">Cancel</button>
-      <button class="btn-save" id="btn-save-settings">Save Changes</button>
+      <!-- MOBILE SIDEBAR OVERLAY -->
+      <div id="mobile-sidebar-overlay">
+        <div class="mobile-sidebar-header">
+          <span class="mobile-sidebar-title">PANEL</span>
+          <button class="mobile-sidebar-close" id="mobile-sidebar-close">&#x2715;</button>
+        </div>
+        <div class="mobile-sidebar-content" id="mobile-sidebar-content"></div>
+      </div>
     </div>
-  </div><!-- /settings-modal -->
-</div><!-- /settings-overlay -->
 
-<!-- FLOATING SCROLL BUTTONS -->
-<div id="scroll-float">
-  <button id="scroll-top-btn" class="scroll-float-btn" title="Scroll to Top">▲</button>
-  <button id="scroll-bottom-btn" class="scroll-float-btn" title="Scroll to Bottom">▼</button>
-</div>
-
-<!-- GLOBAL CONFIRM MODAL -->
-<div id="global-confirm-overlay">
-  <div class="global-confirm-box">
-    <div class="global-confirm-message" id="global-confirm-message"></div>
-    <div class="global-confirm-actions">
-      <button class="global-confirm-ok" id="global-confirm-ok">OK</button>
-      <button class="global-confirm-cancel" id="global-confirm-cancel">Cancel</button>
+    <!-- GIT GRAPH OVERLAY -->
+    <div id="git-graph-overlay">
+      <div id="git-graph-modal" tabindex="-1">
+        <div class="gg-titlebar">
+          <span class="gg-title-icon">⎇</span>
+          <span class="gg-repo-name" id="gg-repo-name"></span>
+          <span class="gg-branch-badge" id="gg-branch-badge"></span>
+          <div class="gg-branch-dropdown" id="gg-branch-dropdown">
+            <button class="gg-branch-trigger" id="gg-branch-trigger">
+              ⎇ <span id="gg-branch-trigger-label">branches</span> ▾
+            </button>
+            <div class="gg-branch-menu" id="gg-branch-menu"></div>
+          </div>
+          <button class="gg-search-toggle" id="gg-search-toggle" title="Search commits (Ctrl+F)">
+            ⌕
+          </button>
+          <span style="flex: 1"></span>
+          <button class="gg-pull-btn" id="gg-pull-btn" title="Git Pull">⬇ Pull</button>
+          <button
+            class="gg-github-btn"
+            id="gg-github-btn"
+            style="display: none"
+            title="Open on GitHub"
+          >
+            GitHub ↗
+          </button>
+          <button class="gg-close-btn" id="gg-close">✕</button>
+        </div>
+        <div class="gg-search-bar" id="gg-search-bar" style="display: none">
+          <div class="gg-search-input-wrap">
+            <span class="gg-search-icon">⌕</span>
+            <input
+              type="text"
+              class="gg-search-input"
+              id="gg-search-input"
+              placeholder="Search by message, author, or hash..."
+              spellcheck="false"
+              autocomplete="off"
+            />
+            <span class="gg-search-hint">Esc</span>
+          </div>
+        </div>
+        <div class="gg-body" id="gg-body">
+          <div class="gg-loading" id="gg-loading">
+            <div class="gg-spinner"></div>
+            <span>Loading git history...</span>
+          </div>
+          <div class="gg-error" id="gg-error" style="display: none"></div>
+          <div class="gg-content" id="gg-content" style="display: none">
+            <div class="gg-search-empty" id="gg-search-empty" style="display: none"></div>
+            <div class="gg-scroll" id="gg-scroll">
+              <svg class="gg-svg" id="gg-svg"></svg>
+              <div class="gg-commits" id="gg-commits"></div>
+              <div class="gg-load-more" id="gg-load-more" style="display: none">
+                <div class="gg-spinner"></div>
+              </div>
+            </div>
+            <div class="gg-file-panel" id="gg-file-panel" style="display: none">
+              <div class="gg-file-header">
+                <span class="gg-file-title" id="gg-file-title">Changed files</span>
+                <button class="gg-file-close" id="gg-file-close">✕</button>
+              </div>
+              <div class="gg-commit-body" id="gg-commit-body" style="display: none"></div>
+              <div class="gg-file-list" id="gg-file-list"></div>
+            </div>
+          </div>
+        </div>
+        <!-- CONFIRM DIALOG -->
+        <div class="gg-confirm" id="gg-confirm" style="display: none">
+          <div class="gg-confirm-box">
+            <div class="gg-confirm-message" id="gg-confirm-message"></div>
+            <div class="gg-confirm-actions">
+              <button class="gg-confirm-ok" id="gg-confirm-ok">Switch Branch</button>
+              <button class="gg-confirm-cancel" id="gg-confirm-cancel">Cancel</button>
+            </div>
+          </div>
+        </div>
+        <div class="gg-resize-handle" id="gg-resize-handle"></div>
+      </div>
     </div>
-  </div>
-</div>
 
-<!-- Custom CSS injection point -->
-<style id="custom-css-tag"></style>
+    <!-- DIFF MODAL -->
+    <div id="diff-overlay">
+      <div id="diff-modal">
+        <div class="diff-titlebar">
+          <span class="diff-title-icon">±</span>
+          <span class="diff-title-file" id="diff-title-file">—</span>
+          <span class="diff-title-badge" id="diff-title-badge"></span>
+          <span style="flex: 1"></span>
+          <button class="diff-close-btn" id="diff-close">✕</button>
+        </div>
+        <div class="diff-body" id="diff-body">
+          <div class="diff-loading" id="diff-loading" style="display: none">Loading diff...</div>
+          <div class="diff-content" id="diff-content"></div>
+        </div>
+      </div>
+    </div>
 
-<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
-<script type="module" src="js/scroll-float.js"></script>
-<script type="module" src="js/mobile.js"></script>
-<script type="module" src="js/main.js"></script>
-<div class="plan-toast-container" id="plan-toast-container"></div>
-<div class="plan-lightbox" id="plan-lightbox" style="display:none">
-  <div class="plan-lightbox-backdrop"></div>
-  <img class="plan-lightbox-img" id="plan-lightbox-img" />
-  <button class="plan-lightbox-close" id="plan-lightbox-close">✕</button>
-</div>
-</body>
+    <!-- IMAGE PREVIEW MODAL -->
+    <div id="img-preview-overlay">
+      <div id="img-preview-modal">
+        <img id="img-preview-img" src="" alt="preview" />
+        <button id="img-preview-close" class="img-preview-close">✕</button>
+      </div>
+    </div>
+
+    <!-- CONTEXT MENU -->
+    <div class="ctx-menu" id="ctx-menu">
+      <div class="ctx-item" id="ctx-rename">✎ Rename</div>
+      <div class="ctx-item" id="ctx-duplicate">⊕ Duplicate</div>
+      <div class="ctx-item" id="ctx-reveal">📂 Reveal in Finder</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item danger" id="ctx-close">✕ Close</div>
+    </div>
+
+    <!-- SOURCE CONTROL CONTEXT MENU -->
+    <div class="ctx-menu" id="sc-ctx-menu">
+      <div class="ctx-item" id="sctx-diff">± View Diff</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item" id="sctx-stage">+ Stage</div>
+      <div class="ctx-item" id="sctx-unstage">− Unstage</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item" id="sctx-discard">↩ Discard Changes</div>
+      <div class="ctx-item danger" id="sctx-delete">✕ Delete File</div>
+    </div>
+
+    <!-- EXPLORER CONTEXT MENU -->
+    <div class="ctx-menu" id="explorer-ctx-menu">
+      <div class="ctx-item" id="ectx-new-file">📄 New File</div>
+      <div class="ctx-item" id="ectx-new-folder">📁 New Folder</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item" id="ectx-rename">✎ Rename</div>
+      <div class="ctx-item" id="ectx-download">↓ Download</div>
+      <div class="ctx-item" id="ectx-reveal">🔍 Reveal in Finder</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item danger" id="ectx-delete">✕ Delete</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+     PLAN MODAL
+═══════════════════════════════════════════════════ -->
+    <div id="plan-overlay">
+      <div id="plan-modal">
+        <div class="plan-titlebar">
+          <span class="plan-title-icon">📋</span>
+          <span class="plan-title-text">Plans</span>
+          <button class="plan-close" id="plan-modal-close">✕</button>
+        </div>
+        <div class="plan-category-tabs" id="plan-category-tabs">
+          <button class="plan-cat-tab active" data-cat="all">
+            ALL<span class="plan-cat-count" id="plan-count-all">0</span>
+          </button>
+          <button class="plan-cat-tab" data-cat="feature">
+            기능<span class="plan-cat-count" id="plan-count-feature">0</span>
+          </button>
+          <button class="plan-cat-tab" data-cat="bug">
+            버그<span class="plan-cat-count" id="plan-count-bug">0</span>
+          </button>
+          <button class="plan-cat-tab" data-cat="other">
+            기타<span class="plan-cat-count" id="plan-count-other">0</span>
+          </button>
+          <button class="plan-btn-new-global" id="plan-btn-new-global" title="New Plan">
+            + New
+          </button>
+          <span class="plan-view-toggle" id="plan-view-toggle">
+            <button class="plan-view-btn active" data-view="list" title="List view">📋</button>
+            <button class="plan-view-btn" data-view="board" title="Board view">📊</button>
+          </span>
+        </div>
+        <div class="plan-body">
+          <!-- BOARD VIEW (kanban) -->
+          <div class="plan-board" id="plan-board" style="display: none">
+            <div class="plan-board-col" data-status="todo">
+              <div class="plan-board-col-header">
+                TODO <span class="plan-board-count" id="plan-board-count-todo">0</span>
+              </div>
+              <div class="plan-board-cards" id="plan-board-todo"></div>
+            </div>
+            <div class="plan-board-col" data-status="doing">
+              <div class="plan-board-col-header">
+                DOING <span class="plan-board-count" id="plan-board-count-doing">0</span>
+              </div>
+              <div class="plan-board-cards" id="plan-board-doing"></div>
+            </div>
+            <div class="plan-board-col" data-status="done">
+              <div class="plan-board-col-header">
+                DONE <span class="plan-board-count" id="plan-board-count-done">0</span>
+              </div>
+              <div class="plan-board-cards" id="plan-board-done"></div>
+            </div>
+            <div class="plan-board-col" data-status="on_hold">
+              <div class="plan-board-col-header">
+                ON HOLD <span class="plan-board-count" id="plan-board-count-on_hold">0</span>
+              </div>
+              <div class="plan-board-cards" id="plan-board-on_hold"></div>
+            </div>
+            <div class="plan-board-col" data-status="cancelled">
+              <div class="plan-board-col-header">
+                CANCELLED <span class="plan-board-count" id="plan-board-count-cancelled">0</span>
+              </div>
+              <div class="plan-board-cards" id="plan-board-cancelled"></div>
+            </div>
+          </div>
+          <!-- BOARD DIVIDER (drag to resize board vs editor) -->
+          <div class="plan-board-divider" id="plan-board-divider" style="display: none"></div>
+          <!-- LEFT: Plan list -->
+          <div class="plan-list-col" id="plan-list-col">
+            <div class="plan-list-toolbar">
+              <button class="plan-btn-new" id="plan-btn-new" title="New Plan">+ New</button>
+            </div>
+            <div class="plan-list-items" id="plan-list-items"></div>
+          </div>
+          <!-- RIGHT: Editor -->
+          <div class="plan-editor-col" id="plan-editor-col">
+            <div class="plan-editor-empty" id="plan-editor-empty">
+              <div class="plan-editor-empty-icon">📝</div>
+              <div class="plan-editor-empty-text">Select a plan or create a new one</div>
+            </div>
+            <div class="plan-editor-area" id="plan-editor-area" style="display: none">
+              <button class="plan-editor-close" id="plan-editor-close" title="Close editor">
+                ✕
+              </button>
+              <input
+                class="plan-editor-title"
+                id="plan-editor-title"
+                placeholder="Plan title..."
+                spellcheck="false"
+              />
+              <textarea
+                class="plan-editor-content"
+                id="plan-editor-content"
+                placeholder="Write your plan here..."
+                spellcheck="false"
+              ></textarea>
+              <div class="plan-editor-footer">
+                <span class="plan-editor-date" id="plan-editor-date"></span>
+                <select class="plan-cat-select" id="plan-cat-select">
+                  <option value="feature">기능</option>
+                  <option value="bug">버그</option>
+                  <option value="other">기타</option>
+                </select>
+                <select class="plan-status-select" id="plan-status-select">
+                  <option value="todo">TODO</option>
+                  <option value="doing">DOING</option>
+                  <option value="done">DONE</option>
+                  <option value="on_hold">ON HOLD</option>
+                  <option value="cancelled">CANCELLED</option>
+                </select>
+                <button class="plan-btn-delete" id="plan-btn-delete" title="Delete plan">
+                  🗑 Delete
+                </button>
+              </div>
+              <div class="plan-images" id="plan-images">
+                <div class="plan-images-header">
+                  Images <span class="plan-images-hint">(Ctrl+V to paste)</span>
+                </div>
+                <div class="plan-images-grid" id="plan-images-grid"></div>
+              </div>
+              <div class="plan-logs" id="plan-logs">
+                <div class="plan-logs-header">Activity Log</div>
+                <div class="plan-logs-list" id="plan-logs-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="plan-ctx-menu" id="plan-ctx-menu" style="display: none">
+      <div class="plan-ctx-item" data-action="edit">✏️ 편집</div>
+      <div class="plan-ctx-sep"></div>
+      <div class="plan-ctx-item" data-action="status" data-status="todo">📋 TODO</div>
+      <div class="plan-ctx-item" data-action="status" data-status="doing">🔨 DOING</div>
+      <div class="plan-ctx-item" data-action="status" data-status="done">✅ DONE</div>
+      <div class="plan-ctx-item" data-action="status" data-status="on_hold">⏸ ON HOLD</div>
+      <div class="plan-ctx-item" data-action="status" data-status="cancelled">❌ CANCELLED</div>
+      <div class="plan-ctx-sep"></div>
+      <div class="plan-ctx-item plan-ctx-danger" data-action="delete">🗑 삭제</div>
+      <div class="plan-ctx-sep"></div>
+      <div class="plan-ctx-item" data-action="ai-assign" data-ai="claude">
+        <img src="icons/claude.webp" class="plan-ctx-ai-icon" alt="" /> Claude
+      </div>
+      <div class="plan-ctx-item" data-action="ai-assign" data-ai="gemini">
+        <img src="icons/gemini.svg" class="plan-ctx-ai-icon" alt="" /> Gemini
+      </div>
+      <div class="plan-ctx-item" data-action="ai-assign" data-ai="codex">
+        <img src="icons/codex.png" class="plan-ctx-ai-icon" alt="" /> Codex
+      </div>
+      <div class="plan-ctx-item" data-action="ai-assign" data-ai="opencode">
+        <img src="icons/opencode.png" class="plan-ctx-ai-icon" alt="" /> OpenCode
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+     AI TASKS DASHBOARD
+═══════════════════════════════════════════════════ -->
+    <div id="ai-dash-overlay">
+      <div id="ai-dash-modal">
+        <div id="ai-dash-header">
+          <span class="ai-dash-title">🤖 AI Tasks</span>
+          <button id="ai-dash-close" class="ai-dash-close-btn">✕</button>
+        </div>
+        <div id="ai-dash-body"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+     SETTINGS MODAL
+═══════════════════════════════════════════════════ -->
+    <div id="settings-overlay">
+      <div id="settings-modal">
+        <div class="settings-titlebar">
+          <span class="settings-title-icon">⚙</span>
+          <span class="settings-title-text">Settings</span>
+          <button class="settings-close" id="settings-close">✕</button>
+        </div>
+        <div class="settings-body">
+          <!-- NAV -->
+          <nav class="settings-nav" id="settings-nav">
+            <div class="nav-item active" data-panel="appearance">
+              <span class="nav-icon">◈</span>Appearance
+            </div>
+            <div class="nav-item" data-panel="terminal">
+              <span class="nav-icon">▸</span>Terminal
+            </div>
+            <div class="nav-item" data-panel="shell"><span class="nav-icon">$</span>Shell</div>
+            <div class="nav-item" data-panel="keybindings">
+              <span class="nav-icon">⌨</span>Keybindings
+            </div>
+            <div class="nav-item" data-panel="advanced">
+              <span class="nav-icon">⚡</span>Advanced
+            </div>
+            <div class="nav-sep"></div>
+            <div class="nav-item" data-panel="importexport">
+              <span class="nav-icon">⇅</span>Import/Export
+            </div>
+          </nav>
+
+          <!-- CONTENT -->
+          <div class="settings-content">
+            <!-- ── APPEARANCE ── -->
+            <div class="settings-panel active" id="panel-appearance">
+              <div class="panel-section">
+                <div class="section-title">Theme</div>
+                <div class="theme-grid" id="theme-grid"></div>
+              </div>
+
+              <div class="panel-section">
+                <div class="section-title">Typography</div>
+                <div class="field-row">
+                  <div class="field-label">Font Family</div>
+                  <div class="field-control">
+                    <select class="s-select" id="s-fontFamily">
+                      <optgroup label="— Google Fonts">
+                        <option value='"JetBrains Mono",monospace'>JetBrains Mono</option>
+                        <option value='"Fira Code",monospace'>Fira Code</option>
+                        <option value='"IBM Plex Mono",monospace'>IBM Plex Mono</option>
+                        <option value='"Source Code Pro",monospace'>Source Code Pro</option>
+                        <option value='"Roboto Mono",monospace'>Roboto Mono</option>
+                        <option value='"Inconsolata",monospace'>Inconsolata</option>
+                        <option value='"Space Mono",monospace'>Space Mono</option>
+                        <option value='"Share Tech Mono",monospace'>Share Tech Mono</option>
+                      </optgroup>
+                      <optgroup label="— System Fonts">
+                        <option value='"Cascadia Code",monospace'>Cascadia Code</option>
+                        <option value='"SF Mono",monospace'>SF Mono (macOS)</option>
+                        <option value='"Menlo",monospace'>Menlo (macOS)</option>
+                        <option value='"Monaco",monospace'>Monaco (macOS)</option>
+                        <option value='"Consolas",monospace'>Consolas (Windows)</option>
+                        <option value='"Courier New",monospace'>Courier New</option>
+                        <option value="monospace">System Default</option>
+                      </optgroup>
+                    </select>
+                    <div class="font-preview" id="font-preview">
+                      $ claude --version<br />❯ The quick brown fox jumps<br />0123456789 !@#$%^&*()
+                    </div>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">Font Size</div>
+                  <div class="field-control">
+                    <div class="range-row">
+                      <input
+                        type="range"
+                        class="s-range"
+                        id="s-fontSize"
+                        min="8"
+                        max="32"
+                        step="1"
+                      />
+                      <input
+                        type="number"
+                        class="s-input"
+                        id="s-fontSize-num"
+                        min="8"
+                        max="32"
+                        step="1"
+                        style="width: 56px; padding: 3px 6px; text-align: center; flex-shrink: 0"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">Line Height</div>
+                  <div class="field-control">
+                    <div class="range-row">
+                      <input
+                        type="range"
+                        class="s-range"
+                        id="s-lineHeight"
+                        min="1.0"
+                        max="2.0"
+                        step="0.05"
+                      />
+                      <span class="range-val" id="s-lineHeight-val">1.2</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel-section">
+                <div class="section-title">Section Font Sizes</div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Sidebar<small>Sessions, Search, Explorer, SC, Plan</small>
+                  </div>
+                  <div class="field-control">
+                    <div class="range-row">
+                      <input
+                        type="range"
+                        class="s-range"
+                        id="s-sidebarFontSize"
+                        min="8"
+                        max="20"
+                        step="1"
+                      />
+                      <span class="range-val" id="s-sidebarFontSize-val">12</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">Tab Bar</div>
+                  <div class="field-control">
+                    <div class="range-row">
+                      <input
+                        type="range"
+                        class="s-range"
+                        id="s-tabBarFontSize"
+                        min="8"
+                        max="20"
+                        step="1"
+                      />
+                      <span class="range-val" id="s-tabBarFontSize-val">12</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">Status Bar</div>
+                  <div class="field-control">
+                    <div class="range-row">
+                      <input
+                        type="range"
+                        class="s-range"
+                        id="s-statusBarFontSize"
+                        min="8"
+                        max="20"
+                        step="1"
+                      />
+                      <span class="range-val" id="s-statusBarFontSize-val">11</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">Input Panel<small>Input History</small></div>
+                  <div class="field-control">
+                    <div class="range-row">
+                      <input
+                        type="range"
+                        class="s-range"
+                        id="s-inputPanelFontSize"
+                        min="8"
+                        max="20"
+                        step="1"
+                      />
+                      <span class="range-val" id="s-inputPanelFontSize-val">11</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">File Viewer</div>
+                  <div class="field-control">
+                    <div class="range-row">
+                      <input
+                        type="range"
+                        class="s-range"
+                        id="s-fileViewerFontSize"
+                        min="8"
+                        max="24"
+                        step="1"
+                      />
+                      <span class="range-val" id="s-fileViewerFontSize-val">13</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">Git Graph</div>
+                  <div class="field-control">
+                    <div class="range-row">
+                      <input
+                        type="range"
+                        class="s-range"
+                        id="s-gitGraphFontSize"
+                        min="8"
+                        max="20"
+                        step="1"
+                      />
+                      <span class="range-val" id="s-gitGraphFontSize-val">12</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel-section">
+                <div class="section-title">Cursor</div>
+                <div class="field-row">
+                  <div class="field-label">Cursor Style</div>
+                  <div class="field-control">
+                    <select class="s-select" id="s-cursorStyle">
+                      <option value="block">Block ▌</option>
+                      <option value="underline">Underline _</option>
+                      <option value="bar">Bar |</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">Cursor Blink</div>
+                  <div class="field-control">
+                    <label class="s-toggle">
+                      <input type="checkbox" id="s-cursorBlink" />
+                      <div class="toggle-track"></div>
+                      <div class="toggle-thumb"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel-section">
+                <div class="section-title">Effects</div>
+                <div class="field-row">
+                  <div class="field-label">CRT Scanlines</div>
+                  <div class="field-control">
+                    <label class="s-toggle">
+                      <input type="checkbox" id="s-crtScanlines" />
+                      <div class="toggle-track"></div>
+                      <div class="toggle-thumb"></div>
+                    </label>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Scanlines Intensity
+                    <small>Higher = more visible</small>
+                  </div>
+                  <div class="field-control">
+                    <div class="range-row">
+                      <input
+                        type="range"
+                        class="s-range"
+                        id="s-crtScanlinesIntensity"
+                        min="0"
+                        max="0.25"
+                        step="0.01"
+                      />
+                      <span class="range-val" id="s-crtScanlinesIntensity-val">0.07</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">CRT Flicker</div>
+                  <div class="field-control">
+                    <label class="s-toggle">
+                      <input type="checkbox" id="s-crtFlicker" />
+                      <div class="toggle-track"></div>
+                      <div class="toggle-thumb"></div>
+                    </label>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">Vignette</div>
+                  <div class="field-control">
+                    <label class="s-toggle">
+                      <input type="checkbox" id="s-vignette" />
+                      <div class="toggle-track"></div>
+                      <div class="toggle-thumb"></div>
+                    </label>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Glow Intensity
+                    <small>Accent color glow strength</small>
+                  </div>
+                  <div class="field-control">
+                    <div class="range-row">
+                      <input
+                        type="range"
+                        class="s-range"
+                        id="s-glowIntensity"
+                        min="0"
+                        max="2"
+                        step="0.1"
+                      />
+                      <span class="range-val" id="s-glowIntensity-val">1.0</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Background Opacity
+                    <small>Terminal background transparency</small>
+                  </div>
+                  <div class="field-control">
+                    <div class="range-row">
+                      <input
+                        type="range"
+                        class="s-range"
+                        id="s-backgroundOpacity"
+                        min="0.1"
+                        max="1.0"
+                        step="0.05"
+                      />
+                      <span class="range-val" id="s-backgroundOpacity-val">1.0</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Screen Dim
+                    <small>Darken entire screen (0 = off)</small>
+                  </div>
+                  <div class="field-control">
+                    <div class="range-row">
+                      <input
+                        type="range"
+                        class="s-range"
+                        id="s-screenDimOpacity"
+                        min="0"
+                        max="0.9"
+                        step="0.05"
+                      />
+                      <span class="range-val" id="s-screenDimOpacity-val">0</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- /appearance -->
+
+            <!-- ── TERMINAL ── -->
+            <div class="settings-panel" id="panel-terminal">
+              <div class="panel-section">
+                <div class="section-title">Scrollback & Buffer</div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Scrollback Lines
+                    <small>Max lines to keep in history</small>
+                  </div>
+                  <div class="field-control">
+                    <input
+                      type="number"
+                      class="s-input"
+                      id="s-scrollback"
+                      min="100"
+                      max="100000"
+                      step="100"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="panel-section">
+                <div class="section-title">Behavior</div>
+                <div class="field-row">
+                  <div class="field-label">Bell Style</div>
+                  <div class="field-control">
+                    <select class="s-select" id="s-bellStyle">
+                      <option value="none">None (silent)</option>
+                      <option value="visual">Visual flash</option>
+                      <option value="sound">Sound</option>
+                      <option value="both">Both</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Copy on Select
+                    <small>Auto-copy when text selected</small>
+                  </div>
+                  <div class="field-control">
+                    <label class="s-toggle">
+                      <input type="checkbox" id="s-copyOnSelect" />
+                      <div class="toggle-track"></div>
+                      <div class="toggle-thumb"></div>
+                    </label>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Right-Click to Paste
+                    <small>Right click pastes clipboard</small>
+                  </div>
+                  <div class="field-control">
+                    <label class="s-toggle">
+                      <input type="checkbox" id="s-rightClickPaste" />
+                      <div class="toggle-track"></div>
+                      <div class="toggle-thumb"></div>
+                    </label>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Trim on Copy
+                    <small>Strip trailing whitespace</small>
+                  </div>
+                  <div class="field-control">
+                    <label class="s-toggle">
+                      <input type="checkbox" id="s-trimCopied" />
+                      <div class="toggle-track"></div>
+                      <div class="toggle-thumb"></div>
+                    </label>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Word Separators
+                    <small>Characters that split words</small>
+                  </div>
+                  <div class="field-control">
+                    <input type="text" class="s-input" id="s-wordSeparators" />
+                  </div>
+                </div>
+              </div>
+              <div class="panel-section">
+                <div class="section-title">Renderer</div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Renderer Engine
+                    <small>WebGL fastest, DOM most compatible</small>
+                  </div>
+                  <div class="field-control">
+                    <select class="s-select" id="s-renderer">
+                      <option value="canvas">Canvas (default)</option>
+                      <option value="webgl">WebGL (fastest)</option>
+                      <option value="dom">DOM (compatible)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- /terminal -->
+
+            <!-- ── SHELL ── -->
+            <div class="settings-panel" id="panel-shell">
+              <div class="panel-section">
+                <div class="section-title">Shell Configuration</div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Shell Path
+                    <small>Full path to shell binary</small>
+                  </div>
+                  <div class="field-control">
+                    <input type="text" class="s-input" id="s-shellPath" placeholder="/bin/zsh" />
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Start Directory
+                    <small>Working dir for new sessions</small>
+                  </div>
+                  <div class="field-control">
+                    <input
+                      type="text"
+                      class="s-input"
+                      id="s-startDirectory"
+                      placeholder="/home/user"
+                    />
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Session Name Format
+                    <small>{n} = session number</small>
+                  </div>
+                  <div class="field-control">
+                    <input
+                      type="text"
+                      class="s-input"
+                      id="s-sessionNameFormat"
+                      placeholder="shell-{n}"
+                    />
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">
+                    Auto Reconnect
+                    <small>Reconnect on disconnect</small>
+                  </div>
+                  <div class="field-control">
+                    <label class="s-toggle">
+                      <input type="checkbox" id="s-autoReconnect" />
+                      <div class="toggle-track"></div>
+                      <div class="toggle-thumb"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div class="panel-section">
+                <div class="section-title">Environment Variables</div>
+                <div class="env-list" id="env-list"></div>
+                <button class="btn-add-env" id="btn-add-env">+ Add Variable</button>
+              </div>
+            </div>
+            <!-- /shell -->
+
+            <!-- ── KEYBINDINGS ── -->
+            <div class="settings-panel" id="panel-keybindings">
+              <div class="panel-section">
+                <div class="section-title">Keyboard Shortcuts</div>
+                <p
+                  style="
+                    font-size: 10px;
+                    color: var(--text-dim);
+                    margin-bottom: 12px;
+                    letter-spacing: 0.04em;
+                    line-height: 1.6;
+                  "
+                >
+                  Click a shortcut field and press the desired key combination to record it.
+                </p>
+                <div id="kb-list"></div>
+              </div>
+            </div>
+            <!-- /keybindings -->
+
+            <!-- ── ADVANCED ── -->
+            <div class="settings-panel" id="panel-advanced">
+              <div class="panel-section">
+                <div class="section-title">Custom CSS</div>
+                <div class="field-row top-align">
+                  <div class="field-label">
+                    Custom Styles
+                    <small>Injected into &lt;style&gt; tag</small>
+                  </div>
+                  <div class="field-control">
+                    <textarea
+                      class="s-textarea"
+                      id="s-customCss"
+                      rows="6"
+                      placeholder="/* Custom CSS here */\n.xterm { opacity: 0.95; }"
+                    ></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="panel-section">
+                <div class="section-title">Connection</div>
+                <div class="field-row">
+                  <div class="field-label">
+                    WS Reconnect Interval
+                    <small>Milliseconds between retries</small>
+                  </div>
+                  <div class="field-control">
+                    <input
+                      type="number"
+                      class="s-input"
+                      id="s-wsReconnectInterval"
+                      min="500"
+                      max="30000"
+                      step="500"
+                    />
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field-label">Log Level</div>
+                  <div class="field-control">
+                    <select class="s-select" id="s-logLevel">
+                      <option value="debug">Debug (verbose)</option>
+                      <option value="info">Info</option>
+                      <option value="warn">Warn</option>
+                      <option value="error">Error only</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="panel-section">
+                <div class="section-title">Reset</div>
+                <div class="btn-row">
+                  <button class="btn-danger" id="btn-reset-settings">⚠ Reset All Settings</button>
+                </div>
+              </div>
+            </div>
+            <!-- /advanced -->
+
+            <!-- ── IMPORT/EXPORT ── -->
+            <div class="settings-panel" id="panel-importexport">
+              <div class="panel-section">
+                <div class="section-title">Export</div>
+                <p
+                  style="
+                    font-size: 11px;
+                    color: var(--text-dim);
+                    margin-bottom: 14px;
+                    line-height: 1.7;
+                  "
+                >
+                  Download your current settings as a JSON file. Use this to backup or transfer your
+                  configuration.
+                </p>
+                <div class="btn-row">
+                  <button class="btn-action" id="btn-export">↓ Export settings.json</button>
+                </div>
+              </div>
+              <div class="panel-section">
+                <div class="section-title">Import</div>
+                <p
+                  style="
+                    font-size: 11px;
+                    color: var(--text-dim);
+                    margin-bottom: 14px;
+                    line-height: 1.7;
+                  "
+                >
+                  Import a previously exported settings JSON file. This will overwrite your current
+                  settings.
+                </p>
+                <div class="btn-row">
+                  <button class="btn-action" id="btn-import">↑ Import settings.json</button>
+                  <input type="file" id="import-file-input" accept=".json" style="display: none" />
+                </div>
+                <div
+                  id="import-status"
+                  style="margin-top: 10px; font-size: 11px; color: var(--ok); display: none"
+                ></div>
+              </div>
+            </div>
+            <!-- /importexport -->
+          </div>
+          <!-- /settings-content -->
+        </div>
+        <!-- /settings-body -->
+
+        <div class="settings-footer">
+          <span class="save-status" id="save-status">✓ Saved</span>
+          <button class="btn-cancel" id="btn-cancel-settings">Cancel</button>
+          <button class="btn-save" id="btn-save-settings">Save Changes</button>
+        </div>
+      </div>
+      <!-- /settings-modal -->
+    </div>
+    <!-- /settings-overlay -->
+
+    <!-- FLOATING SCROLL BUTTONS -->
+    <div id="scroll-float">
+      <button id="scroll-top-btn" class="scroll-float-btn" title="Scroll to Top">▲</button>
+      <button id="scroll-bottom-btn" class="scroll-float-btn" title="Scroll to Bottom">▼</button>
+    </div>
+
+    <!-- GLOBAL CONFIRM MODAL -->
+    <div id="global-confirm-overlay">
+      <div class="global-confirm-box">
+        <div class="global-confirm-message" id="global-confirm-message"></div>
+        <div class="global-confirm-actions">
+          <button class="global-confirm-ok" id="global-confirm-ok">OK</button>
+          <button class="global-confirm-cancel" id="global-confirm-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom CSS injection point -->
+    <style id="custom-css-tag"></style>
+
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+    <script type="module" src="js/scroll-float.js"></script>
+    <script type="module" src="js/mobile.js"></script>
+    <script type="module" src="js/main.js"></script>
+    <div class="plan-toast-container" id="plan-toast-container"></div>
+    <div class="plan-lightbox" id="plan-lightbox" style="display: none">
+      <div class="plan-lightbox-backdrop"></div>
+      <img class="plan-lightbox-img" id="plan-lightbox-img" />
+      <button class="plan-lightbox-close" id="plan-lightbox-close">✕</button>
+    </div>
+  </body>
 </html>

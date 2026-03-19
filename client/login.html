@@ -1,269 +1,400 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SUPER TERMINAL — Login</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{width:100%;height:100vh;background:#050508;color:#e8e8ff;font-family:'JetBrains Mono',monospace;
-      display:flex;align-items:center;justify-content:center}
-    .login-box{background:#0d0d18;border:1px solid #1e1e38;border-radius:8px;padding:40px;width:380px;
-      box-shadow:0 0 40px rgba(0,255,229,.05)}
-    .login-logo{text-align:center;margin-bottom:24px;font-size:14px;font-weight:600;letter-spacing:.15em;color:#00ffe5}
-    .login-title{text-align:center;font-size:12px;color:#7777aa;margin-bottom:20px}
-    .login-input{width:100%;background:#111120;color:#e8e8ff;border:1px solid #1e1e38;border-radius:4px;
-      padding:10px 12px;font-family:inherit;font-size:13px;outline:none;margin-bottom:12px;transition:border .2s}
-    .login-input:focus{border-color:#00ffe5;box-shadow:0 0 6px rgba(0,255,229,.2)}
-    .login-input::placeholder{color:#7777aa}
-    .login-btn{width:100%;background:#00ffe520;color:#00ffe5;border:1px solid #00ffe530;border-radius:4px;
-      padding:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.05em}
-    .login-btn:hover{background:#00ffe5;color:#050508}
-    .login-btn:disabled{opacity:.4;cursor:not-allowed}
-    .login-error{color:#ff3366;font-size:11px;text-align:center;margin-top:12px;min-height:16px}
-    .login-switch{text-align:center;margin-top:16px;font-size:11px;color:#7777aa}
-    .login-switch a{color:#00ffe5;cursor:pointer;text-decoration:none}
-    .login-switch a:hover{text-decoration:underline}
-    .hidden{display:none}
-  </style>
-</head>
-<body>
-  <div class="login-box">
-    <div class="login-logo">SUPER / TERMINAL</div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SUPER TERMINAL — Login</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        width: 100%;
+        height: 100vh;
+        background: #050508;
+        color: #e8e8ff;
+        font-family: 'JetBrains Mono', monospace;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .login-box {
+        background: #0d0d18;
+        border: 1px solid #1e1e38;
+        border-radius: 8px;
+        padding: 40px;
+        width: 380px;
+        box-shadow: 0 0 40px rgba(0, 255, 229, 0.05);
+      }
+      .login-logo {
+        text-align: center;
+        margin-bottom: 24px;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.15em;
+        color: #00ffe5;
+      }
+      .login-title {
+        text-align: center;
+        font-size: 12px;
+        color: #7777aa;
+        margin-bottom: 20px;
+      }
+      .login-input {
+        width: 100%;
+        background: #111120;
+        color: #e8e8ff;
+        border: 1px solid #1e1e38;
+        border-radius: 4px;
+        padding: 10px 12px;
+        font-family: inherit;
+        font-size: 13px;
+        outline: none;
+        margin-bottom: 12px;
+        transition: border 0.2s;
+      }
+      .login-input:focus {
+        border-color: #00ffe5;
+        box-shadow: 0 0 6px rgba(0, 255, 229, 0.2);
+      }
+      .login-input::placeholder {
+        color: #7777aa;
+      }
+      .login-btn {
+        width: 100%;
+        background: #00ffe520;
+        color: #00ffe5;
+        border: 1px solid #00ffe530;
+        border-radius: 4px;
+        padding: 10px;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        letter-spacing: 0.05em;
+      }
+      .login-btn:hover {
+        background: #00ffe5;
+        color: #050508;
+      }
+      .login-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .login-error {
+        color: #ff3366;
+        font-size: 11px;
+        text-align: center;
+        margin-top: 12px;
+        min-height: 16px;
+      }
+      .login-switch {
+        text-align: center;
+        margin-top: 16px;
+        font-size: 11px;
+        color: #7777aa;
+      }
+      .login-switch a {
+        color: #00ffe5;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      .login-switch a:hover {
+        text-decoration: underline;
+      }
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-box">
+      <div class="login-logo">SUPER / TERMINAL</div>
 
-    <!-- Login Form -->
-    <div id="login-view">
-      <div class="login-title">Sign in to your account</div>
-      <form id="login-form">
-        <input type="email" class="login-input" id="login-email" placeholder="Email" autocomplete="email" autofocus/>
-        <input type="password" class="login-input" id="login-password" placeholder="Password" autocomplete="current-password"/>
-        <button type="submit" class="login-btn">LOGIN</button>
-      </form>
-      <div class="login-error" id="login-error"></div>
-      <div class="login-switch" id="switch-to-register">
-        Don't have an account? <a id="show-register">Sign up</a>
+      <!-- Login Form -->
+      <div id="login-view">
+        <div class="login-title">Sign in to your account</div>
+        <form id="login-form">
+          <input
+            type="email"
+            class="login-input"
+            id="login-email"
+            placeholder="Email"
+            autocomplete="email"
+            autofocus
+          />
+          <input
+            type="password"
+            class="login-input"
+            id="login-password"
+            placeholder="Password"
+            autocomplete="current-password"
+          />
+          <button type="submit" class="login-btn">LOGIN</button>
+        </form>
+        <div class="login-error" id="login-error"></div>
+        <div class="login-switch" id="switch-to-register">
+          Don't have an account? <a id="show-register">Sign up</a>
+        </div>
+        <div class="login-switch hidden" id="switch-to-token">
+          <a id="show-token">Login with access token</a>
+        </div>
       </div>
-      <div class="login-switch hidden" id="switch-to-token">
-        <a id="show-token">Login with access token</a>
+
+      <!-- Register Form -->
+      <div id="register-view" class="hidden">
+        <div class="login-title">Create your account</div>
+        <form id="register-form">
+          <input
+            type="text"
+            class="login-input"
+            id="register-name"
+            placeholder="Name (optional)"
+            autocomplete="name"
+          />
+          <input
+            type="email"
+            class="login-input"
+            id="register-email"
+            placeholder="Email"
+            autocomplete="email"
+          />
+          <input
+            type="password"
+            class="login-input"
+            id="register-password"
+            placeholder="Password (8+ characters)"
+            autocomplete="new-password"
+          />
+          <input
+            type="password"
+            class="login-input"
+            id="register-confirm"
+            placeholder="Confirm password"
+            autocomplete="new-password"
+          />
+          <button type="submit" class="login-btn">SIGN UP</button>
+        </form>
+        <div class="login-error" id="register-error"></div>
+        <div class="login-switch">Already have an account? <a id="show-login">Sign in</a></div>
+      </div>
+
+      <!-- Token Form (legacy) -->
+      <div id="token-view" class="hidden">
+        <div class="login-title">Enter your access token to continue</div>
+        <form id="token-form">
+          <input
+            type="password"
+            class="login-input"
+            id="token-input"
+            placeholder="Access token"
+            autocomplete="off"
+          />
+          <button type="submit" class="login-btn">LOGIN</button>
+        </form>
+        <div class="login-error" id="token-error"></div>
+        <div class="login-switch">
+          <a id="show-login-from-token">Back to email login</a>
+        </div>
       </div>
     </div>
 
-    <!-- Register Form -->
-    <div id="register-view" class="hidden">
-      <div class="login-title">Create your account</div>
-      <form id="register-form">
-        <input type="text" class="login-input" id="register-name" placeholder="Name (optional)" autocomplete="name"/>
-        <input type="email" class="login-input" id="register-email" placeholder="Email" autocomplete="email"/>
-        <input type="password" class="login-input" id="register-password" placeholder="Password (8+ characters)" autocomplete="new-password"/>
-        <input type="password" class="login-input" id="register-confirm" placeholder="Confirm password" autocomplete="new-password"/>
-        <button type="submit" class="login-btn">SIGN UP</button>
-      </form>
-      <div class="login-error" id="register-error"></div>
-      <div class="login-switch">
-        Already have an account? <a id="show-login">Sign in</a>
-      </div>
-    </div>
+    <script>
+      // ─── DOM refs ──────────────────────────────────────
+      const loginView = document.getElementById('login-view');
+      const registerView = document.getElementById('register-view');
+      const tokenView = document.getElementById('token-view');
+      const switchToRegister = document.getElementById('switch-to-register');
+      const switchToToken = document.getElementById('switch-to-token');
 
-    <!-- Token Form (legacy) -->
-    <div id="token-view" class="hidden">
-      <div class="login-title">Enter your access token to continue</div>
-      <form id="token-form">
-        <input type="password" class="login-input" id="token-input" placeholder="Access token" autocomplete="off"/>
-        <button type="submit" class="login-btn">LOGIN</button>
-      </form>
-      <div class="login-error" id="token-error"></div>
-      <div class="login-switch">
-        <a id="show-login-from-token">Back to email login</a>
-      </div>
-    </div>
-  </div>
+      const loginForm = document.getElementById('login-form');
+      const loginEmail = document.getElementById('login-email');
+      const loginPassword = document.getElementById('login-password');
+      const loginError = document.getElementById('login-error');
 
-  <script>
-    // ─── DOM refs ──────────────────────────────────────
-    const loginView = document.getElementById('login-view');
-    const registerView = document.getElementById('register-view');
-    const tokenView = document.getElementById('token-view');
-    const switchToRegister = document.getElementById('switch-to-register');
-    const switchToToken = document.getElementById('switch-to-token');
+      const registerForm = document.getElementById('register-form');
+      const registerName = document.getElementById('register-name');
+      const registerEmail = document.getElementById('register-email');
+      const registerPassword = document.getElementById('register-password');
+      const registerConfirm = document.getElementById('register-confirm');
+      const registerError = document.getElementById('register-error');
 
-    const loginForm = document.getElementById('login-form');
-    const loginEmail = document.getElementById('login-email');
-    const loginPassword = document.getElementById('login-password');
-    const loginError = document.getElementById('login-error');
+      const tokenForm = document.getElementById('token-form');
+      const tokenInput = document.getElementById('token-input');
+      const tokenError = document.getElementById('token-error');
 
-    const registerForm = document.getElementById('register-form');
-    const registerName = document.getElementById('register-name');
-    const registerEmail = document.getElementById('register-email');
-    const registerPassword = document.getElementById('register-password');
-    const registerConfirm = document.getElementById('register-confirm');
-    const registerError = document.getElementById('register-error');
+      // ─── View switching ────────────────────────────────
+      function showView(view) {
+        loginView.classList.toggle('hidden', view !== 'login');
+        registerView.classList.toggle('hidden', view !== 'register');
+        tokenView.classList.toggle('hidden', view !== 'token');
+        loginError.textContent = '';
+        registerError.textContent = '';
+        tokenError.textContent = '';
+      }
 
-    const tokenForm = document.getElementById('token-form');
-    const tokenInput = document.getElementById('token-input');
-    const tokenError = document.getElementById('token-error');
+      document
+        .getElementById('show-register')
+        .addEventListener('click', () => showView('register'));
+      document.getElementById('show-login').addEventListener('click', () => showView('login'));
+      document.getElementById('show-token').addEventListener('click', () => showView('token'));
+      document
+        .getElementById('show-login-from-token')
+        .addEventListener('click', () => showView('login'));
 
-    // ─── View switching ────────────────────────────────
-    function showView(view) {
-      loginView.classList.toggle('hidden', view !== 'login');
-      registerView.classList.toggle('hidden', view !== 'register');
-      tokenView.classList.toggle('hidden', view !== 'token');
-      loginError.textContent = '';
-      registerError.textContent = '';
-      tokenError.textContent = '';
-    }
+      // ─── Auth success handler ──────────────────────────
+      function onAuthSuccess(token) {
+        localStorage.setItem('super-terminal-token', token);
+        window.location.href = '/?token=' + encodeURIComponent(token);
+      }
 
-    document.getElementById('show-register').addEventListener('click', () => showView('register'));
-    document.getElementById('show-login').addEventListener('click', () => showView('login'));
-    document.getElementById('show-token').addEventListener('click', () => showView('token'));
-    document.getElementById('show-login-from-token').addEventListener('click', () => showView('login'));
+      // ─── Auto-auth check ───────────────────────────────
+      async function init() {
+        const saved = localStorage.getItem('super-terminal-token');
 
-    // ─── Auth success handler ──────────────────────────
-    function onAuthSuccess(token) {
-      localStorage.setItem('super-terminal-token', token);
-      window.location.href = '/?token=' + encodeURIComponent(token);
-    }
+        try {
+          const url = saved
+            ? '/api/auth/check?token=' + encodeURIComponent(saved)
+            : '/api/auth/check';
+          const res = await fetch(url);
+          const data = await res.json();
 
-    // ─── Auto-auth check ───────────────────────────────
-    async function init() {
-      const saved = localStorage.getItem('super-terminal-token');
+          // Already authenticated
+          if (data.ok && saved) {
+            window.location.href = '/?token=' + encodeURIComponent(saved);
+            return;
+          }
 
-      try {
-        const url = saved
-          ? '/api/auth/check?token=' + encodeURIComponent(saved)
-          : '/api/auth/check';
-        const res = await fetch(url);
-        const data = await res.json();
+          // No auth configured — go straight to app
+          if (!data.authEnabled) {
+            window.location.href = '/';
+            return;
+          }
 
-        // Already authenticated
-        if (data.ok && saved) {
-          window.location.href = '/?token=' + encodeURIComponent(saved);
+          // Show/hide registration link
+          if (!data.registrationAllowed) {
+            switchToRegister.classList.add('hidden');
+          }
+
+          // Show/hide token login link
+          if (data.tokenAuthEnabled) {
+            switchToToken.classList.remove('hidden');
+          }
+
+          // First-time setup: show registration form directly
+          if (data.setupRequired) {
+            showView('register');
+            return;
+          }
+
+          // If auth mode is token-only, show token view
+          if (data.authMode === 'token' && !data.registrationAllowed) {
+            showView('token');
+          }
+        } catch {
+          // Server unreachable — show login form anyway
+        }
+      }
+
+      init();
+
+      // ─── Login form ────────────────────────────────────
+      loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        loginError.textContent = '';
+        const email = loginEmail.value.trim();
+        const password = loginPassword.value;
+        if (!email || !password) return;
+
+        try {
+          const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+          });
+          const data = await res.json();
+          if (data.ok && data.token) {
+            onAuthSuccess(data.token);
+          } else {
+            loginError.textContent = data.error || 'Login failed';
+          }
+        } catch {
+          loginError.textContent = 'Connection error';
+        }
+      });
+
+      // ─── Register form ─────────────────────────────────
+      registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        registerError.textContent = '';
+        const name = registerName.value.trim();
+        const email = registerEmail.value.trim();
+        const password = registerPassword.value;
+        const confirm = registerConfirm.value;
+
+        if (!email || !password) return;
+        if (password.length < 8) {
+          registerError.textContent = 'Password must be at least 8 characters';
+          return;
+        }
+        if (password.length > 128) {
+          registerError.textContent = 'Password must be at most 128 characters';
+          return;
+        }
+        if (password !== confirm) {
+          registerError.textContent = 'Passwords do not match';
           return;
         }
 
-        // No auth configured — go straight to app
-        if (!data.authEnabled) {
-          window.location.href = '/';
-          return;
+        try {
+          const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password, name }),
+          });
+          const data = await res.json();
+          if (data.ok && data.token) {
+            onAuthSuccess(data.token);
+          } else {
+            registerError.textContent = data.error || 'Registration failed';
+          }
+        } catch {
+          registerError.textContent = 'Connection error';
         }
+      });
 
-        // Show/hide registration link
-        if (!data.registrationAllowed) {
-          switchToRegister.classList.add('hidden');
+      // ─── Token form (legacy) ───────────────────────────
+      tokenForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        tokenError.textContent = '';
+        const token = tokenInput.value.trim();
+        if (!token) return;
+
+        try {
+          const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            onAuthSuccess(token);
+          } else {
+            tokenError.textContent = data.error || 'Invalid token';
+            tokenInput.select();
+          }
+        } catch {
+          tokenError.textContent = 'Connection error';
         }
-
-        // Show/hide token login link
-        if (data.tokenAuthEnabled) {
-          switchToToken.classList.remove('hidden');
-        }
-
-        // First-time setup: show registration form directly
-        if (data.setupRequired) {
-          showView('register');
-          return;
-        }
-
-        // If auth mode is token-only, show token view
-        if (data.authMode === 'token' && !data.registrationAllowed) {
-          showView('token');
-        }
-      } catch {
-        // Server unreachable — show login form anyway
-      }
-    }
-
-    init();
-
-    // ─── Login form ────────────────────────────────────
-    loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      loginError.textContent = '';
-      const email = loginEmail.value.trim();
-      const password = loginPassword.value;
-      if (!email || !password) return;
-
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
-        const data = await res.json();
-        if (data.ok && data.token) {
-          onAuthSuccess(data.token);
-        } else {
-          loginError.textContent = data.error || 'Login failed';
-        }
-      } catch {
-        loginError.textContent = 'Connection error';
-      }
-    });
-
-    // ─── Register form ─────────────────────────────────
-    registerForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      registerError.textContent = '';
-      const name = registerName.value.trim();
-      const email = registerEmail.value.trim();
-      const password = registerPassword.value;
-      const confirm = registerConfirm.value;
-
-      if (!email || !password) return;
-      if (password.length < 8) {
-        registerError.textContent = 'Password must be at least 8 characters';
-        return;
-      }
-      if (password.length > 128) {
-        registerError.textContent = 'Password must be at most 128 characters';
-        return;
-      }
-      if (password !== confirm) {
-        registerError.textContent = 'Passwords do not match';
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, name }),
-        });
-        const data = await res.json();
-        if (data.ok && data.token) {
-          onAuthSuccess(data.token);
-        } else {
-          registerError.textContent = data.error || 'Registration failed';
-        }
-      } catch {
-        registerError.textContent = 'Connection error';
-      }
-    });
-
-    // ─── Token form (legacy) ───────────────────────────
-    tokenForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      tokenError.textContent = '';
-      const token = tokenInput.value.trim();
-      if (!token) return;
-
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        });
-        const data = await res.json();
-        if (data.ok) {
-          onAuthSuccess(token);
-        } else {
-          tokenError.textContent = data.error || 'Invalid token';
-          tokenInput.select();
-        }
-      } catch {
-        tokenError.textContent = 'Connection error';
-      }
-    });
-  </script>
-</body>
+      });
+    </script>
+  </body>
 </html>

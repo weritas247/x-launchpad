@@ -1,12 +1,30 @@
-import { S, terminalMap, sessionMeta, tabBar, tabAddBtn, termWrapper, ctxMenu, escHtml } from './state.js';
+import {
+  S,
+  terminalMap,
+  sessionMeta,
+  tabBar,
+  tabAddBtn,
+  termWrapper,
+  ctxMenu,
+  escHtml,
+} from './state.js';
 import { AI_REGISTRY } from './constants.js';
 import { wsSend, getAuthToken, apiFetch } from './websocket.js';
 import { xtermKeyHandler } from './keyboard.js';
 import { trackInput } from './prompt-history.js';
 import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session.js';
-import { removeSplitPane, teardownSplitLayout, showDropZoneOverlay, hideDropZoneOverlay } from './split-pane.js';
+import {
+  removeSplitPane,
+  teardownSplitLayout,
+  showDropZoneOverlay,
+  hideDropZoneOverlay,
+} from './split-pane.js';
 import { resetTabStatus, tabStatusOnInput } from './tab-status.js';
-import { setupTerminalImageHandlers, hasPendingAttachments, uploadAndFlush } from './image-attach.js';
+import {
+  setupTerminalImageHandlers,
+  hasPendingAttachments,
+  uploadAndFlush,
+} from './image-attach.js';
 import { destroyStream, bypassStream, unbypassStream, streamWrite } from './stream-writer.js';
 import { aiNotifyCheck } from './notifications.js';
 import { tabStatusCheck } from './tab-status.js';
@@ -23,7 +41,7 @@ function getSpButtons() {
 }
 
 function updateSpFocus(btns, idx) {
-  btns.forEach(b => b.classList.remove('sp-focused'));
+  btns.forEach((b) => b.classList.remove('sp-focused'));
   spFocusIdx = idx;
   if (idx >= 0 && idx < btns.length) {
     btns[idx].classList.add('sp-focused');
@@ -40,44 +58,51 @@ export function showSessionPicker() {
   if (spAbort) spAbort.abort();
   spAbort = new AbortController();
 
-  document.addEventListener('keydown', e => {
-    const btns = getSpButtons();
-    const cols = 3;
-    const len = btns.length;
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      const btns = getSpButtons();
+      const cols = 3;
+      const len = btns.length;
 
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      hideSessionPicker();
-      return;
-    }
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (spFocusIdx >= 0 && spFocusIdx < len) btns[spFocusIdx].click();
-      return;
-    }
-    if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      updateSpFocus(btns, (spFocusIdx + 1) % len);
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      updateSpFocus(btns, (spFocusIdx - 1 + len) % len);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      const next = spFocusIdx + cols;
-      if (next < len) updateSpFocus(btns, next);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      const prev = spFocusIdx - cols;
-      if (prev >= 0) updateSpFocus(btns, prev);
-    }
-  }, { signal: spAbort.signal, capture: true });
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        hideSessionPicker();
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (spFocusIdx >= 0 && spFocusIdx < len) btns[spFocusIdx].click();
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        updateSpFocus(btns, (spFocusIdx + 1) % len);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        updateSpFocus(btns, (spFocusIdx - 1 + len) % len);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = spFocusIdx + cols;
+        if (next < len) updateSpFocus(btns, next);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = spFocusIdx - cols;
+        if (prev >= 0) updateSpFocus(btns, prev);
+      }
+    },
+    { signal: spAbort.signal, capture: true }
+  );
 }
 
 export function hideSessionPicker() {
   document.getElementById('session-picker').style.display = 'none';
-  if (spAbort) { spAbort.abort(); spAbort = null; }
-  getSpButtons().forEach(b => b.classList.remove('sp-focused'));
+  if (spAbort) {
+    spAbort.abort();
+    spAbort = null;
+  }
+  getSpButtons().forEach((b) => b.classList.remove('sp-focused'));
   spFocusIdx = -1;
 }
 
@@ -85,7 +110,11 @@ export function closeSession(id) {
   wsSend({ type: 'session_close', sessionId: id });
   const entry = terminalMap.get(id);
   if (entry) {
-    if (entry.dataWs) { try { entry.dataWs.close(); } catch {} }
+    if (entry.dataWs) {
+      try {
+        entry.dataWs.close();
+      } catch {}
+    }
     entry.term.dispose();
     entry.tabEl.remove();
     terminalMap.delete(id);
@@ -104,7 +133,7 @@ export function closeSession(id) {
     const first = terminalMap.keys().next().value;
     if (first) {
       activateSession(first);
-      wsSend({ type:'session_attach', sessionId: first });
+      wsSend({ type: 'session_attach', sessionId: first });
     } else {
       showEmptyState();
     }
@@ -129,7 +158,7 @@ export function syncSessionList(sessions, isReconnect = false) {
   const isInitialLoad = terminalMap.size === 0 && sessions.length > 0;
 
   const newIds = [];
-  sessions.forEach(s => {
+  sessions.forEach((s) => {
     if (!sessionMeta.has(s.id)) {
       sessionMeta.set(s.id, { name: s.name, createdAt: s.createdAt });
       attachTerminal(s.id, s.name);
@@ -139,9 +168,12 @@ export function syncSessionList(sessions, isReconnect = false) {
   if (newIds.length > 0) {
     wsSend({ type: 'session_subscribe', sessionIds: newIds });
     setTimeout(() => {
-      newIds.forEach(id => {
+      newIds.forEach((id) => {
         const e = terminalMap.get(id);
-        if (e) { e.fitAddon.fit(); wsSend({ type:'resize', sessionId:id, cols:e.term.cols, rows:e.term.rows }); }
+        if (e) {
+          e.fitAddon.fit();
+          wsSend({ type: 'resize', sessionId: id, cols: e.term.cols, rows: e.term.rows });
+        }
       });
     }, 100);
   }
@@ -152,12 +184,15 @@ export function syncSessionList(sessions, isReconnect = false) {
     wsSend({ type: 'session_attach', sessionId: firstId });
     setTimeout(() => {
       const e = terminalMap.get(firstId);
-      if (e) { e.fitAddon.fit(); wsSend({ type:'resize', sessionId:firstId, cols:e.term.cols, rows:e.term.rows }); }
+      if (e) {
+        e.fitAddon.fit();
+        wsSend({ type: 'resize', sessionId: firstId, cols: e.term.cols, rows: e.term.rows });
+      }
     }, 50);
 
     if (isInitialLoad) {
       // Bypass streaming for restored sessions — dump output instantly, then scroll to bottom
-      newIds.forEach(id => {
+      newIds.forEach((id) => {
         bypassStream(id);
         setTimeout(() => {
           unbypassStream(id);
@@ -168,7 +203,9 @@ export function syncSessionList(sessions, isReconnect = false) {
       const badge = document.getElementById('hdr-restore-badge');
       if (badge) {
         badge.style.display = '';
-        setTimeout(() => { badge.style.display = 'none'; }, 2000);
+        setTimeout(() => {
+          badge.style.display = 'none';
+        }, 2000);
       }
       const e = terminalMap.get(firstId);
       if (e) {
@@ -186,7 +223,7 @@ export function attachTerminal(sessionId, name) {
   const div = document.createElement('div');
   div.className = 'term-pane';
   div.dataset.sessionId = sessionId;
-  const container = (S.layoutTree !== null && S.splitRoot) ? S.splitRoot : termWrapper;
+  const container = S.layoutTree !== null && S.splitRoot ? S.splitRoot : termWrapper;
   container.appendChild(div);
 
   const term = new Terminal({
@@ -194,7 +231,8 @@ export function attachTerminal(sessionId, name) {
     cursorStyle: S.settings?.appearance?.cursorStyle || 'block',
     fontSize: S.settings?.appearance?.fontSize || 14,
     lineHeight: S.settings?.appearance?.lineHeight || 1.2,
-    fontFamily: S.settings?.appearance?.fontFamily || '"JetBrains Mono","Share Tech Mono",monospace',
+    fontFamily:
+      S.settings?.appearance?.fontFamily || '"JetBrains Mono","Share Tech Mono",monospace',
     theme: S.currentTheme.term,
     scrollback: S.settings?.terminal?.scrollback || 5000,
     allowProposedApi: true,
@@ -206,7 +244,7 @@ export function attachTerminal(sessionId, name) {
   fitAddon.fit();
 
   // Let app-level keybindings override xterm — execute action immediately
-  term.attachCustomKeyEventHandler(e => xtermKeyHandler(e));
+  term.attachCustomKeyEventHandler((e) => xtermKeyHandler(e));
 
   // ─── Per-session data WebSocket (terminal I/O) ────
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -245,11 +283,11 @@ export function attachTerminal(sessionId, name) {
     }
   }
 
-  term.onData(data => {
+  term.onData((data) => {
     if (S.activeSessionId === sessionId) {
       if (data === '\r' && hasPendingAttachments(sessionId)) {
         trackInput(sessionId, data);
-        uploadAndFlush(sessionId).then(paths => {
+        uploadAndFlush(sessionId).then((paths) => {
           if (paths) dataSend(' ' + paths);
           dataSend('\r');
         });
@@ -263,7 +301,7 @@ export function attachTerminal(sessionId, name) {
   });
 
   term.onResize(({ cols, rows }) => {
-    wsSend({ type:'resize', sessionId, cols, rows });
+    wsSend({ type: 'resize', sessionId, cols, rows });
   });
 
   div.addEventListener('contextmenu', async (e) => {
@@ -325,9 +363,6 @@ export function updateSessionInfo(sessionId, cwd, ai) {
   const cwdEl = entry.sidebarEl.querySelector('[data-cwd]');
   if (cwdEl) cwdEl.textContent = wtName ? `⌥${wtName}  ${shortCwd}` : shortCwd;
 
-  let badgeEl = entry.sidebarEl.querySelector('.session-ai-badge');
-  const metaEl = entry.sidebarEl.querySelector('.session-meta');
-
   // Update tab AI icon
   let tabAiIcon = entry.tabEl.querySelector('.tab-ai-icon');
   if (ai) {
@@ -360,7 +395,10 @@ export function updateSessionInfo(sessionId, cwd, ai) {
   }
 
   const metaObj = sessionMeta.get(sessionId);
-  if (metaObj) { metaObj.cwd = cwd; if (ai) metaObj.ai = ai; }
+  if (metaObj) {
+    metaObj.cwd = cwd;
+    if (ai) metaObj.ai = ai;
+  }
 
   if (S.layoutTree !== null) {
     const titleEl = entry.div.querySelector('.split-pane-title');
@@ -382,14 +420,17 @@ export function createTab(sessionId, name) {
     <span class="tab-name">${escHtml(name)}</span>
     <button class="tab-close-btn">✕</button>
   `;
-  el.addEventListener('click', e => {
-    if (e.target.closest('.tab-close-btn')) { closeSession(sessionId); return; }
+  el.addEventListener('click', (e) => {
+    if (e.target.closest('.tab-close-btn')) {
+      closeSession(sessionId);
+      return;
+    }
     activateSession(sessionId);
-    wsSend({ type:'session_attach', sessionId });
+    wsSend({ type: 'session_attach', sessionId });
   });
-  el.addEventListener('contextmenu', e => showCtxMenu(e, sessionId));
+  el.addEventListener('contextmenu', (e) => showCtxMenu(e, sessionId));
 
-  el.addEventListener('dragstart', e => {
+  el.addEventListener('dragstart', (e) => {
     e.dataTransfer.setData('text/tab-session', sessionId);
     e.dataTransfer.setData('text/split-tab', sessionId);
     e.dataTransfer.effectAllowed = 'move';
@@ -400,19 +441,19 @@ export function createTab(sessionId, name) {
   });
   el.addEventListener('dragend', () => {
     el.classList.remove('dragging');
-    document.querySelectorAll('.tab.drag-over').forEach(t => t.classList.remove('drag-over'));
+    document.querySelectorAll('.tab.drag-over').forEach((t) => t.classList.remove('drag-over'));
     hideDropZoneOverlay();
   });
-  el.addEventListener('dragover', e => {
+  el.addEventListener('dragover', (e) => {
     e.preventDefault();
     const src = e.dataTransfer.types.includes('text/tab-session');
     if (src && e.currentTarget !== document.querySelector('.tab.dragging')) {
-      document.querySelectorAll('.tab.drag-over').forEach(t => t.classList.remove('drag-over'));
+      document.querySelectorAll('.tab.drag-over').forEach((t) => t.classList.remove('drag-over'));
       el.classList.add('drag-over');
     }
   });
   el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-  el.addEventListener('drop', e => {
+  el.addEventListener('drop', (e) => {
     e.preventDefault();
     const srcId = e.dataTransfer.getData('text/tab-session');
     el.classList.remove('drag-over');
@@ -436,20 +477,22 @@ function showCtxMenu(e, sessionId) {
   e.preventDefault();
   S.ctxTargetId = sessionId;
   ctxMenu.style.left = e.clientX + 'px';
-  ctxMenu.style.top  = e.clientY + 'px';
+  ctxMenu.style.top = e.clientY + 'px';
   ctxMenu.classList.add('visible');
 }
 
 export function makeSidebarItemDraggable(el, sessionId) {
   el.draggable = true;
-  el.addEventListener('dragstart', e => {
+  el.addEventListener('dragstart', (e) => {
     e.dataTransfer.setData('text/sidebar-session', sessionId);
     e.dataTransfer.effectAllowed = 'move';
-    setTimeout(() => el.style.opacity = '0.4', 0);
+    setTimeout(() => (el.style.opacity = '0.4'), 0);
   });
   el.addEventListener('dragend', () => {
     el.style.opacity = '';
-    document.querySelectorAll('.folder-item.drag-over').forEach(f => f.classList.remove('drag-over'));
+    document
+      .querySelectorAll('.folder-item.drag-over')
+      .forEach((f) => f.classList.remove('drag-over'));
     document.getElementById('session-list').classList.remove('drag-over-root');
   });
 }
@@ -467,7 +510,8 @@ export function initContextMenu() {
     input.className = 'session-name-input tab-rename-input';
     input.value = old;
     nameEl.replaceWith(input);
-    input.focus(); input.select();
+    input.focus();
+    input.select();
     const finish = () => {
       const n = input.value.trim() || old;
       const span = document.createElement('span');
@@ -477,9 +521,15 @@ export function initContextMenu() {
       renameSession(S.ctxTargetId, n);
     };
     input.addEventListener('blur', finish);
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { finish(); e.preventDefault(); }
-      if (e.key === 'Escape') { input.value = old; finish(); }
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        finish();
+        e.preventDefault();
+      }
+      if (e.key === 'Escape') {
+        input.value = old;
+        finish();
+      }
     });
   });
   document.getElementById('ctx-duplicate').addEventListener('click', () => {
@@ -503,15 +553,22 @@ export function initContextMenu() {
 
 function updateBreadcrumb(cwd) {
   const bar = document.getElementById('breadcrumb-bar');
-  if (!bar || !cwd) { if (bar) bar.innerHTML = ''; return; }
+  if (!bar || !cwd) {
+    if (bar) bar.innerHTML = '';
+    return;
+  }
   let display = cwd;
   // Detect home dir pattern: /Users/xxx or /home/xxx
   const homeMatch = cwd.match(/^(\/(?:Users|home)\/[^/]+)/);
   if (homeMatch) display = '~' + cwd.slice(homeMatch[1].length);
   const parts = display.split('/').filter(Boolean);
   const wtName = detectWorktreeName(cwd);
-  const prefix = wtName ? `<span class="breadcrumb-wt">⌥${escHtml(wtName)}</span><span class="breadcrumb-sep">›</span>` : '';
-  bar.innerHTML = prefix + parts.map(p =>
-    `<span class="breadcrumb-part">${escHtml(p)}</span>`
-  ).join('<span class="breadcrumb-sep">›</span>');
+  const prefix = wtName
+    ? `<span class="breadcrumb-wt">⌥${escHtml(wtName)}</span><span class="breadcrumb-sep">›</span>`
+    : '';
+  bar.innerHTML =
+    prefix +
+    parts
+      .map((p) => `<span class="breadcrumb-part">${escHtml(p)}</span>`)
+      .join('<span class="breadcrumb-sep">›</span>');
 }

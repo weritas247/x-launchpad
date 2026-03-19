@@ -40,7 +40,13 @@ let currentView = localStorage.getItem('plan-view') || 'list';
 let ctxTargetPlanId = null;
 
 const STATUSES = ['todo', 'doing', 'done', 'on_hold', 'cancelled'];
-const STATUS_LABELS = { todo: 'TODO', doing: 'DOING', done: 'DONE', on_hold: 'ON HOLD', cancelled: 'CANCELLED' };
+const STATUS_LABELS = {
+  todo: 'TODO',
+  doing: 'DOING',
+  done: 'DONE',
+  on_hold: 'ON HOLD',
+  cancelled: 'CANCELLED',
+};
 
 // ─── API ─────────────────────────────────────────────
 async function loadPlans() {
@@ -48,7 +54,7 @@ async function loadPlans() {
     const res = await apiFetch('/api/plans');
     const data = await res.json();
     if (data.ok) {
-      plans = data.plans.map(p => ({
+      plans = data.plans.map((p) => ({
         id: p.id,
         title: p.title || '',
         content: p.content || '',
@@ -72,7 +78,12 @@ async function apiCreatePlan(plan) {
     await apiFetch('/api/plans', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: plan.id, title: plan.title, content: plan.content, category: plan.category }),
+      body: JSON.stringify({
+        id: plan.id,
+        title: plan.title,
+        content: plan.content,
+        category: plan.category,
+      }),
     });
   } catch (e) {
     console.error('[plan] create failed:', e);
@@ -106,15 +117,15 @@ function updateCount() {
   const bugEl = document.getElementById('plan-count-bug');
   const otherEl = document.getElementById('plan-count-other');
   if (allEl) allEl.textContent = plans.length;
-  if (featEl) featEl.textContent = plans.filter(p => p.category === 'feature').length;
-  if (bugEl) bugEl.textContent = plans.filter(p => p.category === 'bug').length;
-  if (otherEl) otherEl.textContent = plans.filter(p => p.category === 'other').length;
+  if (featEl) featEl.textContent = plans.filter((p) => p.category === 'feature').length;
+  if (bugEl) bugEl.textContent = plans.filter((p) => p.category === 'bug').length;
+  if (otherEl) otherEl.textContent = plans.filter((p) => p.category === 'other').length;
 }
 
 // ─── Filtered list ──────────────────────────────────
 function filteredPlans() {
   if (activeCategory === 'all') return plans;
-  return plans.filter(p => p.category === activeCategory);
+  return plans.filter((p) => p.category === activeCategory);
 }
 
 // ─── CRUD ───────────────────────────────────────────
@@ -146,8 +157,8 @@ async function createPlan() {
 
 function deletePlan(id) {
   const filtered = filteredPlans();
-  const idx = filtered.findIndex(p => p.id === id);
-  plans = plans.filter(p => p.id !== id);
+  const idx = filtered.findIndex((p) => p.id === id);
+  plans = plans.filter((p) => p.id !== id);
   updateCount();
   if (activeId === id) {
     const newFiltered = filteredPlans();
@@ -170,8 +181,11 @@ function deletePlan(id) {
 
 function selectPlan(id) {
   activeId = id;
-  const plan = plans.find(p => p.id === id);
-  if (!plan) { showEmptyState(); return; }
+  const plan = plans.find((p) => p.id === id);
+  if (!plan) {
+    showEmptyState();
+    return;
+  }
 
   editorEmpty.style.display = 'none';
   editorArea.style.display = 'flex';
@@ -183,7 +197,7 @@ function selectPlan(id) {
   loadPlanLogs(id);
   loadPlanImages(id);
 
-  listEl.querySelectorAll('.plan-item').forEach(el => {
+  listEl.querySelectorAll('.plan-item').forEach((el) => {
     el.classList.toggle('active', el.dataset.id === id);
   });
 }
@@ -200,9 +214,12 @@ function scheduleSave() {
 }
 
 function flushSave() {
-  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
   if (!activeId) return;
-  const plan = plans.find(p => p.id === activeId);
+  const plan = plans.find((p) => p.id === activeId);
   if (!plan) return;
   plan.title = titleInput.value;
   plan.content = contentInput.value;
@@ -217,13 +234,13 @@ function flushSave() {
 // ─── Category tabs ──────────────────────────────────
 function switchCategory(cat) {
   activeCategory = cat;
-  catTabsEl.querySelectorAll('.plan-cat-tab').forEach(el => {
+  catTabsEl.querySelectorAll('.plan-cat-tab').forEach((el) => {
     el.classList.toggle('active', el.dataset.cat === cat);
   });
   if (currentView === 'board') renderBoard();
   else renderList();
   const filtered = filteredPlans();
-  if (activeId && filtered.find(p => p.id === activeId)) {
+  if (activeId && filtered.find((p) => p.id === activeId)) {
     selectPlan(activeId);
   } else if (filtered.length > 0) {
     selectPlan(filtered[0].id);
@@ -237,7 +254,7 @@ function switchCategory(cat) {
 function switchView(view) {
   currentView = view;
   localStorage.setItem('plan-view', view);
-  viewToggleEl?.querySelectorAll('.plan-view-btn').forEach(btn => {
+  viewToggleEl?.querySelectorAll('.plan-view-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.view === view);
   });
   if (view === 'board') {
@@ -289,21 +306,23 @@ function restoreBoardSplit() {
 function renderList() {
   if (!listEl) return;
   const filtered = filteredPlans();
-  listEl.innerHTML = filtered.map(p => {
-    const title = escHtml(p.title || 'Untitled');
-    const preview = escHtml((p.content || '').slice(0, 80).replace(/\n/g, ' '));
-    const date = formatDate(p.updated);
-    const active = p.id === activeId ? ' active' : '';
-    const catLabel = CATEGORIES[p.category] || '기타';
-    const statusLabel = STATUS_LABELS[p.status || 'todo'] || 'TODO';
-    return `<div class="plan-item${active}" data-id="${p.id}">
+  listEl.innerHTML = filtered
+    .map((p) => {
+      const title = escHtml(p.title || 'Untitled');
+      const preview = escHtml((p.content || '').slice(0, 80).replace(/\n/g, ' '));
+      const date = formatDate(p.updated);
+      const active = p.id === activeId ? ' active' : '';
+      const catLabel = CATEGORIES[p.category] || '기타';
+      const statusLabel = STATUS_LABELS[p.status || 'todo'] || 'TODO';
+      return `<div class="plan-item${active}" data-id="${p.id}">
       <span class="plan-item-cat" data-cat="${p.category || 'other'}">${catLabel}</span>
       <span class="plan-item-status">${statusLabel}</span>
       <div class="plan-item-title">${title}</div>
       <div class="plan-item-preview">${preview || 'No content'}</div>
       <div class="plan-item-date">${date}</div>
     </div>`;
-  }).join('');
+    })
+    .join('');
 }
 
 function renderBoard() {
@@ -312,20 +331,23 @@ function renderBoard() {
     const col = document.getElementById(`plan-board-${status}`);
     const countBadge = document.getElementById(`plan-board-count-${status}`);
     if (!col) continue;
-    const cards = filtered.filter(p => (p.status || 'todo') === status);
+    const cards = filtered.filter((p) => (p.status || 'todo') === status);
     if (countBadge) countBadge.textContent = cards.length;
-    col.innerHTML = cards.map(p => {
-      const title = escHtml(p.title || 'Untitled');
-      const preview = escHtml((p.content || '').slice(0, 60).replace(/\n/g, ' '));
-      const date = formatDate(p.updated);
-      const catLabel = CATEGORIES[p.category] || '기타';
-      const aiBadge = p.ai_done ? '<span class="plan-board-card-ai-badge">✅ AI</span>' : '';
-      const aiSessions = (p.ai_sessions || []).map(s => {
-        const reg = AI_REGISTRY[s.ai] || {};
-        const icon = reg.icon ? `<img src="${reg.icon}" alt="">` : '🤖';
-        return `<span class="plan-board-card-ai-session" data-session-id="${escHtml(s.sessionId)}" title="${escHtml(reg.label || s.ai)} session">${icon}${escHtml(s.sessionId.slice(-6))}</span>`;
-      }).join('');
-      return `<div class="plan-board-card" draggable="true" data-id="${p.id}" data-cat="${p.category || 'other'}">
+    col.innerHTML = cards
+      .map((p) => {
+        const title = escHtml(p.title || 'Untitled');
+        const preview = escHtml((p.content || '').slice(0, 60).replace(/\n/g, ' '));
+        const date = formatDate(p.updated);
+        const catLabel = CATEGORIES[p.category] || '기타';
+        const aiBadge = p.ai_done ? '<span class="plan-board-card-ai-badge">✅ AI</span>' : '';
+        const aiSessions = (p.ai_sessions || [])
+          .map((s) => {
+            const reg = AI_REGISTRY[s.ai] || {};
+            const icon = reg.icon ? `<img src="${reg.icon}" alt="">` : '🤖';
+            return `<span class="plan-board-card-ai-session" data-session-id="${escHtml(s.sessionId)}" title="${escHtml(reg.label || s.ai)} session">${icon}${escHtml(s.sessionId.slice(-6))}</span>`;
+          })
+          .join('');
+        return `<div class="plan-board-card" draggable="true" data-id="${p.id}" data-cat="${p.category || 'other'}">
         <div class="plan-board-card-title">${title}</div>
         <div class="plan-board-card-preview">${preview || 'No content'}</div>
         <div class="plan-board-card-footer">
@@ -334,14 +356,15 @@ function renderBoard() {
           <span class="plan-board-card-date">${date}</span>
         </div>
       </div>`;
-    }).join('');
+      })
+      .join('');
   }
 }
 
 function formatDate(ts) {
   const d = new Date(ts);
   const now = new Date();
-  const pad = n => String(n).padStart(2, '0');
+  const pad = (n) => String(n).padStart(2, '0');
   const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   if (d.toDateString() === now.toDateString()) return `Today ${time}`;
   const diff = Math.floor((now - d) / 86400000);
@@ -351,32 +374,32 @@ function formatDate(ts) {
 
 // ─── Drag and Drop ───────────────────────────────────
 function initBoardDragDrop() {
-  boardEl?.addEventListener('dragstart', e => {
+  boardEl?.addEventListener('dragstart', (e) => {
     const card = e.target.closest('.plan-board-card');
     if (!card) return;
     card.classList.add('dragging');
     e.dataTransfer.setData('text/plain', card.dataset.id);
     e.dataTransfer.effectAllowed = 'move';
   });
-  boardEl?.addEventListener('dragend', e => {
+  boardEl?.addEventListener('dragend', (e) => {
     const card = e.target.closest('.plan-board-card');
     if (card) card.classList.remove('dragging');
-    boardEl.querySelectorAll('.plan-board-col').forEach(col => col.classList.remove('drag-over'));
+    boardEl.querySelectorAll('.plan-board-col').forEach((col) => col.classList.remove('drag-over'));
   });
-  boardEl?.querySelectorAll('.plan-board-col').forEach(col => {
-    col.addEventListener('dragover', e => {
+  boardEl?.querySelectorAll('.plan-board-col').forEach((col) => {
+    col.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       col.classList.add('drag-over');
     });
     col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
-    col.addEventListener('drop', async e => {
+    col.addEventListener('drop', async (e) => {
       e.preventDefault();
       col.classList.remove('drag-over');
       const planId = e.dataTransfer.getData('text/plain');
       const newStatus = col.dataset.status;
       if (!planId || !newStatus) return;
-      const plan = plans.find(p => p.id === planId);
+      const plan = plans.find((p) => p.id === planId);
       if (!plan || plan.status === newStatus) return;
       plan.status = newStatus;
       plan.ai_done = false;
@@ -403,7 +426,7 @@ function initBoardDivider() {
   let startX = 0;
   let startW = 0;
 
-  boardDivider.addEventListener('mousedown', e => {
+  boardDivider.addEventListener('mousedown', (e) => {
     e.preventDefault();
     startX = e.clientX;
     startW = boardEl.offsetWidth;
@@ -446,13 +469,20 @@ async function loadPlanImages(planId) {
   try {
     const res = await apiFetch(`/api/plans/${planId}/images`);
     const data = await res.json();
-    if (!data.ok || !data.images.length) { imagesGridEl.innerHTML = ''; return; }
-    imagesGridEl.innerHTML = data.images.map(img => `
+    if (!data.ok || !data.images.length) {
+      imagesGridEl.innerHTML = '';
+      return;
+    }
+    imagesGridEl.innerHTML = data.images
+      .map(
+        (img) => `
       <div class="plan-image-thumb" data-url="${escHtml(img.url)}" data-name="${escHtml(img.name)}">
         <img src="${escHtml(img.url)}" alt="${escHtml(img.name)}" loading="lazy" />
         <button class="plan-image-delete" title="Delete">✕</button>
       </div>
-    `).join('');
+    `
+      )
+      .join('');
   } catch {
     imagesGridEl.innerHTML = '';
   }
@@ -475,7 +505,9 @@ async function uploadPlanImage(planId, file) {
 
 async function deletePlanImage(planId, filename) {
   try {
-    await apiFetch(`/api/plans/${planId}/images/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+    await apiFetch(`/api/plans/${planId}/images/${encodeURIComponent(filename)}`, {
+      method: 'DELETE',
+    });
     await loadPlanImages(planId);
   } catch (e) {
     console.error('[plan] image delete failed:', e);
@@ -499,17 +531,24 @@ async function loadPlanLogs(planId) {
   try {
     const res = await apiFetch(`/api/plans/${planId}/logs`);
     const data = await res.json();
-    if (!data.ok) { logsListEl.innerHTML = ''; return; }
-    logsListEl.innerHTML = data.logs.map(log => {
-      const icon = log.type === 'commit' ? '🔨' : '📝';
-      const hash = log.commit_hash ? `<span class="plan-log-hash">${escHtml(log.commit_hash.slice(0, 7))}</span>` : '';
-      const time = formatDate(new Date(log.created_at).getTime());
-      return `<div class="plan-log-item">
+    if (!data.ok) {
+      logsListEl.innerHTML = '';
+      return;
+    }
+    logsListEl.innerHTML = data.logs
+      .map((log) => {
+        const icon = log.type === 'commit' ? '🔨' : '📝';
+        const hash = log.commit_hash
+          ? `<span class="plan-log-hash">${escHtml(log.commit_hash.slice(0, 7))}</span>`
+          : '';
+        const time = formatDate(new Date(log.created_at).getTime());
+        return `<div class="plan-log-item">
         <span class="plan-log-icon">${icon}</span>
         <span class="plan-log-content">${escHtml(log.content)} ${hash}</span>
         <span class="plan-log-time">${time}</span>
       </div>`;
-    }).join('');
+      })
+      .join('');
   } catch {
     logsListEl.innerHTML = '';
   }
@@ -566,11 +605,11 @@ function saveModalSize() {
 export async function openPlanModal() {
   if (!isLoggedIn()) return;
   await loadPlans();
-  if (activeId && !plans.find(p => p.id === activeId)) activeId = null;
+  if (activeId && !plans.find((p) => p.id === activeId)) activeId = null;
   if (currentView === 'board') renderBoard();
   else renderList();
   const filtered = filteredPlans();
-  if (activeId && filtered.find(p => p.id === activeId)) {
+  if (activeId && filtered.find((p) => p.id === activeId)) {
     selectPlan(activeId);
   } else if (filtered.length > 0) {
     selectPlan(filtered[0].id);
@@ -615,14 +654,17 @@ export function initPlanPanel() {
   document.getElementById('plan-modal-close')?.addEventListener('click', closePlanModal);
 
   // Overlay click to close
-  overlay?.addEventListener('click', e => {
+  overlay?.addEventListener('click', (e) => {
     if (e.target === overlay) closePlanModal();
   });
 
   // Category tab clicks
-  catTabsEl?.addEventListener('click', e => {
+  catTabsEl?.addEventListener('click', (e) => {
     const tab = e.target.closest('.plan-cat-tab');
-    if (tab) { flushSave(); switchCategory(tab.dataset.cat); }
+    if (tab) {
+      flushSave();
+      switchCategory(tab.dataset.cat);
+    }
   });
 
   // New plan
@@ -635,16 +677,19 @@ export function initPlanPanel() {
   });
 
   // List click delegation
-  listEl?.addEventListener('click', e => {
+  listEl?.addEventListener('click', (e) => {
     const item = e.target.closest('.plan-item');
-    if (item) { flushSave(); selectPlan(item.dataset.id); }
+    if (item) {
+      flushSave();
+      selectPlan(item.dataset.id);
+    }
   });
 
   // Enter in title → focus content (keyup for IME/한글 compatibility)
-  titleInput?.addEventListener('keydown', e => {
+  titleInput?.addEventListener('keydown', (e) => {
     if ((e.key === 'Enter' || e.keyCode === 13) && !e.isComposing) e.preventDefault();
   });
-  titleInput?.addEventListener('keyup', e => {
+  titleInput?.addEventListener('keyup', (e) => {
     if (e.key === 'Enter' || e.keyCode === 13) contentInput.focus();
   });
 
@@ -658,7 +703,7 @@ export function initPlanPanel() {
   contentInput?.addEventListener('input', scheduleSave);
 
   // View toggle
-  viewToggleEl?.addEventListener('click', e => {
+  viewToggleEl?.addEventListener('click', (e) => {
     const btn = e.target.closest('.plan-view-btn');
     if (btn) switchView(btn.dataset.view);
   });
@@ -666,7 +711,7 @@ export function initPlanPanel() {
   // Status select change
   statusSelect?.addEventListener('change', async () => {
     if (!activeId) return;
-    const plan = plans.find(p => p.id === activeId);
+    const plan = plans.find((p) => p.id === activeId);
     if (!plan) return;
     const newStatus = statusSelect.value;
     plan.status = newStatus;
@@ -686,18 +731,22 @@ export function initPlanPanel() {
   });
 
   // AI session badge click → navigate to session tab
-  boardEl?.addEventListener('click', e => {
-    const badge = e.target.closest('.plan-board-card-ai-session');
-    if (badge) {
-      e.stopPropagation();
-      const sid = badge.dataset.sessionId;
-      if (sid) activateSession(sid);
-      return;
-    }
-  }, true);
+  boardEl?.addEventListener(
+    'click',
+    (e) => {
+      const badge = e.target.closest('.plan-board-card-ai-session');
+      if (badge) {
+        e.stopPropagation();
+        const sid = badge.dataset.sessionId;
+        if (sid) activateSession(sid);
+        return;
+      }
+    },
+    true
+  );
 
   // Board card click → editor
-  boardEl?.addEventListener('click', e => {
+  boardEl?.addEventListener('click', (e) => {
     const card = e.target.closest('.plan-board-card');
     if (!card) return;
     // skip if clicking AI session badge
@@ -709,7 +758,7 @@ export function initPlanPanel() {
   });
 
   // Board card right-click → context menu
-  boardEl?.addEventListener('contextmenu', e => {
+  boardEl?.addEventListener('contextmenu', (e) => {
     const card = e.target.closest('.plan-board-card');
     if (!card) return;
     e.preventDefault();
@@ -717,7 +766,7 @@ export function initPlanPanel() {
   });
 
   // Context menu actions
-  ctxMenuEl?.addEventListener('click', async e => {
+  ctxMenuEl?.addEventListener('click', async (e) => {
     e.stopPropagation();
     const item = e.target.closest('.plan-ctx-item');
     if (!item || !ctxTargetPlanId) return;
@@ -727,7 +776,7 @@ export function initPlanPanel() {
       if (currentView === 'board') showBoardEditor();
     } else if (action === 'status') {
       const newStatus = item.dataset.status;
-      const plan = plans.find(p => p.id === ctxTargetPlanId);
+      const plan = plans.find((p) => p.id === ctxTargetPlanId);
       if (plan && plan.status !== newStatus) {
         plan.status = newStatus;
         plan.ai_done = false;
@@ -739,7 +788,9 @@ export function initPlanPanel() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: newStatus }),
           });
-        } catch (err) { console.error('[plan] status change failed:', err); }
+        } catch (err) {
+          console.error('[plan] status change failed:', err);
+        }
       }
     } else if (action === 'delete') {
       deletePlan(ctxTargetPlanId);
@@ -764,7 +815,7 @@ export function initPlanPanel() {
   });
 
   // Image paste on editor content area
-  contentInput?.addEventListener('paste', e => {
+  contentInput?.addEventListener('paste', (e) => {
     if (!activeId) return;
     const items = e.clipboardData?.items;
     if (!items) return;
@@ -779,7 +830,7 @@ export function initPlanPanel() {
   });
 
   // Image grid: click to lightbox, delete button
-  imagesGridEl?.addEventListener('click', e => {
+  imagesGridEl?.addEventListener('click', (e) => {
     const delBtn = e.target.closest('.plan-image-delete');
     if (delBtn) {
       e.stopPropagation();
@@ -806,7 +857,7 @@ const pendingAiSessions = new Map();
 let _pendingAiAssign = null;
 
 async function assignAiToplan(planId, aiType) {
-  const plan = plans.find(p => p.id === planId);
+  const plan = plans.find((p) => p.id === planId);
   if (!plan) return;
 
   // Build the prompt from plan content
@@ -819,16 +870,24 @@ async function assignAiToplan(planId, aiType) {
     const res = await apiFetch(`/api/plans/${planId}/images`);
     const data = await res.json();
     if (data.ok && data.images && data.images.length) {
-      prompt += '\n\n첨부 이미지:\n' + data.images.map(img => img.url).join('\n');
+      prompt += '\n\n첨부 이미지:\n' + data.images.map((img) => img.url).join('\n');
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   // Get current cwd from active session
   const meta = S.activeSessionId ? sessionMeta.get(S.activeSessionId) : null;
   const cwd = meta?.cwd || undefined;
 
   // Create AI session
-  wsSend({ type: 'session_create', name: `${aiType}:${title.slice(0, 20)}`, cmd: aiType, cwd, planId });
+  wsSend({
+    type: 'session_create',
+    name: `${aiType}:${title.slice(0, 20)}`,
+    cmd: aiType,
+    cwd,
+    planId,
+  });
 
   // Store pending: will be resolved when session_created comes back
   _pendingAiAssign = { planId, aiType, prompt };
@@ -862,7 +921,7 @@ export function onAiPromptSent(sessionId) {
   const { planId, aiType } = pending;
   pendingAiSessions.delete(sessionId);
 
-  const plan = plans.find(p => p.id === planId);
+  const plan = plans.find((p) => p.id === planId);
   if (!plan) return;
 
   // Add AI session badge
@@ -876,7 +935,7 @@ export function onAiPromptSent(sessionId) {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'doing' }),
-    }).catch(err => console.error('[plan] status change failed:', err));
+    }).catch((err) => console.error('[plan] status change failed:', err));
   }
 
   renderBoard();
@@ -897,12 +956,24 @@ function getActiveAiTasks() {
   for (const plan of plans) {
     if (!plan.ai_sessions) continue;
     for (const s of plan.ai_sessions) {
-      tasks.push({ planId: plan.id, planTitle: plan.title || 'Untitled', planStatus: plan.status, ...s });
+      tasks.push({
+        planId: plan.id,
+        planTitle: plan.title || 'Untitled',
+        planStatus: plan.status,
+        ...s,
+      });
     }
   }
   // Also include pending sessions not yet confirmed
   for (const [sessionId, info] of pendingAiSessions) {
-    tasks.push({ planId: info.planId, planTitle: plans.find(p => p.id === info.planId)?.title || 'Untitled', planStatus: 'pending', sessionId, ai: info.aiType, pending: true });
+    tasks.push({
+      planId: info.planId,
+      planTitle: plans.find((p) => p.id === info.planId)?.title || 'Untitled',
+      planStatus: 'pending',
+      sessionId,
+      ai: info.aiType,
+      pending: true,
+    });
   }
   return tasks;
 }
@@ -921,14 +992,19 @@ function renderAiDashboard() {
     aiDashBody.innerHTML = '<div class="ai-dash-empty">활성 AI 작업이 없습니다</div>';
     return;
   }
-  aiDashBody.innerHTML = tasks.map(t => {
-    const reg = AI_REGISTRY[t.ai] || {};
-    const icon = reg.icon || 'icons/codex.png';
-    const label = reg.label || t.ai;
-    const statusCls = t.pending ? ' pending' : '';
-    const statusText = t.pending ? '대기중…' : (t.planStatus === 'doing' ? '작업중' : t.planStatus || '—');
-    const sid = t.sessionId || '';
-    return `<div class="ai-dash-card" data-session-id="${escHtml(sid)}">
+  aiDashBody.innerHTML = tasks
+    .map((t) => {
+      const reg = AI_REGISTRY[t.ai] || {};
+      const icon = reg.icon || 'icons/codex.png';
+      const label = reg.label || t.ai;
+      const statusCls = t.pending ? ' pending' : '';
+      const statusText = t.pending
+        ? '대기중…'
+        : t.planStatus === 'doing'
+          ? '작업중'
+          : t.planStatus || '—';
+      const sid = t.sessionId || '';
+      return `<div class="ai-dash-card" data-session-id="${escHtml(sid)}">
       <img class="ai-dash-card-icon" src="${escHtml(icon)}" alt="${escHtml(label)}">
       <div class="ai-dash-card-info">
         <div class="ai-dash-card-plan">${escHtml(t.planTitle)}</div>
@@ -937,7 +1013,8 @@ function renderAiDashboard() {
       <span class="ai-dash-card-status${statusCls}">${statusText}</span>
       ${sid ? `<button class="ai-dash-card-go" data-sid="${escHtml(sid)}">이동 →</button>` : ''}
     </div>`;
-  }).join('');
+    })
+    .join('');
 }
 
 export function openAiDashboard() {
@@ -952,12 +1029,17 @@ export function closeAiDashboard() {
 // Event listeners
 sbAiTasks?.addEventListener('click', () => openAiDashboard());
 document.getElementById('ai-dash-close')?.addEventListener('click', () => closeAiDashboard());
-aiDashOverlay?.addEventListener('click', e => { if (e.target === aiDashOverlay) closeAiDashboard(); });
-aiDashBody?.addEventListener('click', e => {
+aiDashOverlay?.addEventListener('click', (e) => {
+  if (e.target === aiDashOverlay) closeAiDashboard();
+});
+aiDashBody?.addEventListener('click', (e) => {
   const goBtn = e.target.closest('.ai-dash-card-go');
   if (goBtn) {
     const sid = goBtn.dataset.sid;
-    if (sid) { activateSession(sid); closeAiDashboard(); }
+    if (sid) {
+      activateSession(sid);
+      closeAiDashboard();
+    }
     return;
   }
   const card = e.target.closest('.ai-dash-card');

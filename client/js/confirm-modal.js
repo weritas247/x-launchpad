@@ -2,8 +2,8 @@
 // Usage: const ok = await confirmModal('Delete file?', 'Delete');
 
 const overlay = document.getElementById('global-confirm-overlay');
-const msgEl  = document.getElementById('global-confirm-message');
-const okBtn  = document.getElementById('global-confirm-ok');
+const msgEl = document.getElementById('global-confirm-message');
+const okBtn = document.getElementById('global-confirm-ok');
 const cancelBtn = document.getElementById('global-confirm-cancel');
 
 let _resolve = null;
@@ -17,12 +17,20 @@ function close(result) {
 
 okBtn.addEventListener('click', () => close(true));
 cancelBtn.addEventListener('click', () => close(false));
-overlay.addEventListener('click', e => { if (e.target === overlay) close(false); });
+overlay.addEventListener('click', (e) => {
+  if (e.target === overlay) close(false);
+});
 
-document.addEventListener('keydown', e => {
+document.addEventListener('keydown', (e) => {
   if (!overlay.classList.contains('open')) return;
-  if (e.key === 'Escape') { e.stopPropagation(); close(false); }
-  if (e.key === 'Enter')  { e.stopPropagation(); close(true); }
+  if (e.key === 'Escape') {
+    e.stopPropagation();
+    close(false);
+  }
+  if (e.key === 'Enter') {
+    e.stopPropagation();
+    close(true);
+  }
 });
 
 /**
@@ -35,5 +43,7 @@ export function confirmModal(message, okText = 'OK') {
   okBtn.textContent = okText;
   overlay.classList.add('open');
   okBtn.focus();
-  return new Promise(resolve => { _resolve = resolve; });
+  return new Promise((resolve) => {
+    _resolve = resolve;
+  });
 }

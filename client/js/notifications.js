@@ -1,4 +1,13 @@
-import { S, sessionMeta, terminalMap, notifyBuffers, notifyTimers, notifyState, escHtml, stripAnsi } from './state.js';
+import {
+  S,
+  sessionMeta,
+  terminalMap,
+  notifyBuffers,
+  notifyTimers,
+  notifyState,
+  escHtml,
+  stripAnsi,
+} from './state.js';
 import { AI_REGISTRY } from './constants.js';
 import { activateSession } from './session.js';
 import { wsSend } from './websocket.js';
@@ -6,15 +15,30 @@ import { wsSend } from './websocket.js';
 const NOTIFY_DEBOUNCE = 1200;
 
 const AI_PATTERNS = [
-  { re: />\s*$/m,                                      ai:'claude',   type:'question', msg:'Claude is waiting for your input' },
-  { re: /✓|✔|Task complete|Done\.|Completed\./i,       ai:'claude',   type:'done',     msg:'Claude finished the task' },
-  { re: /\?\s*$/m,                                     ai:'opencode', type:'question', msg:'opencode is asking a question' },
-  { re: /Done|Completed|Finished/i,                    ai:'opencode', type:'done',     msg:'opencode finished the task' },
-  { re: /^>\s*$/m,                                     ai:'gemini',   type:'question', msg:'Gemini is waiting for input' },
-  { re: /Done\.|Task complete|Finished/i,              ai:'gemini',   type:'done',     msg:'Gemini finished the task' },
-  { re: /^aider>\s*$/im,                               ai:'aider',    type:'question', msg:'Aider is waiting for input' },
-  { re: /^Tokens:|Applied edit/im,                     ai:'aider',    type:'done',     msg:'Aider finished editing' },
-  { re: /[\$❯›»]\s*$/m,                                ai:'any',      type:'question', msg:'Terminal is waiting for input' },
+  { re: />\s*$/m, ai: 'claude', type: 'question', msg: 'Claude is waiting for your input' },
+  {
+    re: /✓|✔|Task complete|Done\.|Completed\./i,
+    ai: 'claude',
+    type: 'done',
+    msg: 'Claude finished the task',
+  },
+  { re: /\?\s*$/m, ai: 'opencode', type: 'question', msg: 'opencode is asking a question' },
+  {
+    re: /Done|Completed|Finished/i,
+    ai: 'opencode',
+    type: 'done',
+    msg: 'opencode finished the task',
+  },
+  { re: /^>\s*$/m, ai: 'gemini', type: 'question', msg: 'Gemini is waiting for input' },
+  {
+    re: /Done\.|Task complete|Finished/i,
+    ai: 'gemini',
+    type: 'done',
+    msg: 'Gemini finished the task',
+  },
+  { re: /^aider>\s*$/im, ai: 'aider', type: 'question', msg: 'Aider is waiting for input' },
+  { re: /^Tokens:|Applied edit/im, ai: 'aider', type: 'done', msg: 'Aider finished editing' },
+  { re: /[$❯›»]\s*$/m, ai: 'any', type: 'question', msg: 'Terminal is waiting for input' },
 ];
 
 function getAiIcon(aiKey) {
@@ -30,46 +54,54 @@ export function aiNotifyCheck(sessionId, chunk) {
   notifyBuffers.set(sessionId, next);
 
   clearTimeout(notifyTimers.get(sessionId));
-  notifyTimers.set(sessionId, setTimeout(() => {
-    const buf = stripAnsi(notifyBuffers.get(sessionId) || '');
-    notifyBuffers.set(sessionId, '');
+  notifyTimers.set(
+    sessionId,
+    setTimeout(() => {
+      const buf = stripAnsi(notifyBuffers.get(sessionId) || '');
+      notifyBuffers.set(sessionId, '');
 
-    let matched = null;
-    for (const p of AI_PATTERNS) {
-      if (p.ai !== 'any' && currentAi && p.ai !== currentAi) continue;
-      if (p.re.test(buf)) { matched = p; break; }
-    }
-    if (!matched) return;
-
-    const prevState = notifyState.get(sessionId);
-    if (prevState === matched.type) return;
-    notifyState.set(sessionId, matched.type);
-
-    const meta = sessionMeta.get(sessionId);
-    const sessName = meta?.name || sessionId;
-    const icon = getAiIcon(currentAi);
-    const title = matched.type === 'done'
-      ? `${icon} Task Done — ${sessName}`
-      : `${icon} Needs Input — ${sessName}`;
-    const body = matched.msg;
-
-    const isActiveVisible = (sessionId === S.activeSessionId) && (document.visibilityState === 'visible');
-    if (!isActiveVisible) {
-      showToast(title, body, sessionId);
-    }
-
-    if (document.visibilityState === 'hidden' || !document.hasFocus()) {
-      if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
-          fireOsNotification(title, body, sessionId);
-        } else if (Notification.permission === 'default') {
-          Notification.requestPermission().then(p => {
-            if (p === 'granted') fireOsNotification(title, body, sessionId);
-          });
+      let matched = null;
+      for (const p of AI_PATTERNS) {
+        if (p.ai !== 'any' && currentAi && p.ai !== currentAi) continue;
+        if (p.re.test(buf)) {
+          matched = p;
+          break;
         }
       }
-    }
-  }, NOTIFY_DEBOUNCE));
+      if (!matched) return;
+
+      const prevState = notifyState.get(sessionId);
+      if (prevState === matched.type) return;
+      notifyState.set(sessionId, matched.type);
+
+      const meta = sessionMeta.get(sessionId);
+      const sessName = meta?.name || sessionId;
+      const icon = getAiIcon(currentAi);
+      const title =
+        matched.type === 'done'
+          ? `${icon} Task Done — ${sessName}`
+          : `${icon} Needs Input — ${sessName}`;
+      const body = matched.msg;
+
+      const isActiveVisible =
+        sessionId === S.activeSessionId && document.visibilityState === 'visible';
+      if (!isActiveVisible) {
+        showToast(title, body, sessionId);
+      }
+
+      if (document.visibilityState === 'hidden' || !document.hasFocus()) {
+        if ('Notification' in window) {
+          if (Notification.permission === 'granted') {
+            fireOsNotification(title, body, sessionId);
+          } else if (Notification.permission === 'default') {
+            Notification.requestPermission().then((p) => {
+              if (p === 'granted') fireOsNotification(title, body, sessionId);
+            });
+          }
+        }
+      }
+    }, NOTIFY_DEBOUNCE)
+  );
 }
 
 export function resetNotifyState(sessionId) {
@@ -89,7 +121,7 @@ function fireOsNotification(title, body, sessionId) {
     window.focus();
     if (terminalMap.has(sessionId)) {
       activateSession(sessionId);
-      wsSend({ type:'session_attach', sessionId });
+      wsSend({ type: 'session_attach', sessionId });
     }
     n.close();
   };
@@ -115,11 +147,14 @@ export function showToast(title, body, sessionId) {
     <div class="toast-body">${escHtml(body)}</div>
     <button class="toast-close">✕</button>
   `;
-  t.addEventListener('click', e => {
-    if (e.target.closest('.toast-close')) { t.remove(); return; }
+  t.addEventListener('click', (e) => {
+    if (e.target.closest('.toast-close')) {
+      t.remove();
+      return;
+    }
     if (terminalMap.has(sessionId)) {
       activateSession(sessionId);
-      wsSend({ type:'session_attach', sessionId });
+      wsSend({ type: 'session_attach', sessionId });
     }
     t.remove();
   });
@@ -127,7 +162,9 @@ export function showToast(title, body, sessionId) {
   alertSound.currentTime = 0;
   alertSound.play().catch(() => {});
   setTimeout(() => t.classList.add('toast-hide'), 5500);
-  setTimeout(() => { if (t.parentNode) t.remove(); }, 6200);
+  setTimeout(() => {
+    if (t.parentNode) t.remove();
+  }, 6200);
 }
 
 export function initNotifications() {

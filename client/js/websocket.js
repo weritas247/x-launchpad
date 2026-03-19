@@ -6,17 +6,19 @@ const _signalBars = document.querySelector('.signal-bars');
 const _latencyValue = document.getElementById('latency-value');
 
 let _onInputSend = null;
-export function setOnInputSend(fn) { _onInputSend = fn; }
+export function setOnInputSend(fn) {
+  _onInputSend = fn;
+}
 
 // ─── Input batching ─────────────────────────────────
 // Accumulate keystrokes within BATCH_WINDOW ms and send as a single frame
 const INPUT_BATCH_WINDOW = 10; // ms
-const _inputBatch = new Map();   // sessionId → { data: string, timer: number }
+const _inputBatch = new Map(); // sessionId → { data: string, timer: number }
 
 // ─── Input buffering (offline queue) ────────────────
 // Queue input while disconnected, flush on reconnect
-const _inputQueue = [];          // { type, sessionId, data }
-const INPUT_QUEUE_MAX = 200;     // prevent unbounded growth
+const _inputQueue = []; // { type, sessionId, data }
+const INPUT_QUEUE_MAX = 200; // prevent unbounded growth
 
 // ─── Connection health tracking ─────────────────────
 let _heartbeatTimer = null;
@@ -24,16 +26,19 @@ let _pongTimer = null;
 let _lastPong = 0;
 let _wasConnected = false;
 let _disconnectTime = 0;
-const HEARTBEAT_INTERVAL = 5000;   // ping every 5s
-const PONG_TIMEOUT = 8000;         // no pong within 8s = dead
+const HEARTBEAT_INTERVAL = 5000; // ping every 5s
+const PONG_TIMEOUT = 8000; // no pong within 8s = dead
 
 function updateLatencyUI(rtt) {
   if (!_signalBars || !_latencyValue) return;
   let level;
-  if (rtt < 50)       level = 4;  // excellent
-  else if (rtt < 150) level = 3;  // good
-  else if (rtt < 300) level = 2;  // fair
-  else                 level = 1;  // poor
+  if (rtt < 50)
+    level = 4; // excellent
+  else if (rtt < 150)
+    level = 3; // good
+  else if (rtt < 300)
+    level = 2; // fair
+  else level = 1; // poor
   _signalBars.className = 'signal-bars level-' + level;
   _latencyValue.textContent = rtt + 'ms';
 }
@@ -77,8 +82,14 @@ function startHeartbeat() {
 }
 
 function stopHeartbeat() {
-  if (_heartbeatTimer) { clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
-  if (_pongTimer) { clearTimeout(_pongTimer); _pongTimer = null; }
+  if (_heartbeatTimer) {
+    clearInterval(_heartbeatTimer);
+    _heartbeatTimer = null;
+  }
+  if (_pongTimer) {
+    clearTimeout(_pongTimer);
+    _pongTimer = null;
+  }
 }
 
 function _rawSend(obj) {
@@ -198,7 +209,11 @@ export function connect(messageHandler) {
     // Control WS only receives JSON — terminal I/O goes through per-session data WS
     if (event.data instanceof ArrayBuffer) return; // ignore binary on control WS
     let msg;
-    try { msg = JSON.parse(event.data); } catch { return; }
+    try {
+      msg = JSON.parse(event.data);
+    } catch {
+      return;
+    }
     // Handle pong from server — measure RTT
     if (msg.type === 'pong') {
       _lastPong = Date.now();

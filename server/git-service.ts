@@ -34,36 +34,68 @@ export interface BranchEntry {
   isRemote: boolean;
 }
 
-export function getGitLog(cwd: string, maxCount = 50, skip = 0): { commits: CommitEntry[]; hasMore: boolean } {
+export function getGitLog(
+  cwd: string,
+  maxCount = 50,
+  skip = 0
+): { commits: CommitEntry[]; hasMore: boolean } {
   const fetchCount = maxCount + 1;
-  const raw = execFileSync('git', [
-    'log', '--format=%H%x00%P%x00%D%x00%an%x00%aI%x00%s%x00%b%x01',
-    `--max-count=${fetchCount}`, `--skip=${skip}`, '--topo-order', '--all',
-  ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+  const raw = execFileSync(
+    'git',
+    [
+      'log',
+      '--format=%H%x00%P%x00%D%x00%an%x00%aI%x00%s%x00%b%x01',
+      `--max-count=${fetchCount}`,
+      `--skip=${skip}`,
+      '--topo-order',
+      '--all',
+    ],
+    { cwd, encoding: 'utf-8', timeout: 5000 }
+  ).trim();
 
-  const allCommits = raw.split('\x01').filter(Boolean).map(record => {
-    const [hash, parentStr, refStr, author, date, message, ...bodyParts] = record.trim().split('\x00');
-    return {
-      hash,
-      parents: parentStr ? parentStr.split(' ') : [],
-      refs: refStr ? refStr.split(', ').map(r => r.trim()).filter(Boolean) : [],
-      author,
-      date,
-      message,
-      body: bodyParts.join('\x00').trim(),
-      additions: 0,
-      deletions: 0,
-    };
-  });
+  const allCommits = raw
+    .split('\x01')
+    .filter(Boolean)
+    .map((record) => {
+      const [hash, parentStr, refStr, author, date, message, ...bodyParts] = record
+        .trim()
+        .split('\x00');
+      return {
+        hash,
+        parents: parentStr ? parentStr.split(' ') : [],
+        refs: refStr
+          ? refStr
+              .split(', ')
+              .map((r) => r.trim())
+              .filter(Boolean)
+          : [],
+        author,
+        date,
+        message,
+        body: bodyParts.join('\x00').trim(),
+        additions: 0,
+        deletions: 0,
+      };
+    });
 
   const hasMore = allCommits.length > maxCount;
   const commits = hasMore ? allCommits.slice(0, maxCount) : allCommits;
 
   // Fetch per-commit stats separately
   try {
-    const statsRaw = execFileSync('git', [
-      'log', '--format=%H', '--shortstat', `--max-count=${fetchCount}`, `--skip=${skip}`, '--topo-order', '--all',
-    ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+    const statsRaw = execFileSync(
+      'git',
+      [
+        'log',
+        '--format=%H',
+        '--shortstat',
+        `--max-count=${fetchCount}`,
+        `--skip=${skip}`,
+        '--topo-order',
+        '--all',
+      ],
+      { cwd, encoding: 'utf-8', timeout: 5000 }
+    ).trim();
 
     const statsMap = new Map<string, { additions: number; deletions: number }>();
     let currentHash = '';
@@ -73,7 +105,8 @@ export function getGitLog(cwd: string, maxCount = 50, skip = 0): { commits: Comm
       if (/^[0-9a-f]{40}$/.test(trimmed)) {
         currentHash = trimmed;
       } else if (currentHash && /file.* changed/.test(trimmed)) {
-        let additions = 0, deletions = 0;
+        let additions = 0,
+          deletions = 0;
         const addMatch = trimmed.match(/(\d+) insertion/);
         const delMatch = trimmed.match(/(\d+) deletion/);
         if (addMatch) additions = parseInt(addMatch[1]);
@@ -85,7 +118,10 @@ export function getGitLog(cwd: string, maxCount = 50, skip = 0): { commits: Comm
 
     for (const c of commits) {
       const s = statsMap.get(c.hash);
-      if (s) { c.additions = s.additions; c.deletions = s.deletions; }
+      if (s) {
+        c.additions = s.additions;
+        c.deletions = s.deletions;
+      }
     }
   } catch {
     // stats are optional — if this fails, commits still have 0/0
@@ -99,17 +135,30 @@ export function searchGitLog(cwd: string, query: string, maxCount = 50): CommitE
 
   const format = '--format=%H%x00%P%x00%D%x00%an%x00%aI%x00%s%x00%b%x01';
   const parseCommits = (raw: string): CommitEntry[] =>
-    raw.split('\x01').filter(Boolean).map(record => {
-      const [hash, parentStr, refStr, author, date, message, ...bodyParts] = record.trim().split('\x00');
-      return {
-        hash,
-        parents: parentStr ? parentStr.split(' ') : [],
-        refs: refStr ? refStr.split(', ').map(r => r.trim()).filter(Boolean) : [],
-        author, date, message,
-        body: bodyParts.join('\x00').trim(),
-        additions: 0, deletions: 0,
-      };
-    });
+    raw
+      .split('\x01')
+      .filter(Boolean)
+      .map((record) => {
+        const [hash, parentStr, refStr, author, date, message, ...bodyParts] = record
+          .trim()
+          .split('\x00');
+        return {
+          hash,
+          parents: parentStr ? parentStr.split(' ') : [],
+          refs: refStr
+            ? refStr
+                .split(', ')
+                .map((r) => r.trim())
+                .filter(Boolean)
+            : [],
+          author,
+          date,
+          message,
+          body: bodyParts.join('\x00').trim(),
+          additions: 0,
+          deletions: 0,
+        };
+      });
 
   const seen = new Set<string>();
   const results: CommitEntry[] = [];
@@ -125,28 +174,32 @@ export function searchGitLog(cwd: string, query: string, maxCount = 50): CommitE
 
   // Search by message (--grep)
   try {
-    const raw = execFileSync('git', [
-      'log', format, `--max-count=${maxCount}`, '--all', '--topo-order',
-      '--grep', query, '--',
-    ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+    const raw = execFileSync(
+      'git',
+      ['log', format, `--max-count=${maxCount}`, '--all', '--topo-order', '--grep', query, '--'],
+      { cwd, encoding: 'utf-8', timeout: 5000 }
+    ).trim();
     if (raw) addUnique(parseCommits(raw));
   } catch {}
 
   // Search by author
   try {
-    const raw = execFileSync('git', [
-      'log', format, `--max-count=${maxCount}`, '--all', '--topo-order',
-      '--author', query, '--',
-    ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+    const raw = execFileSync(
+      'git',
+      ['log', format, `--max-count=${maxCount}`, '--all', '--topo-order', '--author', query, '--'],
+      { cwd, encoding: 'utf-8', timeout: 5000 }
+    ).trim();
     if (raw) addUnique(parseCommits(raw));
   } catch {}
 
   // Search by hash prefix (if query looks like hex)
   if (/^[0-9a-f]{4,40}$/i.test(query)) {
     try {
-      const raw = execFileSync('git', [
-        'log', format, '--max-count=1', query, '--',
-      ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+      const raw = execFileSync('git', ['log', format, '--max-count=1', query, '--'], {
+        cwd,
+        encoding: 'utf-8',
+        timeout: 5000,
+      }).trim();
       if (raw) addUnique(parseCommits(raw));
     } catch {}
   }
@@ -158,20 +211,27 @@ export function searchGitLog(cwd: string, query: string, maxCount = 50): CommitE
 
 export function getFileList(cwd: string, hash: string): FileEntry[] {
   // Get file status (M/A/D)
-  const raw = execFileSync('git', [
-    'diff-tree', '--no-commit-id', '--name-status', '-r', hash,
-  ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+  const raw = execFileSync('git', ['diff-tree', '--no-commit-id', '--name-status', '-r', hash], {
+    cwd,
+    encoding: 'utf-8',
+    timeout: 5000,
+  }).trim();
 
-  const files = raw.split('\n').filter(Boolean).map(line => {
-    const [status, ...pathParts] = line.split('\t');
-    return { status, path: pathParts.join('\t'), additions: 0, deletions: 0 };
-  });
+  const files = raw
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const [status, ...pathParts] = line.split('\t');
+      return { status, path: pathParts.join('\t'), additions: 0, deletions: 0 };
+    });
 
   // Get per-file line stats
   try {
-    const numstat = execFileSync('git', [
-      'diff-tree', '--no-commit-id', '--numstat', '-r', hash,
-    ], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
+    const numstat = execFileSync('git', ['diff-tree', '--no-commit-id', '--numstat', '-r', hash], {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 5000,
+    }).trim();
 
     const statsMap = new Map<string, { additions: number; deletions: number }>();
     for (const line of numstat.split('\n').filter(Boolean)) {
@@ -185,7 +245,10 @@ export function getFileList(cwd: string, hash: string): FileEntry[] {
 
     for (const f of files) {
       const s = statsMap.get(f.path);
-      if (s) { f.additions = s.additions; f.deletions = s.deletions; }
+      if (s) {
+        f.additions = s.additions;
+        f.deletions = s.deletions;
+      }
     }
   } catch {}
 
@@ -194,34 +257,47 @@ export function getFileList(cwd: string, hash: string): FileEntry[] {
 
 export function getCurrentBranch(cwd: string): string | null {
   let branch = execFileSync('git', ['branch', '--show-current'], {
-    cwd, encoding: 'utf-8', timeout: 3000,
+    cwd,
+    encoding: 'utf-8',
+    timeout: 3000,
   }).trim();
   if (!branch) {
     branch = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
-      cwd, encoding: 'utf-8', timeout: 3000,
+      cwd,
+      encoding: 'utf-8',
+      timeout: 3000,
     }).trim();
   }
   return branch || null;
 }
 
 export function getBranchList(cwd: string): BranchEntry[] {
-  const raw = execFileSync('git', [
-    'branch', '-a', '--format=%(HEAD)%(refname:short)',
-  ], { cwd, encoding: 'utf-8', timeout: 3000 }).trim();
+  const raw = execFileSync('git', ['branch', '-a', '--format=%(HEAD)%(refname:short)'], {
+    cwd,
+    encoding: 'utf-8',
+    timeout: 3000,
+  }).trim();
 
-  return raw.split('\n').filter(Boolean).map(line => {
-    const isCurrent = line.startsWith('*');
-    const name = line.slice(1).trim();
-    const isRemote = name.startsWith('origin/');
-    return { name, isCurrent, isRemote };
-  });
+  return raw
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const isCurrent = line.startsWith('*');
+      const name = line.slice(1).trim();
+      const isRemote = name.startsWith('origin/');
+      return { name, isCurrent, isRemote };
+    });
 }
 
 export function getRemoteUrl(cwd: string, remote = 'origin'): string | null {
   try {
-    return execFileSync('git', ['remote', 'get-url', remote], {
-      cwd, encoding: 'utf-8', timeout: 3000,
-    }).trim() || null;
+    return (
+      execFileSync('git', ['remote', 'get-url', remote], {
+        cwd,
+        encoding: 'utf-8',
+        timeout: 3000,
+      }).trim() || null
+    );
   } catch {
     return null;
   }
@@ -238,14 +314,27 @@ export interface TreeEntry {
 export function getFileTree(dirPath: string, depth = 3): TreeEntry[] {
   const fs = require('fs') as typeof import('fs');
   const path = require('path') as typeof import('path');
-  const IGNORED = new Set(['.git', 'node_modules', '.next', '.nuxt', 'dist', '__pycache__', '.cache', '.DS_Store', 'Thumbs.db']);
+  const IGNORED = new Set([
+    '.git',
+    'node_modules',
+    '.next',
+    '.nuxt',
+    'dist',
+    '__pycache__',
+    '.cache',
+    '.DS_Store',
+    'Thumbs.db',
+  ]);
 
   function walk(dir: string, currentDepth: number): TreeEntry[] {
     if (currentDepth > depth) return [];
     let entries: string[];
-    try { entries = fs.readdirSync(dir); } catch { return []; }
+    try {
+      entries = fs.readdirSync(dir);
+    } catch {
+      return [];
+    }
 
-    const result: TreeEntry[] = [];
     const dirs: TreeEntry[] = [];
     const files: TreeEntry[] = [];
 
@@ -254,7 +343,11 @@ export function getFileTree(dirPath: string, depth = 3): TreeEntry[] {
       const fullPath = path.join(dir, name);
       const relativePath = path.relative(dirPath, fullPath);
       let stat;
-      try { stat = fs.statSync(fullPath); } catch { continue; }
+      try {
+        stat = fs.statSync(fullPath);
+      } catch {
+        continue;
+      }
 
       if (stat.isDirectory()) {
         dirs.push({
@@ -279,7 +372,7 @@ export function getFileTree(dirPath: string, depth = 3): TreeEntry[] {
 
 // ─── GIT STATUS ──────────────────────────────────────────────────
 export interface GitStatusEntry {
-  status: string;   // 'M', 'A', 'D', '??', 'R', 'C', 'U', 'MM', etc.
+  status: string; // 'M', 'A', 'D', '??', 'R', 'C', 'U', 'MM', etc.
   path: string;
   staged: boolean;
 }
@@ -287,24 +380,29 @@ export interface GitStatusEntry {
 export function getGitStatus(cwd: string): GitStatusEntry[] {
   try {
     const raw = execFileSync('git', ['status', '--porcelain', '-u'], {
-      cwd, encoding: 'utf-8', timeout: 5000,
+      cwd,
+      encoding: 'utf-8',
+      timeout: 5000,
     }).trim();
     if (!raw) return [];
 
-    return raw.split('\n').filter(Boolean).map(line => {
-      const x = line[0]; // index status
-      const y = line[1]; // worktree status
-      const filePath = line.slice(3);
+    return raw
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const x = line[0]; // index status
+        const y = line[1]; // worktree status
+        const filePath = line.slice(3);
 
-      // Determine display status and staged flag
-      if (x === '?' && y === '?') {
-        return { status: 'U', path: filePath, staged: false }; // Untracked
-      }
-      if (x !== ' ' && x !== '?') {
-        return { status: x, path: filePath, staged: true }; // Staged change
-      }
-      return { status: y, path: filePath, staged: false }; // Unstaged change
-    });
+        // Determine display status and staged flag
+        if (x === '?' && y === '?') {
+          return { status: 'U', path: filePath, staged: false }; // Untracked
+        }
+        if (x !== ' ' && x !== '?') {
+          return { status: x, path: filePath, staged: true }; // Staged change
+        }
+        return { status: y, path: filePath, staged: false }; // Unstaged change
+      });
   } catch {
     return [];
   }
@@ -313,7 +411,9 @@ export function getGitStatus(cwd: string): GitStatusEntry[] {
 export function isGitRepo(cwd: string): boolean {
   try {
     execFileSync('git', ['rev-parse', '--is-inside-work-tree'], {
-      cwd, encoding: 'utf-8', timeout: 2000,
+      cwd,
+      encoding: 'utf-8',
+      timeout: 2000,
     });
     return true;
   } catch {
@@ -328,14 +428,16 @@ export function getGitDiff(cwd: string, filePath?: string, staged = false): stri
     args.push('--no-color');
     if (filePath) args.push('--', filePath);
     const diff = execFileSync('git', args, {
-      cwd, encoding: 'utf-8', timeout: 5000,
+      cwd,
+      encoding: 'utf-8',
+      timeout: 5000,
     });
     // For untracked files, git diff returns empty — read file directly
     if (!diff && filePath) {
       const content = readFileSync(join(cwd, filePath), 'utf-8');
       const lines = content.split('\n');
       const header = `--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n`;
-      return header + lines.map(l => '+' + l).join('\n');
+      return header + lines.map((l) => '+' + l).join('\n');
     }
     return diff;
   } catch {
@@ -354,7 +456,11 @@ export function gitStageFile(cwd: string, filePath: string): boolean {
 
 export function gitUnstageFile(cwd: string, filePath: string): boolean {
   try {
-    execFileSync('git', ['reset', 'HEAD', '--', filePath], { cwd, encoding: 'utf-8', timeout: 5000 });
+    execFileSync('git', ['reset', 'HEAD', '--', filePath], {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 5000,
+    });
     return true;
   } catch {
     return false;
@@ -393,18 +499,30 @@ export function generateCommitMessage(cwd: string): string {
     // Get staged diff, fallback to unstaged diff
     let diff = '';
     try {
-      diff = execFileSync('git', ['diff', '--cached', '--stat'], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
-    } catch { /* ignore */ }
+      diff = execFileSync('git', ['diff', '--cached', '--stat'], {
+        cwd,
+        encoding: 'utf-8',
+        timeout: 5000,
+      }).trim();
+    } catch {
+      /* ignore */
+    }
     if (!diff) {
       try {
-        diff = execFileSync('git', ['diff', '--stat'], { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
-      } catch { /* ignore */ }
+        diff = execFileSync('git', ['diff', '--stat'], {
+          cwd,
+          encoding: 'utf-8',
+          timeout: 5000,
+        }).trim();
+      } catch {
+        /* ignore */
+      }
     }
     if (!diff) return 'update files';
 
     // Parse stat output to generate descriptive message
-    const lines = diff.split('\n').filter(l => l.includes('|'));
-    const files = lines.map(l => l.trim().split(/\s+\|/)[0].trim());
+    const lines = diff.split('\n').filter((l) => l.includes('|'));
+    const files = lines.map((l) => l.trim().split(/\s+\|/)[0].trim());
 
     if (files.length === 0) return 'update files';
     if (files.length === 1) {
@@ -412,9 +530,9 @@ export function generateCommitMessage(cwd: string): string {
       return `update ${name}`;
     }
     // Find common directory or extension
-    const exts = [...new Set(files.map(f => f.split('.').pop()))];
+    const exts = [...new Set(files.map((f) => f.split('.').pop()))];
     if (exts.length === 1) return `update ${files.length} ${exts[0]} files`;
-    const dirs = [...new Set(files.map(f => f.split('/')[0]))];
+    const dirs = [...new Set(files.map((f) => f.split('/')[0]))];
     if (dirs.length === 1) return `update ${dirs[0]} (${files.length} files)`;
     return `update ${files.length} files`;
   } catch {
@@ -442,7 +560,11 @@ export function gitCommit(cwd: string, message: string): { ok: boolean; error?: 
 }
 
 // ─── FILE OPERATIONS ─────────────────────────────────────────────
-export function createFile(cwd: string, filePath: string, isDir: boolean): { ok: boolean; error?: string } {
+export function createFile(
+  cwd: string,
+  filePath: string,
+  isDir: boolean
+): { ok: boolean; error?: string } {
   const path = require('path') as typeof import('path');
   const fs = require('fs') as typeof import('fs');
   const fullPath = path.resolve(cwd, filePath);
@@ -461,12 +583,17 @@ export function createFile(cwd: string, filePath: string, isDir: boolean): { ok:
   }
 }
 
-export function renameFile(cwd: string, oldPath: string, newPath: string): { ok: boolean; error?: string } {
+export function renameFile(
+  cwd: string,
+  oldPath: string,
+  newPath: string
+): { ok: boolean; error?: string } {
   const path = require('path') as typeof import('path');
   const fs = require('fs') as typeof import('fs');
   const fullOld = path.resolve(cwd, oldPath);
   const fullNew = path.resolve(cwd, newPath);
-  if (!isPathWithin(fullOld, cwd) || !isPathWithin(fullNew, cwd)) return { ok: false, error: 'Access denied' };
+  if (!isPathWithin(fullOld, cwd) || !isPathWithin(fullNew, cwd))
+    return { ok: false, error: 'Access denied' };
   try {
     fs.renameSync(fullOld, fullNew);
     return { ok: true };
@@ -544,7 +671,17 @@ export function duplicateFile(cwd: string, filePath: string): { ok: boolean; err
 }
 
 // ─── FILE READ ───────────────────────────────────────────────────
-export function readFileContent(cwd: string, filePath: string): { content?: string; binary?: boolean; isImage?: boolean; imageData?: string; imageMime?: string; error?: string } {
+export function readFileContent(
+  cwd: string,
+  filePath: string
+): {
+  content?: string;
+  binary?: boolean;
+  isImage?: boolean;
+  imageData?: string;
+  imageMime?: string;
+  error?: string;
+} {
   const path = require('path') as typeof import('path');
   const fs = require('fs') as typeof import('fs');
   const fullPath = path.resolve(cwd, filePath);
@@ -555,9 +692,14 @@ export function readFileContent(cwd: string, filePath: string): { content?: stri
   }
 
   const imageExts: Record<string, string> = {
-    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-    '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
-    '.bmp': 'image/bmp', '.ico': 'image/x-icon',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
+    '.bmp': 'image/bmp',
+    '.ico': 'image/x-icon',
   };
 
   try {
@@ -592,7 +734,12 @@ export interface SearchResult {
   text: string;
 }
 
-export function searchInFiles(cwd: string, query: string, opts?: { caseSensitive?: boolean; useRegex?: boolean; include?: string }, maxResults = 100): SearchResult[] {
+export function searchInFiles(
+  cwd: string,
+  query: string,
+  opts?: { caseSensitive?: boolean; useRegex?: boolean; include?: string },
+  maxResults = 100
+): SearchResult[] {
   if (!query.trim()) return [];
   try {
     const args = ['-rn', '-I', '--max-count=5'];
@@ -600,14 +747,24 @@ export function searchInFiles(cwd: string, query: string, opts?: { caseSensitive
     if (!opts?.useRegex) args.push('-F'); // fixed string (literal)
     // Include patterns
     if (opts?.include) {
-      for (const pat of opts.include.split(',').map(s => s.trim()).filter(Boolean)) {
+      for (const pat of opts.include
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)) {
         args.push(`--include=${pat}`);
       }
     } else {
-      args.push('--include=*.{js,ts,jsx,tsx,json,css,html,md,py,go,rs,rb,sh,yml,yaml,toml,txt,cfg,conf,env}');
+      args.push(
+        '--include=*.{js,ts,jsx,tsx,json,css,html,md,py,go,rs,rb,sh,yml,yaml,toml,txt,cfg,conf,env}'
+      );
     }
     args.push(query, '.');
-    const raw = execFileSync('grep', args, { cwd, encoding: 'utf-8', timeout: 5000, maxBuffer: 1024 * 512 }).trim();
+    const raw = execFileSync('grep', args, {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 5000,
+      maxBuffer: 1024 * 512,
+    }).trim();
 
     if (!raw) return [];
     const results: SearchResult[] = [];
@@ -626,7 +783,13 @@ export function searchInFiles(cwd: string, query: string, opts?: { caseSensitive
 }
 
 // ─── FILE REPLACE ────────────────────────────────────────────────
-export function replaceInFile(cwd: string, filePath: string, query: string, replacement: string, opts?: { caseSensitive?: boolean; useRegex?: boolean }): { ok: boolean; count: number; error?: string } {
+export function replaceInFile(
+  cwd: string,
+  filePath: string,
+  query: string,
+  replacement: string,
+  opts?: { caseSensitive?: boolean; useRegex?: boolean }
+): { ok: boolean; count: number; error?: string } {
   const path = require('path') as typeof import('path');
   const fs = require('fs') as typeof import('fs');
   const fullPath = path.resolve(cwd, filePath);
@@ -645,7 +808,10 @@ export function replaceInFile(cwd: string, filePath: string, query: string, repl
       pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
     }
     let count = 0;
-    content = content.replace(pattern, () => { count++; return replacement; });
+    content = content.replace(pattern, () => {
+      count++;
+      return replacement;
+    });
     fs.writeFileSync(fullPath, content, 'utf-8');
     return { ok: true, count };
   } catch (e: any) {
@@ -653,10 +819,15 @@ export function replaceInFile(cwd: string, filePath: string, query: string, repl
   }
 }
 
-export function replaceInAllFiles(cwd: string, query: string, replacement: string, opts?: { caseSensitive?: boolean; useRegex?: boolean; include?: string }): { ok: boolean; count: number; error?: string } {
+export function replaceInAllFiles(
+  cwd: string,
+  query: string,
+  replacement: string,
+  opts?: { caseSensitive?: boolean; useRegex?: boolean; include?: string }
+): { ok: boolean; count: number; error?: string } {
   // First find matching files using search
   const results = searchInFiles(cwd, query, opts);
-  const files = [...new Set(results.map(r => r.file))];
+  const files = [...new Set(results.map((r) => r.file))];
   let totalCount = 0;
   for (const file of files) {
     const result = replaceInFile(cwd, file, query, replacement, opts);
@@ -668,7 +839,9 @@ export function replaceInAllFiles(cwd: string, query: string, replacement: strin
 export function getUpstreamStatus(cwd: string): { ahead: number; behind: number } {
   try {
     const raw = execFileSync('git', ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'], {
-      cwd, encoding: 'utf-8', timeout: 3000,
+      cwd,
+      encoding: 'utf-8',
+      timeout: 3000,
     }).trim();
     const [ahead, behind] = raw.split(/\s+/).map(Number);
     return { ahead: ahead || 0, behind: behind || 0 };
@@ -679,9 +852,13 @@ export function getUpstreamStatus(cwd: string): { ahead: number; behind: number 
 
 export function getGitRoot(cwd: string): string | null {
   try {
-    return execFileSync('git', ['rev-parse', '--show-toplevel'], {
-      cwd, encoding: 'utf-8', timeout: 2000,
-    }).trim() || null;
+    return (
+      execFileSync('git', ['rev-parse', '--show-toplevel'], {
+        cwd,
+        encoding: 'utf-8',
+        timeout: 2000,
+      }).trim() || null
+    );
   } catch {
     return null;
   }
@@ -699,7 +876,9 @@ export interface WorktreeEntry {
 export function getWorktreeList(cwd: string): WorktreeEntry[] {
   try {
     const raw = execFileSync('git', ['worktree', 'list', '--porcelain'], {
-      cwd, encoding: 'utf-8', timeout: 5000,
+      cwd,
+      encoding: 'utf-8',
+      timeout: 5000,
     }).trim();
     if (!raw) return [];
 
@@ -730,7 +909,12 @@ export function getWorktreeList(cwd: string): WorktreeEntry[] {
   }
 }
 
-export function addWorktree(cwd: string, wtPath: string, branch?: string, createBranch?: boolean): { ok: boolean; error?: string } {
+export function addWorktree(
+  cwd: string,
+  wtPath: string,
+  branch?: string,
+  createBranch?: boolean
+): { ok: boolean; error?: string } {
   try {
     const args = ['worktree', 'add'];
     if (createBranch && branch) {
@@ -747,7 +931,11 @@ export function addWorktree(cwd: string, wtPath: string, branch?: string, create
   }
 }
 
-export function removeWorktree(cwd: string, wtPath: string, force?: boolean): { ok: boolean; error?: string } {
+export function removeWorktree(
+  cwd: string,
+  wtPath: string,
+  force?: boolean
+): { ok: boolean; error?: string } {
   try {
     const args = ['worktree', 'remove'];
     if (force) args.push('--force');

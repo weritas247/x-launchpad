@@ -66,7 +66,10 @@ function startClaudePoll() {
 }
 
 function stopClaudePoll() {
-  if (claudePollTimer) { clearInterval(claudePollTimer); claudePollTimer = null; }
+  if (claudePollTimer) {
+    clearInterval(claudePollTimer);
+    claudePollTimer = null;
+  }
 }
 
 /** Call this when user types data in the terminal (from term.onData) */
@@ -141,7 +144,9 @@ function renderClaudePrompts() {
   const allPrompts = claudePromptsMap.get(S.activeSessionId) || [];
   const meta = sessionMeta.get(S.activeSessionId);
   const sessionCreatedAt = meta && meta.createdAt ? meta.createdAt : 0;
-  const prompts = allPrompts.filter(p => p.timestamp && new Date(p.timestamp).getTime() >= sessionCreatedAt);
+  const prompts = allPrompts.filter(
+    (p) => p.timestamp && new Date(p.timestamp).getTime() >= sessionCreatedAt
+  );
   if (prompts.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'input-entry-empty';

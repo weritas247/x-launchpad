@@ -4,22 +4,104 @@ import { connect, wsSend, setOnInputSend, requestScrollback } from './websocket.
 import { initThemeSwatches } from './themes.js';
 import { activateSession, updateStatusBar, setOnSessionChangeSidePanels } from './session.js';
 import { initSplitDnD, refitAllPanes, updateSidebarSplitGroup } from './split-pane.js';
-import { newSession, closeSession, renameSession, syncSessionList, attachTerminal, updateSessionInfo, showSessionPicker, hideSessionPicker, initContextMenu } from './terminal.js';
-import { loadSettings, applySettings, openSettings, closeSettings, initSettingsUI } from './settings.js';
+import {
+  newSession,
+  closeSession,
+  renameSession,
+  syncSessionList,
+  attachTerminal,
+  updateSessionInfo,
+  showSessionPicker,
+  hideSessionPicker,
+  initContextMenu,
+} from './terminal.js';
+import {
+  loadSettings,
+  applySettings,
+  openSettings,
+  closeSettings,
+  initSettingsUI,
+} from './settings.js';
 import { aiNotifyCheck, resetNotifyState, initNotifications } from './notifications.js';
 import { tabStatusCheck, tabStatusOnAiChange, suppressTabStatus } from './tab-status.js';
 import { initFolderDnD } from './folder.js';
-import { openGitGraph, closeGitGraph, isGitGraphOpen, handleGitGraphData, handleGitFileListData, handleGitBranchData, handleGitBranchListData, handleGitRemoteUrlData, handleGitCheckoutAck, handleGitPullAck, handleGitGraphSearchData, requestBranch, handleGitGraphKeydown } from './git-graph.js';
+import {
+  openGitGraph,
+  closeGitGraph,
+  isGitGraphOpen,
+  handleGitGraphData,
+  handleGitFileListData,
+  handleGitBranchData,
+  handleGitBranchListData,
+  handleGitRemoteUrlData,
+  handleGitCheckoutAck,
+  handleGitPullAck,
+  handleGitGraphSearchData,
+  requestBranch,
+  handleGitGraphKeydown,
+} from './git-graph.js';
 import { streamWrite, bypassStream, unbypassStream } from './stream-writer.js';
 import { registerAction, buildCombo, matchCombo, tryKeybinding } from './keyboard.js';
-import { initInputPanel, toggleInputPanel, onSessionChange as inputPanelSessionChange, handleClaudePrompts } from './prompt-history.js';
-import { handleClaudeUsageData, startUsagePolling, onSessionChangeUsage, onAiChangeUsage } from './claude-usage.js';
-import { initActivityBar, getActivePanel, switchPanel, toggleSidebarExport, initSidebarResize } from './activity-bar.js';
-import { initExplorer, handleFileTreeData, handleFileReadData, handleFileOpAck, onExplorerSessionChange, requestFileTree } from './explorer.js';
-import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange, handleWorktreeListData, handleWorktreeAddAck, handleWorktreeRemoveAck, handleWorktreeSwitchAck } from './source-control.js';
-import { initSearch, handleSearchResults, handleReplaceAck, onSearchSessionChange } from './search.js';
+import {
+  initInputPanel,
+  toggleInputPanel,
+  onSessionChange as inputPanelSessionChange,
+  handleClaudePrompts,
+} from './prompt-history.js';
+import {
+  handleClaudeUsageData,
+  startUsagePolling,
+  onSessionChangeUsage,
+  onAiChangeUsage,
+} from './claude-usage.js';
+import {
+  initActivityBar,
+  getActivePanel,
+  switchPanel,
+  toggleSidebarExport,
+  initSidebarResize,
+} from './activity-bar.js';
+import {
+  initExplorer,
+  handleFileTreeData,
+  handleFileReadData,
+  handleFileOpAck,
+  onExplorerSessionChange,
+  requestFileTree,
+} from './explorer.js';
+import {
+  initSourceControl,
+  handleGitStatusData,
+  handleGitDiffData,
+  handleGitCommitAck,
+  handleGitPushAck,
+  handleGitGenerateMessage,
+  onSourceControlSessionChange,
+  handleWorktreeListData,
+  handleWorktreeAddAck,
+  handleWorktreeRemoveAck,
+  handleWorktreeSwitchAck,
+} from './source-control.js';
+import {
+  initSearch,
+  handleSearchResults,
+  handleReplaceAck,
+  onSearchSessionChange,
+} from './search.js';
 import { setActivateSessionFn } from './file-viewer.js';
-import { initPlanPanel, handlePlanFileData, onPlanSessionChange, openPlanModal, closePlanModal, isPlanModalOpen, showPlanToast, onAiSessionCreated, onAiSessionReady, onAiPromptSent, updateAiTasksBadge } from './plan-panel.js';
+import {
+  initPlanPanel,
+  handlePlanFileData,
+  onPlanSessionChange,
+  openPlanModal,
+  closePlanModal,
+  isPlanModalOpen,
+  showPlanToast,
+  onAiSessionCreated,
+  onAiSessionReady,
+  onAiPromptSent,
+  updateAiTasksBadge,
+} from './plan-panel.js';
 import './mobile.js'; // auto-initializes mobile UI
 
 S.currentTheme = THEMES[0];
@@ -29,7 +111,7 @@ setOnInputSend(resetNotifyState);
 const hdrTime = document.getElementById('hdr-time');
 const sbClock = document.getElementById('sb-clock');
 setInterval(() => {
-  const t = new Date().toTimeString().slice(0,8);
+  const t = new Date().toTimeString().slice(0, 8);
   sbClock.textContent = t;
   hdrTime.textContent = t;
 }, 1000);
@@ -38,14 +120,18 @@ function handleMessage(msg) {
   if (msg.type === 'session_list') {
     syncSessionList(msg.sessions, S.wsJustReconnected);
     if (S.wsJustReconnected) {
-      msg.sessions.forEach(s => {
+      msg.sessions.forEach((s) => {
         suppressTabStatus(s.id, 2000);
         // Scrollback is now auto-sent by per-session data WS on connect
       });
     }
     S.wsJustReconnected = false;
     // Auto-close git graph if active session is gone
-    if (isGitGraphOpen() && S.activeSessionId && !msg.sessions.some(s => s.id === S.activeSessionId)) {
+    if (
+      isGitGraphOpen() &&
+      S.activeSessionId &&
+      !msg.sessions.some((s) => s.id === S.activeSessionId)
+    ) {
       closeGitGraph();
     }
   } else if (msg.type === 'settings') {
@@ -58,10 +144,18 @@ function handleMessage(msg) {
       pending.resolve(msg.sessionId);
     } else {
       activateSession(msg.sessionId);
-      wsSend({ type:'session_attach', sessionId: msg.sessionId });
+      wsSend({ type: 'session_attach', sessionId: msg.sessionId });
       setTimeout(() => {
         const e = terminalMap.get(msg.sessionId);
-        if (e) { e.fitAddon.fit(); wsSend({ type:'resize', sessionId:msg.sessionId, cols:e.term.cols, rows:e.term.rows }); }
+        if (e) {
+          e.fitAddon.fit();
+          wsSend({
+            type: 'resize',
+            sessionId: msg.sessionId,
+            cols: e.term.cols,
+            rows: e.term.rows,
+          });
+        }
       }, 50);
     }
   } else if (msg.type === 'session_attached') {
@@ -69,7 +163,10 @@ function handleMessage(msg) {
     onSessionChangeUsage();
     setTimeout(() => {
       const e = terminalMap.get(msg.sessionId);
-      if (e) { e.fitAddon.fit(); wsSend({ type:'resize', sessionId:msg.sessionId, cols:e.term.cols, rows:e.term.rows }); }
+      if (e) {
+        e.fitAddon.fit();
+        wsSend({ type: 'resize', sessionId: msg.sessionId, cols: e.term.cols, rows: e.term.rows });
+      }
     }, 50);
   } else if (msg.type === 'session_info') {
     updateSessionInfo(msg.sessionId, msg.cwd, msg.ai);
@@ -91,7 +188,7 @@ function handleMessage(msg) {
     }
   } else if (msg.type === 'ai_prompt_sent') {
     onAiPromptSent(msg.sessionId);
-  // output and scrollback are now handled by per-session data WebSocket in terminal.js
+    // output and scrollback are now handled by per-session data WebSocket in terminal.js
   } else if (msg.type === 'git_graph_data') {
     handleGitGraphData(msg);
   } else if (msg.type === 'git_file_list_data') {
@@ -150,23 +247,31 @@ function handleMessage(msg) {
 }
 
 // ─── REGISTER KEYBINDING ACTIONS ─────────────────────
-registerAction('newSession',    () => newSession());
-registerAction('closeSession',  () => { if (S.activeSessionId) closeSession(S.activeSessionId); });
-registerAction('openSettings',  () => openSettings());
-registerAction('fullscreen',    () => toggleFullscreen());
-registerAction('nextTab',       () => switchTabBy(1));
-registerAction('prevTab',       () => switchTabBy(-1));
-registerAction('renameSession', () => { if (S.activeSessionId) promptRenameSession(S.activeSessionId); });
+registerAction('newSession', () => newSession());
+registerAction('closeSession', () => {
+  if (S.activeSessionId) closeSession(S.activeSessionId);
+});
+registerAction('openSettings', () => openSettings());
+registerAction('fullscreen', () => toggleFullscreen());
+registerAction('nextTab', () => switchTabBy(1));
+registerAction('prevTab', () => switchTabBy(-1));
+registerAction('renameSession', () => {
+  if (S.activeSessionId) promptRenameSession(S.activeSessionId);
+});
 registerAction('clearTerminal', () => clearActiveTerminal());
-registerAction('gitGraph',      () => { isGitGraphOpen() ? closeGitGraph() : openGitGraph(); });
+registerAction('gitGraph', () => {
+  isGitGraphOpen() ? closeGitGraph() : openGitGraph();
+});
 registerAction('toggleSidebar', () => toggleSidebarExport());
-registerAction('focusSearch',   () => switchPanel('search'));
+registerAction('focusSearch', () => switchPanel('search'));
 registerAction('focusExplorer', () => switchPanel('explorer'));
 registerAction('focusSourceControl', () => switchPanel('source-control'));
 registerAction('toggleInputPanel', () => toggleInputPanel());
-registerAction('planModal',       () => { isPlanModalOpen() ? closePlanModal() : openPlanModal(); });
+registerAction('planModal', () => {
+  isPlanModalOpen() ? closePlanModal() : openPlanModal();
+});
 
-document.addEventListener('keydown', e => {
+document.addEventListener('keydown', (e) => {
   if (!S.settings) return;
 
   // Git graph modal handles its own keys (arrows, enter, escape)
@@ -174,9 +279,18 @@ document.addEventListener('keydown', e => {
 
   if (e.key === 'Escape') {
     const picker = document.getElementById('session-picker');
-    if (picker.style.display !== 'none') { hideSessionPicker(); return; }
-    if (isPlanModalOpen()) { closePlanModal(); return; }
-    if (settingsOverlay.classList.contains('open')) { closeSettings(); return; }
+    if (picker.style.display !== 'none') {
+      hideSessionPicker();
+      return;
+    }
+    if (isPlanModalOpen()) {
+      closePlanModal();
+      return;
+    }
+    if (settingsOverlay.classList.contains('open')) {
+      closeSettings();
+      return;
+    }
   }
 
   if (isPlanModalOpen()) return;
@@ -184,7 +298,7 @@ document.addEventListener('keydown', e => {
 
   // Split pane navigation: Ctrl+Shift+Arrow
   if (e.ctrlKey && e.shiftKey && S.layoutTree !== null) {
-    const dirs = { ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down' };
+    const dirs = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
     const dir = dirs[e.key];
     if (dir) {
       e.preventDefault();
@@ -202,14 +316,17 @@ document.addEventListener('keydown', e => {
     const n = parseInt(combo.replace('Meta+', ''));
     if (n >= 1 && n <= 9) {
       const ids = Array.from(terminalMap.keys());
-      if (ids[n - 1]) { e.preventDefault(); activateSession(ids[n - 1]); }
+      if (ids[n - 1]) {
+        e.preventDefault();
+        activateSession(ids[n - 1]);
+      }
     }
   }
 });
 
 function toggleFullscreen() {
-  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
-  else document.exitFullscreen().catch(()=>{});
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+  else document.exitFullscreen().catch(() => {});
 }
 
 function promptRenameSession(id) {
@@ -231,7 +348,7 @@ function switchTabBy(dir) {
   const idx = ids.indexOf(S.activeSessionId);
   const next = ids[(idx + dir + ids.length) % ids.length];
   activateSession(next);
-  wsSend({ type:'session_attach', sessionId: next });
+  wsSend({ type: 'session_attach', sessionId: next });
 }
 
 function navigateSplitPane(dir) {
@@ -240,27 +357,39 @@ function navigateSplitPane(dir) {
     if (!node) return;
     if (node.type === 'pane') {
       const rect = node.element.getBoundingClientRect();
-      panes.push({ sessionId: node.sessionId, cx: rect.left + rect.width/2, cy: rect.top + rect.height/2 });
-    } else { node.children.forEach(collectPanes); }
+      panes.push({
+        sessionId: node.sessionId,
+        cx: rect.left + rect.width / 2,
+        cy: rect.top + rect.height / 2,
+      });
+    } else {
+      node.children.forEach(collectPanes);
+    }
   }
   collectPanes(S.layoutTree);
   const activeEntry = terminalMap.get(S.activeSessionId);
   if (!activeEntry) return;
   const ar = activeEntry.div.getBoundingClientRect();
-  const ax = ar.left + ar.width/2, ay = ar.top + ar.height/2;
-  const coneMap = { left: Math.PI, right: 0, up: -Math.PI/2, down: Math.PI/2 };
+  const ax = ar.left + ar.width / 2,
+    ay = ar.top + ar.height / 2;
+  const coneMap = { left: Math.PI, right: 0, up: -Math.PI / 2, down: Math.PI / 2 };
   const targetAngle = coneMap[dir];
-  let best = null, bestDist = Infinity;
-  panes.forEach(p => {
+  let best = null,
+    bestDist = Infinity;
+  panes.forEach((p) => {
     if (p.sessionId === S.activeSessionId) return;
-    const dx = p.cx - ax, dy = p.cy - ay;
+    const dx = p.cx - ax,
+      dy = p.cy - ay;
     const angle = Math.atan2(dy, dx);
     let diff = angle - targetAngle;
-    while (diff > Math.PI) diff -= 2*Math.PI;
-    while (diff < -Math.PI) diff += 2*Math.PI;
-    if (Math.abs(diff) <= Math.PI/4) {
-      const primaryDist = (dir === 'left' || dir === 'right') ? Math.abs(dx) : Math.abs(dy);
-      if (primaryDist < bestDist) { bestDist = primaryDist; best = p; }
+    while (diff > Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    if (Math.abs(diff) <= Math.PI / 4) {
+      const primaryDist = dir === 'left' || dir === 'right' ? Math.abs(dx) : Math.abs(dy);
+      if (primaryDist < bestDist) {
+        bestDist = primaryDist;
+        best = p;
+      }
     }
   });
   if (best) activateSession(best.sessionId);
@@ -274,14 +403,18 @@ tabAddBtn.addEventListener('click', newSession);
 document.getElementById('btn-start-empty').addEventListener('click', newSession);
 
 document.getElementById('sp-close').addEventListener('click', hideSessionPicker);
-document.getElementById('session-picker').addEventListener('click', e => {
+document.getElementById('session-picker').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) hideSessionPicker();
 });
 function updateProjectName(cwd) {
   const el = document.getElementById('sb-project');
   const nameEl = document.getElementById('sb-project-name');
   const sepEl = document.getElementById('sb-project-sep');
-  if (!cwd) { el.style.display = 'none'; sepEl.style.display = 'none'; return; }
+  if (!cwd) {
+    el.style.display = 'none';
+    sepEl.style.display = 'none';
+    return;
+  }
   const parts = cwd.replace(/\/$/, '').split('/');
   nameEl.textContent = parts[parts.length - 1] || '~';
   el.style.display = '';
@@ -294,19 +427,19 @@ function getCurrentSessionCwd() {
   return meta?.cwd || undefined;
 }
 
-document.querySelectorAll('.sp-btn').forEach(btn => {
+document.querySelectorAll('.sp-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     const label = btn.dataset.label || 'Shell';
-    const cmd   = btn.dataset.cmd || null;
+    const cmd = btn.dataset.cmd || null;
     hideSessionPicker();
     wsSend({ type: 'session_create', name: label, cmd, cwd: getCurrentSessionCwd() });
   });
 });
 
-document.querySelectorAll('.btn-ai-quick').forEach(btn => {
+document.querySelectorAll('.btn-ai-quick').forEach((btn) => {
   btn.addEventListener('click', () => {
     const label = btn.dataset.label || btn.dataset.ai;
-    const cmd   = btn.dataset.cmd;
+    const cmd = btn.dataset.cmd;
     wsSend({ type: 'session_create', name: label, cmd, cwd: getCurrentSessionCwd() });
   });
 });
@@ -341,4 +474,7 @@ document.getElementById('explorer-refresh')?.addEventListener('click', requestFi
 
 // Diff modal is now handled internally by source-control.js
 
-loadSettings().then(() => { connect(handleMessage); startUsagePolling(); });
+loadSettings().then(() => {
+  connect(handleMessage);
+  startUsagePolling();
+});

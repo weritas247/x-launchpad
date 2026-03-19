@@ -17,9 +17,7 @@ export class ContextMenu {
     this.hide(); // remove previous
 
     // Filter items by `when` predicate
-    const visible = this._items.filter(it =>
-      it === '---' || !it.when || it.when(context)
-    );
+    const visible = this._items.filter((it) => it === '---' || !it.when || it.when(context));
 
     // Collapse adjacent/leading/trailing separators
     const cleaned = [];
@@ -69,7 +67,8 @@ export class ContextMenu {
       // Action sheet style (bottom of screen)
       menu.classList.add('mobile-action-sheet');
       this._backdrop = document.createElement('div');
-      this._backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:8999';
+      this._backdrop.style.cssText =
+        'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:8999';
       this._backdrop.addEventListener('click', () => this.hide());
       document.body.insertBefore(this._backdrop, menu);
     } else {

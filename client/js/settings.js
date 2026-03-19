@@ -25,7 +25,7 @@ export async function saveSettingsToServer(s) {
 export function applySettings(s) {
   S.settings = s;
 
-  const t = THEMES.find(x => x.id === s.appearance.theme) || THEMES[0];
+  const t = THEMES.find((x) => x.id === s.appearance.theme) || THEMES[0];
   applyTheme(t);
 
   applyEffects(s.appearance);
@@ -49,17 +49,29 @@ export function applyEffects(ap) {
     ? `repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,${intensity}) 2px,rgba(0,0,0,${intensity}) 4px)`
     : 'none';
   let scanlineStyle = document.getElementById('scanline-style');
-  if (!scanlineStyle) { scanlineStyle = document.createElement('style'); scanlineStyle.id='scanline-style'; document.head.appendChild(scanlineStyle); }
+  if (!scanlineStyle) {
+    scanlineStyle = document.createElement('style');
+    scanlineStyle.id = 'scanline-style';
+    document.head.appendChild(scanlineStyle);
+  }
   scanlineStyle.textContent = `body::before { background: ${beforeRule} !important; }`;
 
   const vig = ap.vignette !== false;
   let vigStyle = document.getElementById('vignette-style');
-  if (!vigStyle) { vigStyle = document.createElement('style'); vigStyle.id='vignette-style'; document.head.appendChild(vigStyle); }
+  if (!vigStyle) {
+    vigStyle = document.createElement('style');
+    vigStyle.id = 'vignette-style';
+    document.head.appendChild(vigStyle);
+  }
   vigStyle.textContent = vig ? '' : 'body::after { display: none !important; }';
 
   const flicker = ap.crtFlicker !== false;
   let flickerStyle = document.getElementById('flicker-style');
-  if (!flickerStyle) { flickerStyle = document.createElement('style'); flickerStyle.id='flicker-style'; document.head.appendChild(flickerStyle); }
+  if (!flickerStyle) {
+    flickerStyle = document.createElement('style');
+    flickerStyle.id = 'flicker-style';
+    document.head.appendChild(flickerStyle);
+  }
   flickerStyle.textContent = flicker ? '' : '#terminal-wrapper { animation: none !important; }';
 
   const dimOpacity = ap.screenDimOpacity ?? 0;
@@ -108,7 +120,7 @@ export function closeSettings() {
 function buildThemeGrid(selectedId) {
   const grid = document.getElementById('theme-grid');
   grid.innerHTML = '';
-  THEMES.forEach(t => {
+  THEMES.forEach((t) => {
     const card = document.createElement('div');
     card.className = 'theme-card' + (t.id === selectedId ? ' active' : '');
     card.dataset.themeId = t.id;
@@ -118,7 +130,7 @@ function buildThemeGrid(selectedId) {
       <span class="theme-card-check">✓</span>
     `;
     card.addEventListener('click', () => {
-      grid.querySelectorAll('.theme-card').forEach(c => c.classList.remove('active'));
+      grid.querySelectorAll('.theme-card').forEach((c) => c.classList.remove('active'));
       card.classList.add('active');
       S.pendingSettings.appearance.theme = t.id;
       applyTheme(t);
@@ -131,7 +143,7 @@ function buildThemeGrid(selectedId) {
 function buildKbList(kb) {
   const list = document.getElementById('kb-list');
   list.innerHTML = '';
-  KB_DEFS.forEach(def => {
+  KB_DEFS.forEach((def) => {
     const row = document.createElement('div');
     row.className = 'kb-row';
     const input = document.createElement('input');
@@ -150,10 +162,10 @@ function buildKbList(kb) {
         if (e.shiftKey) parts.push('Shift');
         if (e.altKey) parts.push('Alt');
         if (e.metaKey) parts.push('Meta');
-        if (!['Control','Shift','Alt','Meta'].includes(e.key)) {
+        if (!['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
           parts.push(normalizeKey(e));
         }
-        if (parts.length > 0 && !['Control','Shift','Alt','Meta'].includes(e.key)) {
+        if (parts.length > 0 && !['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
           const combo = parts.join('+');
           input.value = combo;
           S.pendingSettings.keybindings[def.key] = combo;
@@ -162,11 +174,15 @@ function buildKbList(kb) {
         }
       };
       document.addEventListener('keydown', handler, true);
-      input.addEventListener('blur', () => {
-        input.classList.remove('recording');
-        document.removeEventListener('keydown', handler, true);
-        if (input.value === 'Press keys...') input.value = kb[def.key] || '';
-      }, { once: true });
+      input.addEventListener(
+        'blur',
+        () => {
+          input.classList.remove('recording');
+          document.removeEventListener('keydown', handler, true);
+          if (input.value === 'Press keys...') input.value = kb[def.key] || '';
+        },
+        { once: true }
+      );
     });
 
     row.innerHTML = `<span class="kb-label">${def.label}</span>`;
@@ -181,7 +197,7 @@ function buildEnvList(env) {
   Object.entries(env || {}).forEach(([k, v]) => addEnvRow(k, v));
 }
 
-function addEnvRow(k='', v='') {
+function addEnvRow(k = '', v = '') {
   const list = document.getElementById('env-list');
   const row = document.createElement('div');
   row.className = 'env-row';
@@ -201,7 +217,7 @@ function addEnvRow(k='', v='') {
 
 function syncEnvToPending() {
   const env = {};
-  document.querySelectorAll('.env-row').forEach(row => {
+  document.querySelectorAll('.env-row').forEach((row) => {
     const k = row.querySelector('.env-key').value.trim();
     const v = row.querySelector('.env-val').value;
     if (k) env[k] = v;
@@ -263,7 +279,10 @@ function setSelectValue(id, val) {
   const el = document.getElementById(id);
   if (!el) return;
   for (let i = 0; i < el.options.length; i++) {
-    if (el.options[i].value === String(val)) { el.selectedIndex = i; return; }
+    if (el.options[i].value === String(val)) {
+      el.selectedIndex = i;
+      return;
+    }
   }
 }
 
@@ -273,7 +292,7 @@ function setRangeValue(id, val, _unit) {
   const numInput = document.getElementById(id + '-num');
   if (!range) return;
   range.value = val;
-  if (display) display.textContent = parseFloat(val).toFixed(val < 1 ? 2 : (val % 1 === 0 ? 0 : 1));
+  if (display) display.textContent = parseFloat(val).toFixed(val < 1 ? 2 : val % 1 === 0 ? 0 : 1);
   if (numInput) numInput.value = val;
 }
 
@@ -290,24 +309,33 @@ function readForm() {
 
   s.appearance.fontFamily = document.getElementById('s-fontFamily').value;
   const fontSizeNumEl = document.getElementById('s-fontSize-num');
-  s.appearance.fontSize = parseInt(fontSizeNumEl ? fontSizeNumEl.value : document.getElementById('s-fontSize').value) || 14;
+  s.appearance.fontSize =
+    parseInt(fontSizeNumEl ? fontSizeNumEl.value : document.getElementById('s-fontSize').value) ||
+    14;
   s.appearance.lineHeight = parseFloat(document.getElementById('s-lineHeight').value);
   s.appearance.cursorStyle = document.getElementById('s-cursorStyle').value;
   s.appearance.cursorBlink = document.getElementById('s-cursorBlink').checked;
   s.appearance.crtScanlines = document.getElementById('s-crtScanlines').checked;
-  s.appearance.crtScanlinesIntensity = parseFloat(document.getElementById('s-crtScanlinesIntensity').value);
+  s.appearance.crtScanlinesIntensity = parseFloat(
+    document.getElementById('s-crtScanlinesIntensity').value
+  );
   s.appearance.crtFlicker = document.getElementById('s-crtFlicker').checked;
   s.appearance.vignette = document.getElementById('s-vignette').checked;
   s.appearance.glowIntensity = parseFloat(document.getElementById('s-glowIntensity').value);
   s.appearance.backgroundOpacity = parseFloat(document.getElementById('s-backgroundOpacity').value);
   s.appearance.screenDimOpacity = parseFloat(document.getElementById('s-screenDimOpacity').value);
 
-  s.appearance.sidebarFontSize = parseInt(document.getElementById('s-sidebarFontSize')?.value) || 12;
-  s.appearance.statusBarFontSize = parseInt(document.getElementById('s-statusBarFontSize')?.value) || 11;
+  s.appearance.sidebarFontSize =
+    parseInt(document.getElementById('s-sidebarFontSize')?.value) || 12;
+  s.appearance.statusBarFontSize =
+    parseInt(document.getElementById('s-statusBarFontSize')?.value) || 11;
   s.appearance.tabBarFontSize = parseInt(document.getElementById('s-tabBarFontSize')?.value) || 12;
-  s.appearance.inputPanelFontSize = parseInt(document.getElementById('s-inputPanelFontSize')?.value) || 11;
-  s.appearance.fileViewerFontSize = parseInt(document.getElementById('s-fileViewerFontSize')?.value) || 13;
-  s.appearance.gitGraphFontSize = parseInt(document.getElementById('s-gitGraphFontSize')?.value) || 12;
+  s.appearance.inputPanelFontSize =
+    parseInt(document.getElementById('s-inputPanelFontSize')?.value) || 11;
+  s.appearance.fileViewerFontSize =
+    parseInt(document.getElementById('s-fileViewerFontSize')?.value) || 13;
+  s.appearance.gitGraphFontSize =
+    parseInt(document.getElementById('s-gitGraphFontSize')?.value) || 12;
 
   s.terminal.scrollback = parseInt(document.getElementById('s-scrollback').value);
   s.terminal.bellStyle = document.getElementById('s-bellStyle').value;
@@ -331,28 +359,35 @@ function readForm() {
 }
 
 function activateNavPanel(panelId) {
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.panel === panelId));
-  document.querySelectorAll('.settings-panel').forEach(el => el.classList.toggle('active', el.id === `panel-${panelId}`));
+  document
+    .querySelectorAll('.nav-item')
+    .forEach((el) => el.classList.toggle('active', el.dataset.panel === panelId));
+  document
+    .querySelectorAll('.settings-panel')
+    .forEach((el) => el.classList.toggle('active', el.id === `panel-${panelId}`));
 }
 
 export function initSettingsUI() {
-  document.getElementById('settings-nav').addEventListener('click', e => {
+  document.getElementById('settings-nav').addEventListener('click', (e) => {
     const item = e.target.closest('.nav-item');
     if (!item) return;
     activateNavPanel(item.dataset.panel);
   });
 
-  document.querySelectorAll('.s-range').forEach(range => {
+  document.querySelectorAll('.s-range').forEach((range) => {
     range.addEventListener('input', () => {
       const valEl = document.getElementById(range.id + '-val');
       const numInput = document.getElementById(range.id + '-num');
       if (valEl) {
         const v = parseFloat(range.value);
-        valEl.textContent = v.toFixed(v < 1 ? 2 : (v % 1 === 0 ? 0 : 1));
+        valEl.textContent = v.toFixed(v < 1 ? 2 : v % 1 === 0 ? 0 : 1);
       }
       if (numInput) numInput.value = range.value;
       if (range.id === 's-fontSize' || range.id === 's-lineHeight') {
-        updateFontPreview(document.getElementById('s-fontFamily').value, document.getElementById('s-fontSize').value);
+        updateFontPreview(
+          document.getElementById('s-fontFamily').value,
+          document.getElementById('s-fontSize').value
+        );
       }
     });
   });
@@ -366,7 +401,7 @@ export function initSettingsUI() {
     });
   }
 
-  document.getElementById('s-fontFamily').addEventListener('change', e => {
+  document.getElementById('s-fontFamily').addEventListener('change', (e) => {
     updateFontPreview(e.target.value, document.getElementById('s-fontSize').value);
   });
 
@@ -383,10 +418,13 @@ export function initSettingsUI() {
 
   document.getElementById('btn-cancel-settings').addEventListener('click', closeSettings);
   document.getElementById('settings-close').addEventListener('click', closeSettings);
-  settingsOverlay.addEventListener('click', e => { if (e.target === settingsOverlay) closeSettings(); });
+  settingsOverlay.addEventListener('click', (e) => {
+    if (e.target === settingsOverlay) closeSettings();
+  });
 
   document.getElementById('btn-reset-settings').addEventListener('click', async () => {
-    if (!await confirmModal('Reset ALL settings to defaults? This cannot be undone.', 'Reset')) return;
+    if (!(await confirmModal('Reset ALL settings to defaults? This cannot be undone.', 'Reset')))
+      return;
     const r = await apiFetch('/api/settings/default');
     const def = await r.json();
     S.pendingSettings = def;
@@ -407,7 +445,7 @@ export function initSettingsUI() {
   document.getElementById('btn-import').addEventListener('click', () => {
     document.getElementById('import-file-input').click();
   });
-  document.getElementById('import-file-input').addEventListener('change', e => {
+  document.getElementById('import-file-input').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -422,7 +460,7 @@ export function initSettingsUI() {
         const statusEl = document.getElementById('import-status');
         statusEl.textContent = '✓ Settings imported successfully';
         statusEl.style.display = 'block';
-        setTimeout(() => statusEl.style.display = 'none', 3000);
+        setTimeout(() => (statusEl.style.display = 'none'), 3000);
       } catch {
         alert('Failed to parse settings file. Make sure it is a valid JSON.');
       }

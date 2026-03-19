@@ -15,7 +15,7 @@ let focusedRowIdx = -1;
 let isLoadingMore = false;
 let hasMore = false;
 let currentSkip = 0;
-const PAGE_SIZE = 50;
+// const PAGE_SIZE = 50; // reserved for future pagination
 const MAX_COMMITS = 500;
 let scrollRAF = null;
 
@@ -25,44 +25,44 @@ let searchQuery = '';
 let searchDebounce = null;
 
 // ─── DOM REFS ────────────────────────────────────────
-const overlay   = document.getElementById('git-graph-overlay');
-const repoName  = document.getElementById('gg-repo-name');
+const overlay = document.getElementById('git-graph-overlay');
+const repoName = document.getElementById('gg-repo-name');
 const branchBdg = document.getElementById('gg-branch-badge');
-const loading   = document.getElementById('gg-loading');
-const errorEl   = document.getElementById('gg-error');
-const content   = document.getElementById('gg-content');
-const svgEl     = document.getElementById('gg-svg');
+const loading = document.getElementById('gg-loading');
+const errorEl = document.getElementById('gg-error');
+const content = document.getElementById('gg-content');
+const svgEl = document.getElementById('gg-svg');
 const commitBox = document.getElementById('gg-commits');
 const filePanel = document.getElementById('gg-file-panel');
-const fileList  = document.getElementById('gg-file-list');
+const fileList = document.getElementById('gg-file-list');
 const fileTitle = document.getElementById('gg-file-title');
 const commitBody = document.getElementById('gg-commit-body');
-const sbBranch  = document.getElementById('sb-branch');
-const sbBrSep   = document.getElementById('sb-branch-sep');
-const sbBrName  = document.getElementById('sb-branch-name');
-const loadMore   = document.getElementById('gg-load-more');
+const sbBranch = document.getElementById('sb-branch');
+const sbBrSep = document.getElementById('sb-branch-sep');
+const sbBrName = document.getElementById('sb-branch-name');
+const loadMore = document.getElementById('gg-load-more');
 const searchToggle = document.getElementById('gg-search-toggle');
-const searchBar    = document.getElementById('gg-search-bar');
-const searchInput  = document.getElementById('gg-search-input');
-const searchEmpty  = document.getElementById('gg-search-empty');
+const searchBar = document.getElementById('gg-search-bar');
+const searchInput = document.getElementById('gg-search-input');
+const searchEmpty = document.getElementById('gg-search-empty');
 
 // Branch dropdown
 const branchDropdown = document.getElementById('gg-branch-dropdown');
-const branchTrigger  = document.getElementById('gg-branch-trigger');
-const branchMenu     = document.getElementById('gg-branch-menu');
+const branchTrigger = document.getElementById('gg-branch-trigger');
+const branchMenu = document.getElementById('gg-branch-menu');
 
 // GitHub button & Pull button
 const githubBtn = document.getElementById('gg-github-btn');
-const pullBtn   = document.getElementById('gg-pull-btn');
+const pullBtn = document.getElementById('gg-pull-btn');
 
 // Confirm dialog
-const confirmEl      = document.getElementById('gg-confirm');
+const confirmEl = document.getElementById('gg-confirm');
 const confirmMessage = document.getElementById('gg-confirm-message');
-const confirmOk      = document.getElementById('gg-confirm-ok');
-const confirmCancel  = document.getElementById('gg-confirm-cancel');
+const confirmOk = document.getElementById('gg-confirm-ok');
+const confirmCancel = document.getElementById('gg-confirm-cancel');
 
 // Modal + resize
-const modal       = document.getElementById('git-graph-modal');
+const modal = document.getElementById('git-graph-modal');
 const resizeHandle = document.getElementById('gg-resize-handle');
 
 const STORAGE_KEY = 'gg-modal-size';
@@ -79,10 +79,13 @@ function restoreModalSize() {
 
 function saveModalSize() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      w: modal.offsetWidth,
-      h: modal.offsetHeight,
-    }));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        w: modal.offsetWidth,
+        h: modal.offsetHeight,
+      })
+    );
   } catch {}
 }
 
@@ -132,18 +135,25 @@ export function openGitGraph() {
   // Close dropdown on outside click
   if (dropdownAbort) dropdownAbort.abort();
   dropdownAbort = new AbortController();
-  document.addEventListener('click', e => {
-    if (!branchDropdown.contains(e.target)) {
-      branchMenu.classList.remove('open');
-    }
-  }, { signal: dropdownAbort.signal });
+  document.addEventListener(
+    'click',
+    (e) => {
+      if (!branchDropdown.contains(e.target)) {
+        branchMenu.classList.remove('open');
+      }
+    },
+    { signal: dropdownAbort.signal }
+  );
 }
 
 export function closeGitGraph() {
   isOpen = false;
   overlay.classList.remove('open');
   branchMenu.classList.remove('open');
-  if (dropdownAbort) { dropdownAbort.abort(); dropdownAbort = null; }
+  if (dropdownAbort) {
+    dropdownAbort.abort();
+    dropdownAbort = null;
+  }
 }
 
 export function isGitGraphOpen() {
@@ -173,14 +183,21 @@ export function handleGitGraphKeydown(e) {
   // Escape — close search first, then modal
   if (e.key === 'Escape') {
     e.preventDefault();
-    if (searchActive) { closeSearch(); return true; }
+    if (searchActive) {
+      closeSearch();
+      return true;
+    }
     closeGitGraph();
     return true;
   }
 
   // Confirm dialog is open — Enter confirms
   if (confirmEl.style.display === 'flex') {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doCheckout(); return true; }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      doCheckout();
+      return true;
+    }
     return false;
   }
 
@@ -196,7 +213,13 @@ export function handleGitGraphKeydown(e) {
   }
 
   // Typing while result list is focused → re-focus search input
-  if (searchActive && document.activeElement !== searchInput && e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
+  if (
+    searchActive &&
+    document.activeElement !== searchInput &&
+    e.key.length === 1 &&
+    !e.metaKey &&
+    !e.ctrlKey
+  ) {
     searchInput.focus();
     return false; // let the keystroke pass through to the input
   }
@@ -312,7 +335,7 @@ export function handleGitGraphData(msg) {
 }
 
 export function handleGitFileListData(msg) {
-  const commit = cachedCommits.find(c => c.hash === msg.hash);
+  const commit = cachedCommits.find((c) => c.hash === msg.hash);
 
   filePanel.style.display = 'block';
 
@@ -325,15 +348,18 @@ export function handleGitFileListData(msg) {
 
   if (!msg.files || msg.files.length === 0) {
     fileTitle.textContent = commit?.body ? 'Commit message' : 'Details';
-    fileList.innerHTML = '<div class="gg-file-item" style="color:var(--text-ghost)">No changed files</div>';
+    fileList.innerHTML =
+      '<div class="gg-file-item" style="color:var(--text-ghost)">No changed files</div>';
     return;
   }
 
   fileTitle.textContent = `Changed files (${msg.files.length})`;
-  fileList.innerHTML = msg.files.map(f => {
-    const stat = fileStatBadge(f.additions, f.deletions);
-    return `<div class="gg-file-item"><span class="gg-file-status gg-file-status-${escHtml(f.status)}">${escHtml(f.status)}</span><span class="gg-file-path">${escHtml(f.path)}</span>${stat}</div>`;
-  }).join('');
+  fileList.innerHTML = msg.files
+    .map((f) => {
+      const stat = fileStatBadge(f.additions, f.deletions);
+      return `<div class="gg-file-item"><span class="gg-file-status gg-file-status-${escHtml(f.status)}">${escHtml(f.status)}</span><span class="gg-file-path">${escHtml(f.path)}</span>${stat}</div>`;
+    })
+    .join('');
 }
 
 export function handleGitBranchData(msg) {
@@ -351,21 +377,27 @@ export function handleGitBranchData(msg) {
 export function handleGitBranchListData(msg) {
   if (!msg.branches || msg.branches.length === 0) return;
 
-  const local = msg.branches.filter(b => !b.isRemote);
-  const remote = msg.branches.filter(b => b.isRemote);
+  const local = msg.branches.filter((b) => !b.isRemote);
+  const remote = msg.branches.filter((b) => b.isRemote);
 
   let html = '';
   if (local.length > 0) {
     html += '<div class="gg-branch-menu-label">LOCAL</div>';
-    html += local.map(b =>
-      `<div class="gg-branch-item${b.isCurrent ? ' current' : ''}" data-branch="${escHtml(b.name)}">${escHtml(b.name)}</div>`
-    ).join('');
+    html += local
+      .map(
+        (b) =>
+          `<div class="gg-branch-item${b.isCurrent ? ' current' : ''}" data-branch="${escHtml(b.name)}">${escHtml(b.name)}</div>`
+      )
+      .join('');
   }
   if (remote.length > 0) {
     html += '<div class="gg-branch-menu-label">REMOTE</div>';
-    html += remote.map(b =>
-      `<div class="gg-branch-item gg-branch-item-remote" data-branch="${escHtml(b.name)}">${escHtml(b.name)}</div>`
-    ).join('');
+    html += remote
+      .map(
+        (b) =>
+          `<div class="gg-branch-item gg-branch-item-remote" data-branch="${escHtml(b.name)}">${escHtml(b.name)}</div>`
+      )
+      .join('');
   }
   branchMenu.innerHTML = html;
 }
@@ -397,7 +429,10 @@ let pullTimer = null;
 function resetPullBtn() {
   pullBtn.classList.remove('pulling', 'pull-ok', 'pull-err');
   pullBtn.textContent = '⬇ Pull';
-  if (pullTimer) { clearTimeout(pullTimer); pullTimer = null; }
+  if (pullTimer) {
+    clearTimeout(pullTimer);
+    pullTimer = null;
+  }
 }
 
 function doPull() {
@@ -415,7 +450,10 @@ function doPull() {
 }
 
 function finishPull(isError) {
-  if (pullTimer) { clearTimeout(pullTimer); pullTimer = null; }
+  if (pullTimer) {
+    clearTimeout(pullTimer);
+    pullTimer = null;
+  }
   pullBtn.classList.remove('pulling');
   if (isError) {
     pullBtn.classList.add('pull-err');
@@ -442,14 +480,15 @@ export function handleGitGraphSearchData(msg) {
   if (!searchActive || msg.query !== searchQuery) return;
 
   const q = msg.query.toLowerCase();
-  const clientResults = cachedCommits.filter(c =>
-    c.message.toLowerCase().includes(q) ||
-    c.author.toLowerCase().includes(q) ||
-    c.hash.toLowerCase().startsWith(q)
+  const clientResults = cachedCommits.filter(
+    (c) =>
+      c.message.toLowerCase().includes(q) ||
+      c.author.toLowerCase().includes(q) ||
+      c.hash.toLowerCase().startsWith(q)
   );
 
   // Merge server + client results, dedup by hash
-  const seen = new Set(clientResults.map(c => c.hash));
+  const seen = new Set(clientResults.map((c) => c.hash));
   const merged = [...clientResults];
   if (msg.commits) {
     for (const c of msg.commits) {
@@ -503,10 +542,10 @@ export function requestBranch(sessionId) {
 function relTime(iso) {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
   if (diff < 60) return 'now';
-  if (diff < 3600) return `${Math.floor(diff/60)}m`;
-  if (diff < 86400) return `${Math.floor(diff/3600)}h`;
-  if (diff < 604800) return `${Math.floor(diff/86400)}d`;
-  return `${Math.floor(diff/604800)}w`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
+  return `${Math.floor(diff / 604800)}w`;
 }
 
 function isWithinOneHour(iso) {
@@ -516,15 +555,16 @@ function isWithinOneHour(iso) {
 function absTime(iso) {
   const d = new Date(iso);
   const now = new Date();
-  const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const h = d.getHours();
   const ampm = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 || 12;
   const min = String(d.getMinutes()).padStart(2, '0');
   const timeStr = `${h12}:${min}\u202F${ampm}`;
-  const isToday = d.getFullYear() === now.getFullYear() &&
-                  d.getMonth() === now.getMonth() &&
-                  d.getDate() === now.getDate();
+  const isToday =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
   if (isToday) return `Today at ${timeStr}`;
   return `${mon[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} at ${timeStr}`;
 }
@@ -556,11 +596,12 @@ function coAuthorAvatar(author) {
 
 function coAuthorBadge(coAuthors) {
   if (!coAuthors.length) return '';
-  return coAuthors.map(a => coAuthorAvatar(a)).join('');
+  return coAuthors.map((a) => coAuthorAvatar(a)).join('');
 }
 
 // ─── STAT BADGE ──────────────────────────────────────
-function statBadge(add, del) {
+function _statBadge(add, del) {
+  // eslint-disable-line no-unused-vars
   if (!add && !del) return '';
   const parts = [];
   if (add) parts.push(`<span class="gg-stat-add">+${add}</span>`);
@@ -600,7 +641,7 @@ function computeLayout(commits) {
   const PAD_Y = ROW_H / 2;
 
   // Pass 1: assign lanes
-  const lanes = [];  // active lane slots: each holds expected commit hash
+  const lanes = []; // active lane slots: each holds expected commit hash
   const positions = new Map(); // hash -> { x, y, col, color }
   const edges = []; // { x1, y1, x2, y2, color }
 
@@ -610,7 +651,10 @@ function computeLayout(commits) {
     if (col === -1) {
       // New lane — find first empty or append
       col = lanes.indexOf(null);
-      if (col === -1) { col = lanes.length; lanes.push(null); }
+      if (col === -1) {
+        col = lanes.length;
+        lanes.push(null);
+      }
     }
     lanes[col] = null; // free the slot
 
@@ -631,7 +675,10 @@ function computeLayout(commits) {
         let pcol = lanes.indexOf(ph);
         if (pcol === -1) {
           pcol = lanes.indexOf(null);
-          if (pcol === -1) { pcol = lanes.length; lanes.push(null); }
+          if (pcol === -1) {
+            pcol = lanes.length;
+            lanes.push(null);
+          }
           lanes[pcol] = ph;
         }
       }
@@ -652,7 +699,7 @@ function computeLayout(commits) {
     }
   }
 
-  const maxCol = Math.max(...Array.from(positions.values()).map(p => p.col), 0);
+  const maxCol = Math.max(...Array.from(positions.values()).map((p) => p.col), 0);
   const svgWidth = PAD_X * 2 + maxCol * COL_W + 8;
   const svgHeight = PAD_Y + commits.length * ROW_H;
 
@@ -695,27 +742,32 @@ function renderGraph(commits) {
   svgEl.innerHTML = svg;
 
   // Commit rows
-  commitBox.innerHTML = commits.map((c, i) => {
-    const refs = c.refs.length > 0 ? `<span class="gg-refs">${c.refs.map(refBadge).join('')}</span>` : '';
-    const coAuthors = parseCoAuthors(c.body);
-    const coAuthorHtml = coAuthorBadge(coAuthors);
-    return `<div class="gg-row" data-hash="${escHtml(c.hash)}" style="height:${ROW_H}px">` +
-      `<span class="gg-msg">${refs}${escHtml(c.message)}</span>` +
-      `<span class="gg-author">${escHtml(c.author)}${coAuthorHtml}</span>` +
-      `<span class="gg-hash" data-hash="${escHtml(c.hash)}">${escHtml(c.hash.slice(0,7))}</span>` +
-      `<span class="gg-time">${isWithinOneHour(c.date) ? relTime(c.date) + ' ago' : absTime(c.date)}</span>` +
-      `</div>`;
-  }).join('');
+  commitBox.innerHTML = commits
+    .map((c, _i) => {
+      const refs =
+        c.refs.length > 0 ? `<span class="gg-refs">${c.refs.map(refBadge).join('')}</span>` : '';
+      const coAuthors = parseCoAuthors(c.body);
+      const coAuthorHtml = coAuthorBadge(coAuthors);
+      return (
+        `<div class="gg-row" data-hash="${escHtml(c.hash)}" style="height:${ROW_H}px">` +
+        `<span class="gg-msg">${refs}${escHtml(c.message)}</span>` +
+        `<span class="gg-author">${escHtml(c.author)}${coAuthorHtml}</span>` +
+        `<span class="gg-hash" data-hash="${escHtml(c.hash)}">${escHtml(c.hash.slice(0, 7))}</span>` +
+        `<span class="gg-time">${isWithinOneHour(c.date) ? relTime(c.date) + ' ago' : absTime(c.date)}</span>` +
+        `</div>`
+      );
+    })
+    .join('');
 }
 
 // ─── COMMIT SELECT (no toggle, for keyboard nav) ────
 function selectCommit(hash) {
   if (selectedHash === hash) return;
   selectedHash = hash;
-  commitBox.querySelectorAll('.gg-row').forEach(r => {
+  commitBox.querySelectorAll('.gg-row').forEach((r) => {
     r.classList.toggle('selected', r.dataset.hash === hash);
   });
-  const commit = cachedCommits.find(c => c.hash === hash);
+  const commit = cachedCommits.find((c) => c.hash === hash);
   if (commit?.body) {
     commitBody.style.display = 'block';
     commitBody.textContent = commit.body;
@@ -733,16 +785,16 @@ function onCommitClick(hash) {
     selectedHash = null;
     filePanel.style.display = 'none';
     commitBody.style.display = 'none';
-    commitBox.querySelectorAll('.gg-row').forEach(r => r.classList.remove('selected'));
+    commitBox.querySelectorAll('.gg-row').forEach((r) => r.classList.remove('selected'));
     return;
   }
   selectedHash = hash;
-  commitBox.querySelectorAll('.gg-row').forEach(r => {
+  commitBox.querySelectorAll('.gg-row').forEach((r) => {
     r.classList.toggle('selected', r.dataset.hash === hash);
   });
 
   // Show body immediately if available
-  const commit = cachedCommits.find(c => c.hash === hash);
+  const commit = cachedCommits.find((c) => c.hash === hash);
   if (commit?.body) {
     commitBody.style.display = 'block';
     commitBody.textContent = commit.body;
@@ -772,7 +824,10 @@ function closeSearch() {
   searchInput.value = '';
   searchQuery = '';
   searchEmpty.style.display = 'none';
-  if (searchDebounce) { clearTimeout(searchDebounce); searchDebounce = null; }
+  if (searchDebounce) {
+    clearTimeout(searchDebounce);
+    searchDebounce = null;
+  }
   // Restore full commit list
   renderGraph(cachedCommits);
   modal.focus();
@@ -788,10 +843,11 @@ function doSearch(query) {
 
   const q = query.toLowerCase();
   // Client-side filter first
-  const clientResults = cachedCommits.filter(c =>
-    c.message.toLowerCase().includes(q) ||
-    c.author.toLowerCase().includes(q) ||
-    c.hash.toLowerCase().startsWith(q)
+  const clientResults = cachedCommits.filter(
+    (c) =>
+      c.message.toLowerCase().includes(q) ||
+      c.author.toLowerCase().includes(q) ||
+      c.hash.toLowerCase().startsWith(q)
   );
 
   if (clientResults.length >= 10) {
@@ -828,7 +884,7 @@ function highlightMatches(query) {
   if (!query) return;
   const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const regex = new RegExp('(' + escaped + ')', 'gi');
-  commitBox.querySelectorAll('.gg-msg').forEach(el => {
+  commitBox.querySelectorAll('.gg-msg').forEach((el) => {
     // Only highlight text nodes, preserve ref badges
     const refs = el.querySelector('.gg-refs');
     const refsHtml = refs ? refs.outerHTML : '';
@@ -836,25 +892,27 @@ function highlightMatches(query) {
     const highlighted = escHtml(textOnly).replace(regex, '<span class="gg-highlight">$1</span>');
     el.innerHTML = refsHtml + highlighted;
   });
-  commitBox.querySelectorAll('.gg-author').forEach(el => {
+  commitBox.querySelectorAll('.gg-author').forEach((el) => {
     // Preserve co-author badges
     const imgs = el.querySelectorAll('.gg-coauthor-img, .gg-coauthor-initial');
     const authorText = el.childNodes[0]?.textContent || '';
     const highlighted = escHtml(authorText).replace(regex, '<span class="gg-highlight">$1</span>');
     el.innerHTML = highlighted;
-    imgs.forEach(img => el.appendChild(img));
+    imgs.forEach((img) => el.appendChild(img));
   });
 }
 
 // ─── EVENT LISTENERS ─────────────────────────────────
 document.getElementById('gg-close').addEventListener('click', closeGitGraph);
-overlay.addEventListener('click', e => { if (e.target === overlay) closeGitGraph(); });
+overlay.addEventListener('click', (e) => {
+  if (e.target === overlay) closeGitGraph();
+});
 document.getElementById('gg-file-close').addEventListener('click', () => {
   filePanel.style.display = 'none';
   commitBody.style.display = 'none';
 });
 
-commitBox.addEventListener('click', e => {
+commitBox.addEventListener('click', (e) => {
   // Hash click → copy to clipboard
   const hashEl = e.target.closest('.gg-hash');
   if (hashEl) {
@@ -888,12 +946,12 @@ commitBox.addEventListener('click', e => {
 sbBranch.addEventListener('click', () => openGitGraph());
 
 // Branch dropdown
-branchTrigger.addEventListener('click', e => {
+branchTrigger.addEventListener('click', (e) => {
   e.stopPropagation();
   branchMenu.classList.toggle('open');
 });
 
-branchMenu.addEventListener('click', e => {
+branchMenu.addEventListener('click', (e) => {
   const item = e.target.closest('.gg-branch-item');
   if (!item) return;
   branchMenu.classList.remove('open');
@@ -929,7 +987,7 @@ searchInput.addEventListener('input', () => {
 });
 
 // Cmd/Ctrl+F to toggle search
-document.addEventListener('keydown', e => {
+document.addEventListener('keydown', (e) => {
   if (!isOpen) return;
   if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
     e.preventDefault();
@@ -939,7 +997,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ─── RESIZE ──────────────────────────────────────────
-resizeHandle.addEventListener('mousedown', e => {
+resizeHandle.addEventListener('mousedown', (e) => {
   e.preventDefault();
   const startX = e.clientX;
   const startY = e.clientY;
