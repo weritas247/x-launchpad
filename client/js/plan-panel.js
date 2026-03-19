@@ -16,10 +16,24 @@ const countEl = document.getElementById('sb-plan-count');
 const catSelect = document.getElementById('plan-cat-select');
 const catTabsEl = document.getElementById('plan-category-tabs');
 
+const boardEl = document.getElementById('plan-board');
+const listColEl = document.getElementById('plan-list-col');
+const editorColEl = document.getElementById('plan-editor-col');
+const viewToggleEl = document.getElementById('plan-view-toggle');
+const statusSelect = document.getElementById('plan-status-select');
+const logsListEl = document.getElementById('plan-logs-list');
+const toastContainer = document.getElementById('plan-toast-container');
+const ctxMenuEl = document.getElementById('plan-ctx-menu');
+
 let plans = [];
 let activeId = null;
 let activeCategory = 'all';
 let saveTimer = null;
+let currentView = localStorage.getItem('plan-view') || 'list';
+let ctxTargetPlanId = null;
+
+const STATUSES = ['todo', 'doing', 'done', 'on_hold', 'cancelled'];
+const STATUS_LABELS = { todo: 'TODO', doing: 'DOING', done: 'DONE', on_hold: 'ON HOLD', cancelled: 'CANCELLED' };
 
 // ─── API ─────────────────────────────────────────────
 async function loadPlans() {
@@ -32,6 +46,8 @@ async function loadPlans() {
         title: p.title || '',
         content: p.content || '',
         category: p.category || 'other',
+        status: p.status || 'todo',
+        ai_done: p.ai_done || false,
         created: new Date(p.created_at).getTime(),
         updated: new Date(p.updated_at).getTime(),
       }));
@@ -102,6 +118,8 @@ function createPlan() {
     title: '',
     content: '',
     category: cat,
+    status: 'todo',
+    ai_done: false,
     created: Date.now(),
     updated: Date.now(),
   };
@@ -143,6 +161,8 @@ function selectPlan(id) {
   contentInput.value = plan.content;
   catSelect.value = plan.category || 'other';
   dateEl.textContent = formatDate(plan.updated);
+  if (statusSelect) statusSelect.value = plan.status || 'todo';
+  loadPlanLogs(id);
 
   listEl.querySelectorAll('.plan-item').forEach(el => {
     el.classList.toggle('active', el.dataset.id === id);
@@ -193,6 +213,26 @@ function switchCategory(cat) {
   }
 }
 
+// ─── View switching ──────────────────────────────────
+function switchView(view) {
+  currentView = view;
+  localStorage.setItem('plan-view', view);
+  viewToggleEl?.querySelectorAll('.plan-view-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === view);
+  });
+  if (view === 'board') {
+    if (boardEl) boardEl.style.display = 'flex';
+    if (listColEl) listColEl.style.display = 'none';
+    if (editorColEl) editorColEl.style.display = 'none';
+    renderBoard();
+  } else {
+    if (boardEl) boardEl.style.display = 'none';
+    if (listColEl) listColEl.style.display = '';
+    if (editorColEl) editorColEl.style.display = '';
+    renderList();
+  }
+}
+
 // ─── Rendering ──────────────────────────────────────
 function renderList() {
   if (!listEl) return;
@@ -203,13 +243,42 @@ function renderList() {
     const date = formatDate(p.updated);
     const active = p.id === activeId ? ' active' : '';
     const catLabel = CATEGORIES[p.category] || '기타';
+    const statusLabel = STATUS_LABELS[p.status || 'todo'] || 'TODO';
     return `<div class="plan-item${active}" data-id="${p.id}">
       <span class="plan-item-cat" data-cat="${p.category || 'other'}">${catLabel}</span>
+      <span class="plan-item-status">${statusLabel}</span>
       <div class="plan-item-title">${title}</div>
       <div class="plan-item-preview">${preview || 'No content'}</div>
       <div class="plan-item-date">${date}</div>
     </div>`;
   }).join('');
+}
+
+function renderBoard() {
+  const filtered = filteredPlans();
+  for (const status of STATUSES) {
+    const col = document.getElementById(`plan-board-${status}`);
+    const countBadge = document.getElementById(`plan-board-count-${status}`);
+    if (!col) continue;
+    const cards = filtered.filter(p => (p.status || 'todo') === status);
+    if (countBadge) countBadge.textContent = cards.length;
+    col.innerHTML = cards.map(p => {
+      const title = escHtml(p.title || 'Untitled');
+      const preview = escHtml((p.content || '').slice(0, 60).replace(/\n/g, ' '));
+      const date = formatDate(p.updated);
+      const catLabel = CATEGORIES[p.category] || '기타';
+      const aiBadge = p.ai_done ? '<span class="plan-board-card-ai-badge">✅ AI</span>' : '';
+      return `<div class="plan-board-card" draggable="true" data-id="${p.id}" data-cat="${p.category || 'other'}">
+        <div class="plan-board-card-title">${title}</div>
+        <div class="plan-board-card-preview">${preview || 'No content'}</div>
+        <div class="plan-board-card-footer">
+          <span class="plan-board-card-cat">${catLabel}</span>
+          <span>${aiBadge}</span>
+          <span class="plan-board-card-date">${date}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
 }
 
 function formatDate(ts) {
@@ -223,6 +292,111 @@ function formatDate(ts) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`;
 }
 
+// ─── Drag and Drop ───────────────────────────────────
+function initBoardDragDrop() {
+  boardEl?.addEventListener('dragstart', e => {
+    const card = e.target.closest('.plan-board-card');
+    if (!card) return;
+    card.classList.add('dragging');
+    e.dataTransfer.setData('text/plain', card.dataset.id);
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  boardEl?.addEventListener('dragend', e => {
+    const card = e.target.closest('.plan-board-card');
+    if (card) card.classList.remove('dragging');
+    boardEl.querySelectorAll('.plan-board-col').forEach(col => col.classList.remove('drag-over'));
+  });
+  boardEl?.querySelectorAll('.plan-board-col').forEach(col => {
+    col.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      col.classList.add('drag-over');
+    });
+    col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+    col.addEventListener('drop', async e => {
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      const planId = e.dataTransfer.getData('text/plain');
+      const newStatus = col.dataset.status;
+      if (!planId || !newStatus) return;
+      const plan = plans.find(p => p.id === planId);
+      if (!plan || plan.status === newStatus) return;
+      plan.status = newStatus;
+      plan.ai_done = false;
+      renderBoard();
+      updateCount();
+      try {
+        await apiFetch(`/api/plans/${planId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        });
+      } catch (err) {
+        console.error('[plan] status update failed:', err);
+        await loadPlans();
+        renderBoard();
+      }
+    });
+  });
+}
+
+// ─── Context Menu ────────────────────────────────────
+function showPlanCtxMenu(x, y, planId) {
+  ctxTargetPlanId = planId;
+  if (!ctxMenuEl) return;
+  ctxMenuEl.style.display = 'block';
+  ctxMenuEl.style.left = Math.min(x, window.innerWidth - 180) + 'px';
+  ctxMenuEl.style.top = Math.min(y, window.innerHeight - 250) + 'px';
+}
+
+function hidePlanCtxMenu() {
+  if (ctxMenuEl) ctxMenuEl.style.display = 'none';
+  ctxTargetPlanId = null;
+}
+
+// ─── Activity Log ─────────────────────────────────────
+async function loadPlanLogs(planId) {
+  if (!logsListEl) return;
+  try {
+    const res = await apiFetch(`/api/plans/${planId}/logs`);
+    const data = await res.json();
+    if (!data.ok) { logsListEl.innerHTML = ''; return; }
+    logsListEl.innerHTML = data.logs.map(log => {
+      const icon = log.type === 'commit' ? '🔨' : '📝';
+      const hash = log.commit_hash ? `<span class="plan-log-hash">${escHtml(log.commit_hash.slice(0, 7))}</span>` : '';
+      const time = formatDate(new Date(log.created_at).getTime());
+      return `<div class="plan-log-item">
+        <span class="plan-log-icon">${icon}</span>
+        <span class="plan-log-content">${escHtml(log.content)} ${hash}</span>
+        <span class="plan-log-time">${time}</span>
+      </div>`;
+    }).join('');
+  } catch {
+    logsListEl.innerHTML = '';
+  }
+}
+
+// ─── Toast ───────────────────────────────────────────
+export function showPlanToast(planId, title, status) {
+  if (!toastContainer) return;
+  const statusLabel = STATUS_LABELS[status] || status;
+  const toast = document.createElement('div');
+  toast.className = 'plan-toast';
+  toast.innerHTML = `
+    <div class="plan-toast-title">${escHtml(title || 'Untitled')}</div>
+    <div class="plan-toast-status">${statusLabel} ✅ AI 완료</div>
+  `;
+  toast.addEventListener('click', () => {
+    openPlanModal().then(() => selectPlan(planId));
+    toast.remove();
+  });
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('fade-out');
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+}
+
 // ─── Auth check ─────────────────────────────────────
 function isLoggedIn() {
   return !!getAuthToken();
@@ -233,7 +407,8 @@ export async function openPlanModal() {
   if (!isLoggedIn()) return;
   await loadPlans();
   if (activeId && !plans.find(p => p.id === activeId)) activeId = null;
-  renderList();
+  if (currentView === 'board') renderBoard();
+  else renderList();
   const filtered = filteredPlans();
   if (activeId && filtered.find(p => p.id === activeId)) {
     selectPlan(activeId);
@@ -318,6 +493,91 @@ export function initPlanPanel() {
   // Auto-save on input
   titleInput?.addEventListener('input', scheduleSave);
   contentInput?.addEventListener('input', scheduleSave);
+
+  // View toggle
+  viewToggleEl?.addEventListener('click', e => {
+    const btn = e.target.closest('.plan-view-btn');
+    if (btn) switchView(btn.dataset.view);
+  });
+
+  // Status select change
+  statusSelect?.addEventListener('change', async () => {
+    if (!activeId) return;
+    const plan = plans.find(p => p.id === activeId);
+    if (!plan) return;
+    const newStatus = statusSelect.value;
+    plan.status = newStatus;
+    plan.ai_done = false;
+    updateCount();
+    if (currentView === 'board') renderBoard();
+    else renderList();
+    try {
+      await apiFetch(`/api/plans/${activeId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch (err) {
+      console.error('[plan] status change failed:', err);
+    }
+  });
+
+  // Board card click → editor
+  boardEl?.addEventListener('click', e => {
+    const card = e.target.closest('.plan-board-card');
+    if (!card) return;
+    flushSave();
+    selectPlan(card.dataset.id);
+    if (editorColEl) editorColEl.style.display = '';
+    loadPlanLogs(card.dataset.id);
+  });
+
+  // Board card right-click → context menu
+  boardEl?.addEventListener('contextmenu', e => {
+    const card = e.target.closest('.plan-board-card');
+    if (!card) return;
+    e.preventDefault();
+    showPlanCtxMenu(e.clientX, e.clientY, card.dataset.id);
+  });
+
+  // Context menu actions
+  ctxMenuEl?.addEventListener('click', async e => {
+    const item = e.target.closest('.plan-ctx-item');
+    if (!item || !ctxTargetPlanId) return;
+    const action = item.dataset.action;
+    if (action === 'edit') {
+      selectPlan(ctxTargetPlanId);
+      if (currentView === 'board' && editorColEl) editorColEl.style.display = '';
+    } else if (action === 'status') {
+      const newStatus = item.dataset.status;
+      const plan = plans.find(p => p.id === ctxTargetPlanId);
+      if (plan && plan.status !== newStatus) {
+        plan.status = newStatus;
+        plan.ai_done = false;
+        renderBoard();
+        updateCount();
+        try {
+          await apiFetch(`/api/plans/${ctxTargetPlanId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus }),
+          });
+        } catch (err) { console.error('[plan] status change failed:', err); }
+      }
+    } else if (action === 'delete') {
+      deletePlan(ctxTargetPlanId);
+    }
+    hidePlanCtxMenu();
+  });
+
+  // Close context menu on click elsewhere
+  document.addEventListener('click', () => hidePlanCtxMenu());
+
+  // Init drag and drop
+  initBoardDragDrop();
+
+  // Apply initial view
+  switchView(currentView);
 }
 
 // Backward compatibility exports (no-ops now)
