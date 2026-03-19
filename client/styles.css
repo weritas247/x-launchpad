@@ -4055,6 +4055,34 @@ body::after {
   color: var(--danger);
   border-color: var(--danger);
 }
+.gg-push-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+.gg-push-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.gg-push-btn.pushing {
+  color: var(--warn);
+  border-color: var(--warn);
+  cursor: wait;
+}
+.gg-push-btn.push-ok {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+.gg-push-btn.push-err {
+  color: var(--danger);
+  border-color: var(--danger);
+}
 .gg-github-btn {
   background: none;
   border: 1px solid var(--border);

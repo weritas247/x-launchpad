@@ -51,9 +51,10 @@ const branchDropdown = document.getElementById('gg-branch-dropdown');
 const branchTrigger = document.getElementById('gg-branch-trigger');
 const branchMenu = document.getElementById('gg-branch-menu');
 
-// GitHub button & Pull button
+// GitHub button, Pull button & Push button
 const githubBtn = document.getElementById('gg-github-btn');
 const pullBtn = document.getElementById('gg-pull-btn');
+const pushBtn = document.getElementById('gg-push-btn');
 
 // Confirm dialog
 const confirmEl = document.getElementById('gg-confirm');
@@ -92,6 +93,28 @@ function saveModalSize() {
 // ─── OPEN / CLOSE ────────────────────────────────────
 export function openGitGraph() {
   if (!S.activeSessionId) return;
+
+  // Resume previous state if cached (e.g., after file click)
+  if (cachedCommits.length > 0) {
+    isOpen = true;
+    restoreModalSize();
+    overlay.classList.add('open');
+    if (document.activeElement) document.activeElement.blur();
+    modal.focus();
+    if (dropdownAbort) dropdownAbort.abort();
+    dropdownAbort = new AbortController();
+    document.addEventListener(
+      'click',
+      (e) => {
+        if (!branchDropdown.contains(e.target)) {
+          branchMenu.classList.remove('open');
+        }
+      },
+      { signal: dropdownAbort.signal }
+    );
+    return;
+  }
+
   isOpen = true;
   selectedHash = null;
   cachedCommits = [];
@@ -147,6 +170,16 @@ export function openGitGraph() {
 }
 
 export function closeGitGraph() {
+  isOpen = false;
+  overlay.classList.remove('open');
+  branchMenu.classList.remove('open');
+  if (dropdownAbort) {
+    dropdownAbort.abort();
+    dropdownAbort = null;
+  }
+}
+
+function hideGitGraph() {
   isOpen = false;
   overlay.classList.remove('open');
   branchMenu.classList.remove('open');
@@ -357,7 +390,7 @@ export function handleGitFileListData(msg) {
   fileList.innerHTML = msg.files
     .map((f) => {
       const stat = fileStatBadge(f.additions, f.deletions);
-      return `<div class="gg-file-item"><span class="gg-file-status gg-file-status-${escHtml(f.status)}">${escHtml(f.status)}</span><span class="gg-file-path">${escHtml(f.path)}</span>${stat}</div>`;
+      return `<div class="gg-file-item" data-path="${escHtml(f.path)}" style="cursor:pointer"><span class="gg-file-status gg-file-status-${escHtml(f.status)}">${escHtml(f.status)}</span><span class="gg-file-path">${escHtml(f.path)}</span>${stat}</div>`;
     })
     .join('');
 }
@@ -473,6 +506,57 @@ function finishPull(isError) {
 
 export function handleGitPullAck(msg) {
   finishPull(!!msg.error);
+}
+
+// ─── PUSH ────────────────────────────────────────────
+let pushTimer = null;
+
+function resetPushBtn() {
+  pushBtn.classList.remove('pushing', 'push-ok', 'push-err');
+  pushBtn.textContent = '⬆ Push';
+  if (pushTimer) {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+  }
+}
+
+function doPush() {
+  if (!S.activeSessionId || pushBtn.classList.contains('pushing')) return;
+  resetPushBtn();
+  pushBtn.classList.add('pushing');
+  pushBtn.textContent = '⬆ Pushing...';
+  wsSend({ type: 'git_push', sessionId: S.activeSessionId });
+  pushTimer = setTimeout(() => {
+    if (pushBtn.classList.contains('pushing')) {
+      finishPush(false);
+    }
+  }, 10000);
+}
+
+function finishPush(isError) {
+  if (pushTimer) {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+  }
+  pushBtn.classList.remove('pushing');
+  if (isError) {
+    pushBtn.classList.add('push-err');
+    pushBtn.textContent = '⬆ Failed';
+  } else {
+    pushBtn.classList.add('push-ok');
+    pushBtn.textContent = '⬆ Done';
+    if (isOpen && S.activeSessionId) {
+      setTimeout(() => {
+        wsSend({ type: 'git_graph', sessionId: S.activeSessionId });
+        wsSend({ type: 'git_branch_list', sessionId: S.activeSessionId });
+      }, 500);
+    }
+  }
+  setTimeout(resetPushBtn, 3000);
+}
+
+export function handleGitPushAckInGraph(msg) {
+  finishPush(!!msg.error);
 }
 
 export function handleGitGraphSearchData(msg) {
@@ -912,6 +996,15 @@ document.getElementById('gg-file-close').addEventListener('click', () => {
   commitBody.style.display = 'none';
 });
 
+fileList.addEventListener('click', (e) => {
+  const item = e.target.closest('.gg-file-item[data-path]');
+  if (item) {
+    const filePath = item.dataset.path;
+    wsSend({ type: 'file_read', sessionId: S.activeSessionId, filePath });
+    hideGitGraph();
+  }
+});
+
 commitBox.addEventListener('click', (e) => {
   // Hash click → copy to clipboard
   const hashEl = e.target.closest('.gg-hash');
@@ -966,8 +1059,9 @@ githubBtn.addEventListener('click', () => {
   if (githubBaseUrl) window.open(githubBaseUrl, '_blank');
 });
 
-// Pull button
+// Pull & Push buttons
 pullBtn.addEventListener('click', doPull);
+pushBtn.addEventListener('click', doPush);
 
 // Confirm dialog
 confirmOk.addEventListener('click', doCheckout);
