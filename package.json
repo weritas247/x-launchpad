@@ -17,7 +17,7 @@
     "dev": "ts-node server/index.ts",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run format:check",
-    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper 2>/dev/null || true",
+    "postinstall": "npm rebuild node-pty && chmod +x node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper 2>/dev/null || true",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"server/**/*.ts\" \"client/**/*.{js,css,html}\"",
