@@ -2,7 +2,7 @@
 
 ## Summary
 
-Super Terminal의 기존 단순 토큰 인증을 이메일 기반 가입/로그인으로 확장한다.
+X-Launchpad의 기존 단순 토큰 인증을 이메일 기반 가입/로그인으로 확장한다.
 기존 `AUTH_TOKEN` 방식은 하위 호환으로 유지하고, 새로운 이메일/비밀번호 인증을 추가한다.
 
 ## Motivation

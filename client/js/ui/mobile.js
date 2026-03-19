@@ -1,4 +1,4 @@
-// mobile.js — Mobile UI/UX module for Super Terminal
+// mobile.js — Mobile UI/UX module for X-Launchpad
 import { switchPanel, getActivePanel } from '../sidebar/activity-bar.js';
 import { openSettings } from './settings.js';
 

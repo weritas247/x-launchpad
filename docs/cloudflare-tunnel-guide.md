@@ -1,6 +1,6 @@
 # Cloudflare Tunnel 설정 가이드
 
-Super Terminal을 퍼블릭 도메인으로 안전하게 노출하기 위한 Cloudflare Tunnel 설정 매뉴얼입니다.
+X-Launchpad을 퍼블릭 도메인으로 안전하게 노출하기 위한 Cloudflare Tunnel 설정 매뉴얼입니다.
 
 ## 목차
 
@@ -64,7 +64,7 @@ Cloudflare Tunnel(구 Argo Tunnel)은 로컬 서버를 인터넷에 안전하게
 
 ```
 [외부 브라우저]
-  → https://super-terminal.win
+  → https://x-launchpad.win
   → Cloudflare Edge (전 세계 분산, 가장 가까운 PoP)
   → Cloudflare Access (2차 인증 — 이메일 OTP)
   → Cloudflare Tunnel (QUIC 암호화 커넥션)
@@ -134,13 +134,13 @@ cloudflared tunnel login
 ### 2. 터널 생성
 
 ```bash
-cloudflared tunnel create super-terminal
+cloudflared tunnel create x-launchpad
 ```
 
 출력 예시:
 ```
 Tunnel credentials written to /Users/USERNAME/.cloudflared/TUNNEL_ID.json
-Created tunnel super-terminal with id TUNNEL_ID
+Created tunnel x-launchpad with id TUNNEL_ID
 ```
 
 > **중요**: `TUNNEL_ID.json` 파일은 터널 인증에 사용됩니다. 절대 외부에 공유하지 마세요.
@@ -149,10 +149,10 @@ Created tunnel super-terminal with id TUNNEL_ID
 
 ```bash
 # 루트 도메인 연결
-cloudflared tunnel route dns super-terminal super-terminal.win
+cloudflared tunnel route dns x-launchpad x-launchpad.win
 
 # 서브도메인 연결 (선택)
-cloudflared tunnel route dns super-terminal dev.super-terminal.win
+cloudflared tunnel route dns x-launchpad dev.x-launchpad.win
 ```
 
 이 명령은 Cloudflare DNS에 CNAME 레코드를 자동으로 추가합니다.
@@ -174,7 +174,7 @@ tunnel: TUNNEL_ID
 credentials-file: /Users/USERNAME/.cloudflared/TUNNEL_ID.json
 
 ingress:
-  - hostname: super-terminal.win
+  - hostname: x-launchpad.win
     service: http://localhost:3031
   - service: http_status:404
 ```
@@ -193,11 +193,11 @@ ingress:
 
 ```yaml
 ingress:
-  - hostname: super-terminal.win
+  - hostname: x-launchpad.win
     service: http://localhost:3031
-  - hostname: api.super-terminal.win
+  - hostname: api.x-launchpad.win
     service: http://localhost:4000
-  - hostname: grafana.super-terminal.win
+  - hostname: grafana.x-launchpad.win
     service: http://localhost:3000
   - service: http_status:404
 ```
@@ -253,9 +253,9 @@ openssl rand -hex 64
    - **Self-hosted** 선택
 
 3. **Basic Information 설정**
-   - Application name: `Super Terminal`
+   - Application name: `X-Launchpad`
    - Session Duration: `24 hours`
-   - Add public hostname → Domain: `super-terminal.win`
+   - Add public hostname → Domain: `x-launchpad.win`
 
 4. **Policy 생성**
    - Policies 탭 → Add a policy 또는 Create new policy
@@ -269,7 +269,7 @@ openssl rand -hex 64
 ### 동작 방식
 
 ```
-1. 브라우저에서 super-terminal.win 접속
+1. 브라우저에서 x-launchpad.win 접속
 2. Cloudflare Access가 이메일 입력 화면 표시
 3. 허용된 이메일 입력 → OTP 코드 발송
 4. OTP 입력 → 24시간 세션 유지
@@ -294,13 +294,13 @@ Login methods 탭에서 설정 가능합니다.
 ### 수동 실행
 
 ```bash
-cloudflared tunnel run super-terminal
+cloudflared tunnel run x-launchpad
 ```
 
 ### 백그라운드 실행
 
 ```bash
-cloudflared tunnel run super-terminal &
+cloudflared tunnel run x-launchpad &
 ```
 
 ### 정상 연결 확인
@@ -335,7 +335,7 @@ sudo cloudflared service install
 
 ### macOS — 앱 서버 자동 시작
 
-`~/Library/LaunchAgents/com.super-terminal.plist` 파일 생성:
+`~/Library/LaunchAgents/com.x-launchpad.plist` 파일 생성:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -344,32 +344,32 @@ sudo cloudflared service install
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.super-terminal</string>
+  <string>com.x-launchpad</string>
   <key>ProgramArguments</key>
   <array>
     <string>/usr/local/bin/node</string>
     <string>dist/server/index.js</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/path/to/super-terminal</string>
+  <string>/path/to/x-launchpad</string>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/tmp/super-terminal.log</string>
+  <string>/tmp/x-launchpad.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/super-terminal-error.log</string>
+  <string>/tmp/x-launchpad-error.log</string>
 </dict>
 </plist>
 ```
 
 ```bash
 # 등록
-launchctl load ~/Library/LaunchAgents/com.super-terminal.plist
+launchctl load ~/Library/LaunchAgents/com.x-launchpad.plist
 
 # 해제
-launchctl unload ~/Library/LaunchAgents/com.super-terminal.plist
+launchctl unload ~/Library/LaunchAgents/com.x-launchpad.plist
 ```
 
 ### Linux — systemd 서비스
@@ -379,26 +379,26 @@ launchctl unload ~/Library/LaunchAgents/com.super-terminal.plist
 sudo cloudflared service install
 
 # 앱 서버 서비스
-sudo cat > /etc/systemd/system/super-terminal.service << 'EOF'
+sudo cat > /etc/systemd/system/x-launchpad.service << 'EOF'
 [Unit]
-Description=Super Terminal
+Description=X-Launchpad
 After=network.target
 
 [Service]
 Type=simple
 User=YOUR_USER
-WorkingDirectory=/path/to/super-terminal
+WorkingDirectory=/path/to/x-launchpad
 ExecStart=/usr/bin/node dist/server/index.js
 Restart=always
 RestartSec=5
-EnvironmentFile=/path/to/super-terminal/.env.dev
+EnvironmentFile=/path/to/x-launchpad/.env.dev
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-sudo systemctl enable super-terminal
-sudo systemctl start super-terminal
+sudo systemctl enable x-launchpad
+sudo systemctl start x-launchpad
 ```
 
 ---
@@ -411,12 +411,12 @@ sudo systemctl start super-terminal
 
 ```bash
 # 집 컴퓨터 (이미 설정됨)
-super-terminal.win → 집 서버:3031
+x-launchpad.win → 집 서버:3031
 
 # 회사 컴퓨터 (추가 설정)
 cloudflared tunnel login
 cloudflared tunnel create work-terminal
-cloudflared tunnel route dns work-terminal work.super-terminal.win
+cloudflared tunnel route dns work-terminal work.x-launchpad.win
 ```
 
 회사 컴퓨터의 `~/.cloudflared/config.yml`:
@@ -425,22 +425,22 @@ tunnel: WORK_TUNNEL_ID
 credentials-file: /Users/USERNAME/.cloudflared/WORK_TUNNEL_ID.json
 
 ingress:
-  - hostname: work.super-terminal.win
+  - hostname: work.x-launchpad.win
     service: http://localhost:3031
   - service: http_status:404
 ```
 
 ### Cloudflare Access에 서브도메인 추가
 
-Access controls → Applications → Super Terminal 편집:
-- Add public hostname → `work.super-terminal.win` 추가
+Access controls → Applications → X-Launchpad 편집:
+- Add public hostname → `work.x-launchpad.win` 추가
 
 ### 결과
 
 | 도메인 | 연결 대상 | 용도 |
 |--------|----------|------|
-| `super-terminal.win` | 집 컴퓨터 | 항상 켜둠 (메인 서버) |
-| `work.super-terminal.win` | 회사 컴퓨터 | 업무 시간만 사용 |
+| `x-launchpad.win` | 집 컴퓨터 | 항상 켜둠 (메인 서버) |
+| `work.x-launchpad.win` | 회사 컴퓨터 | 업무 시간만 사용 |
 
 같은 포트(3031)를 사용해도 서로 다른 머신이므로 충돌 없음.
 
@@ -497,7 +497,7 @@ kill $(lsof -ti:3031)
 
 ```bash
 # 터널 상태 확인
-cloudflared tunnel info super-terminal
+cloudflared tunnel info x-launchpad
 
 # cert.pem 확인
 ls ~/.cloudflared/cert.pem
@@ -506,7 +506,7 @@ ls ~/.cloudflared/cert.pem
 ls ~/.cloudflared/*.json
 
 # 터널 로그 확인 (verbose)
-cloudflared tunnel --loglevel debug run super-terminal
+cloudflared tunnel --loglevel debug run x-launchpad
 ```
 
 ### DNS 전파 대기
@@ -515,7 +515,7 @@ cloudflared tunnel --loglevel debug run super-terminal
 
 ```bash
 # DNS 확인
-dig super-terminal.win CNAME
+dig x-launchpad.win CNAME
 
 # 기대 출력: TUNNEL_ID.cfargotunnel.com
 ```
@@ -531,23 +531,23 @@ dig super-terminal.win CNAME
 cloudflared tunnel list
 
 # 터널 정보
-cloudflared tunnel info super-terminal
+cloudflared tunnel info x-launchpad
 
 # 터널 삭제 (DNS 레코드 먼저 삭제 필요)
-cloudflared tunnel delete super-terminal
+cloudflared tunnel delete x-launchpad
 
 # DNS 라우트 삭제
-cloudflared tunnel route dns --delete super-terminal super-terminal.win
+cloudflared tunnel route dns --delete x-launchpad x-launchpad.win
 ```
 
 ### 터널 실행 & 종료
 
 ```bash
 # 실행
-cloudflared tunnel run super-terminal
+cloudflared tunnel run x-launchpad
 
 # 백그라운드 실행
-cloudflared tunnel run super-terminal &
+cloudflared tunnel run x-launchpad &
 
 # 종료
 pkill -f "cloudflared tunnel run"
@@ -570,10 +570,10 @@ brew services list | grep cloudflared
 
 ```bash
 # 실시간 로그
-cloudflared tunnel --loglevel info run super-terminal
+cloudflared tunnel --loglevel info run x-launchpad
 
 # 디버그 로그
-cloudflared tunnel --loglevel debug run super-terminal
+cloudflared tunnel --loglevel debug run x-launchpad
 
 # 메트릭 확인
 curl http://127.0.0.1:20241/metrics
@@ -601,8 +601,8 @@ curl http://127.0.0.1:20241/metrics
 
 | 항목 | 값 |
 |------|---|
-| 도메인 | `super-terminal.win` |
-| 터널 이름 | `super-terminal` |
+| 도메인 | `x-launchpad.win` |
+| 터널 이름 | `x-launchpad` |
 | 터널 ID | `7b56f5ad-17c4-4e59-b9fb-73afc09c54a9` |
 | 로컬 서비스 | `http://localhost:3031` |
 | Cloudflare Access | 이메일 OTP (`secondwarren@gmail.com`) |

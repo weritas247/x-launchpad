@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Super Terminal을 켜고 끌 수 있는 별도 경량 컨트롤 서버(포트 3001) + 메인 UI 플로팅 버튼 구현
+**Goal:** X-Launchpad을 켜고 끌 수 있는 별도 경량 컨트롤 서버(포트 3001) + 메인 UI 플로팅 버튼 구현
 
-**Architecture:** 독립 Express 서버가 child_process.spawn으로 Super Terminal을 관리. 포트 3000을 OFF 시 바인딩/ON 시 release하여 동일 URL에서 꺼짐 페이지 또는 Super Terminal을 보여줌. 메인 UI에는 왼쪽 아래 플로팅 버튼으로 컨트롤 패널 접근.
+**Architecture:** 독립 Express 서버가 child_process.spawn으로 X-Launchpad을 관리. 포트 3000을 OFF 시 바인딩/ON 시 release하여 동일 URL에서 꺼짐 페이지 또는 X-Launchpad을 보여줌. 메인 UI에는 왼쪽 아래 플로팅 버튼으로 컨트롤 패널 접근.
 
 **Tech Stack:** Node.js, TypeScript, Express, WebSocket (ws), pidusage, child_process
 
@@ -238,7 +238,7 @@ export class ProcessManager extends EventEmitter {
       }
       // stdout에서 listening 메시지 감지 (1차)
       const text = data.toString();
-      if (text.includes('Super Terminal') && text.includes('http')) {
+      if (text.includes('X-Launchpad') && text.includes('http')) {
         this.onReady();
       }
     });
@@ -421,7 +421,7 @@ export class PortSwitcher {
       this.miniServer.on('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EADDRINUSE') {
           console.log(`[port-switcher] 포트 ${this.port} 사용 중, 바인딩 스킵`);
-          resolve(); // Super Terminal이 이미 떠 있을 수 있음
+          resolve(); // X-Launchpad이 이미 떠 있을 수 있음
         } else {
           reject(err);
         }
@@ -511,7 +511,7 @@ export class StatsCollector {
       } catch { /* 프로세스 없음 */ }
     }
 
-    // 세션 수 (Super Terminal API 호출)
+    // 세션 수 (X-Launchpad API 호출)
     if (pid) {
       try {
         stats.sessions = await this.fetchSessionCount();
@@ -656,7 +656,7 @@ pm.on('start_failed', (reason: string) => {
   portSwitcher.bind();
 });
 pm.on('exit', () => {
-  // Super Terminal이 죽으면 포트 3000 다시 바인딩
+  // X-Launchpad이 죽으면 포트 3000 다시 바인딩
   portSwitcher.bind();
 });
 
@@ -749,7 +749,7 @@ app.get('*', (_req, res) => {
   res.sendFile(path.join(publicDir, 'dashboard.html'));
 });
 
-// Graceful shutdown — 컨트롤 서버 종료 시 Super Terminal도 정리
+// Graceful shutdown — 컨트롤 서버 종료 시 X-Launchpad도 정리
 async function shutdown(): Promise<void> {
   console.log('[control] 종료 중...');
   if (pm.getState().running || pm.getState().starting) {
@@ -766,7 +766,7 @@ async function main(): Promise<void> {
     console.log(`[control] Control Server → http://${CONTROL_HOST}:${CONTROL_PORT}`);
 
     if (AUTO_START) {
-      console.log('[control] AUTO_START=1, Super Terminal 시작...');
+      console.log('[control] AUTO_START=1, X-Launchpad 시작...');
       await pm.start();
     } else {
       // 꺼짐 페이지로 포트 3000 바인딩
@@ -888,13 +888,13 @@ body {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Super Terminal — Offline</title>
+  <title>X-Launchpad — Offline</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <div class="container">
     <div class="logo">⚡</div>
-    <div class="title">Super Terminal</div>
+    <div class="title">X-Launchpad</div>
     <div class="subtitle">서버가 꺼져 있습니다</div>
 
     <button class="power-btn" id="power-btn" title="서버 시작">⏻</button>
@@ -987,7 +987,7 @@ curl -s http://127.0.0.1:3000 | head -5
 kill %1
 ```
 
-Expected: HTML 응답에 "Super Terminal" 포함
+Expected: HTML 응답에 "X-Launchpad" 포함
 
 - [ ] **Step 5: 커밋**
 
@@ -1011,7 +1011,7 @@ git commit -m "기능: 서버 OFF 페이지 (전원 버튼 + WebSocket 상태)"
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Super Terminal — Control Dashboard</title>
+  <title>X-Launchpad — Control Dashboard</title>
   <link rel="stylesheet" href="/styles.css">
   <style>
     body { align-items: flex-start; padding: 40px; }
@@ -1043,7 +1043,7 @@ git commit -m "기능: 서버 OFF 페이지 (전원 버튼 + WebSocket 상태)"
 <body>
   <div class="dashboard">
     <div class="dash-header">
-      <div class="dash-title">⚡ Super Terminal Control</div>
+      <div class="dash-title">⚡ X-Launchpad Control</div>
       <span class="badge off" id="badge">OFF</span>
     </div>
 
@@ -1184,11 +1184,11 @@ curl -s http://127.0.0.1:3001/api/status | python3 -m json.tool
 # Expected: running: false
 
 # 꺼짐 페이지 확인
-curl -s http://127.0.0.1:3000 | grep "Super Terminal"
+curl -s http://127.0.0.1:3000 | grep "X-Launchpad"
 # Expected: 매치됨
 ```
 
-- [ ] **Step 2: Super Terminal start/stop 사이클**
+- [ ] **Step 2: X-Launchpad start/stop 사이클**
 
 ```bash
 # 시작
@@ -1201,9 +1201,9 @@ sleep 5
 curl -s http://127.0.0.1:3001/api/status | python3 -m json.tool
 # Expected: running: true, pid: <number>
 
-# Super Terminal 접근 확인
+# X-Launchpad 접근 확인
 curl -s http://127.0.0.1:3000 | head -3
-# Expected: Super Terminal HTML
+# Expected: X-Launchpad HTML
 
 # 종료
 curl -s -X POST http://127.0.0.1:3001/api/stop
@@ -1225,7 +1225,7 @@ git commit -m "수정: 통합 테스트에서 발견된 이슈 해결"
 
 ---
 
-### Task 10: 플로팅 버튼 + 패널 — Super Terminal 메인 UI
+### Task 10: 플로팅 버튼 + 패널 — X-Launchpad 메인 UI
 
 **Files:**
 - Create: `client/js/control-panel.js`
@@ -1340,7 +1340,7 @@ export function initControlPanel() {
 <button id="control-floating-btn" class="control-floating-btn" title="Control Panel">⚡</button>
 <div id="control-panel" class="control-panel">
   <div class="cp-header">
-    <span class="cp-title">⚡ Super Terminal</span>
+    <span class="cp-title">⚡ X-Launchpad</span>
     <span class="cp-badge off" id="cp-badge">OFF</span>
   </div>
   <div class="cp-stats">
@@ -1476,10 +1476,10 @@ sleep 2
 체크리스트:
 1. `http://127.0.0.1:3001` 접근 → 대시보드 표시 (OFF 상태)
 2. `http://127.0.0.1:3000` 접근 → 꺼짐 페이지 표시
-3. 꺼짐 페이지에서 전원 버튼 클릭 → Super Terminal 시작 → 자동 리다이렉트
-4. Super Terminal UI에서 왼쪽 아래 플로팅 버튼 확인
+3. 꺼짐 페이지에서 전원 버튼 클릭 → X-Launchpad 시작 → 자동 리다이렉트
+4. X-Launchpad UI에서 왼쪽 아래 플로팅 버튼 확인
 5. 플로팅 버튼 클릭 → 패널 열림 (ON 상태, uptime, sessions 등)
-6. 패널의 Stop 버튼 클릭 → Super Terminal 종료 → 꺼짐 페이지로 전환
+6. 패널의 Stop 버튼 클릭 → X-Launchpad 종료 → 꺼짐 페이지로 전환
 7. `http://127.0.0.1:3001` 대시보드에서 Start → 다시 시작 확인
 
 - [ ] **Step 2: 에지 케이스 확인**

@@ -180,15 +180,15 @@ echo "$TOOL_INPUT" | grep -q 'git commit' || exit 0
 COMMIT_INFO=$(git log -1 --format='%H|||%s' 2>/dev/null) || exit 0
 HASH=$(echo "$COMMIT_INFO" | cut -d'|||' -f1)
 MSG=$(echo "$COMMIT_INFO" | cut -d'|||' -f2-)
-TOKEN="${SUPER_TERMINAL_TOKEN}"
+TOKEN="${X_LAUNCHPAD_TOKEN}"
 [ -z "$TOKEN" ] && exit 0
-curl -s -X POST "${SUPER_TERMINAL_URL:-http://localhost:3000}/api/plans/log" \
+curl -s -X POST "${X_LAUNCHPAD_URL:-http://localhost:3000}/api/plans/log" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"type\":\"commit\",\"content\":\"$MSG\",\"commit_hash\":\"$HASH\"}"
 ```
 
-JWT 토큰은 `SUPER_TERMINAL_TOKEN` 환경변수에서 읽는다.
+JWT 토큰은 `X_LAUNCHPAD_TOKEN` 환경변수에서 읽는다.
 
 ### 5.2 완료 hook
 
@@ -198,9 +198,9 @@ Claude Code의 `PostToolUse` hook에서 **유저가 수동으로 트리거**한�
 ```bash
 #!/bin/bash
 SUMMARY="$1"
-TOKEN="${SUPER_TERMINAL_TOKEN}"
-[ -z "$TOKEN" ] && echo "SUPER_TERMINAL_TOKEN not set" && exit 1
-curl -s -X POST "${SUPER_TERMINAL_URL:-http://localhost:3000}/api/plans/log" \
+TOKEN="${X_LAUNCHPAD_TOKEN}"
+[ -z "$TOKEN" ] && echo "X_LAUNCHPAD_TOKEN not set" && exit 1
+curl -s -X POST "${X_LAUNCHPAD_URL:-http://localhost:3000}/api/plans/log" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"type\":\"summary\",\"content\":\"$SUMMARY\"}"

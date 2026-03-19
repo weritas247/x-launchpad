@@ -182,7 +182,7 @@ function isMarkdownFile(filePath) {
 - image: max-width 100%
 - hr: 구분선
 
-기존 Super Terminal 테마 변수(--bg-void, --text-main, --accent 등)를 사용하여 일관된 디자인.
+기존 X-Launchpad 테마 변수(--bg-void, --text-main, --accent 등)를 사용하여 일관된 디자인.
 
 ## 파일 변경 목록
 

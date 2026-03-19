@@ -67,7 +67,7 @@ export class ProcessManager extends EventEmitter {
         this.emit('log', line);
       }
       const text = data.toString();
-      if (text.includes('Super Terminal') && text.includes('http')) {
+      if (text.includes('X-Launchpad') && text.includes('http')) {
         this.onReady();
       }
     });

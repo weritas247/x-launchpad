@@ -114,7 +114,7 @@ function fireOsNotification(title, body, sessionId) {
   const n = new Notification(title, {
     body,
     icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="%2300ffe5" opacity=".15"/><polyline points="10,7 6,16 14,16 10,25 22,13 15,13 19,7" fill="%2300ffe5"/></svg>',
-    tag: `super-terminal-${sessionId}`,
+    tag: `x-launchpad-${sessionId}`,
     silent: false,
   });
   n.onclick = () => {

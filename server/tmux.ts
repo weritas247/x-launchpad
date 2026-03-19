@@ -8,7 +8,7 @@ import * as fs from 'fs';
 import { execSync } from 'child_process';
 import { env } from './env';
 
-export const TMUX_SOCKET = path.join(os.tmpdir(), 'super-terminal-tmux');
+export const TMUX_SOCKET = path.join(os.tmpdir(), 'x-launchpad-tmux');
 
 let _tmuxAvailable = false;
 const _tmuxRequested = env.ENABLE_TMUX;

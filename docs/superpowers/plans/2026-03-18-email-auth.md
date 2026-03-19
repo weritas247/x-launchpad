@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add email-based registration and login to Super Terminal, while maintaining backward compatibility with the existing AUTH_TOKEN mechanism.
+**Goal:** Add email-based registration and login to X-Launchpad, while maintaining backward compatibility with the existing AUTH_TOKEN mechanism.
 
 **Architecture:** SQLite `users` table + bcryptjs password hashing + JWT session tokens. The existing `verifyToken()` function is extended to try JWT first, then fall back to legacy AUTH_TOKEN comparison. A first-user registration pattern restricts sign-ups after the initial account is created.
 
@@ -494,7 +494,7 @@ Replace the entire `client/login.html` with the new login/register tab UI. The d
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SUPER TERMINAL — Login</title>
+  <title>X-LAUNCHPAD — Login</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
@@ -521,7 +521,7 @@ Replace the entire `client/login.html` with the new login/register tab UI. The d
 </head>
 <body>
   <div class="login-box">
-    <div class="login-logo">SUPER / TERMINAL</div>
+    <div class="login-logo">X-LAUNCHPAD</div>
 
     <!-- Login Form -->
     <div id="login-view">
@@ -612,13 +612,13 @@ Replace the entire `client/login.html` with the new login/register tab UI. The d
 
     // ─── Auth success handler ──────────────────────────
     function onAuthSuccess(token) {
-      localStorage.setItem('super-terminal-token', token);
+      localStorage.setItem('x-launchpad-token', token);
       window.location.href = '/?token=' + encodeURIComponent(token);
     }
 
     // ─── Auto-auth check ───────────────────────────────
     async function init() {
-      const saved = localStorage.getItem('super-terminal-token');
+      const saved = localStorage.getItem('x-launchpad-token');
 
       try {
         const url = saved

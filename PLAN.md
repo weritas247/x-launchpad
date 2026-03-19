@@ -1,4 +1,4 @@
-# Super Terminal (xterm.js) 구축 계획서
+# X-Launchpad (xterm.js) 구축 계획서
 
 ## 🎯 목표
 

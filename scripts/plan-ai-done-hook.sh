@@ -1,9 +1,9 @@
 #!/bin/bash
 # Claude Code Stop hook: notify kanban board that AI work is complete
-# Only fires for sessions assigned from the kanban board (SUPER_TERMINAL_PLAN_ID set)
+# Only fires for sessions assigned from the kanban board (X_LAUNCHPAD_PLAN_ID set)
 
-TOKEN="${SUPER_TERMINAL_TOKEN}"
-PLAN_ID="${SUPER_TERMINAL_PLAN_ID}"
+TOKEN="${X_LAUNCHPAD_TOKEN}"
+PLAN_ID="${X_LAUNCHPAD_PLAN_ID}"
 
 # Skip if not a kanban-assigned AI session
 [ -z "$TOKEN" ] && exit 0
@@ -16,7 +16,7 @@ SUMMARY=$(git log --oneline -3 --no-merges 2>/dev/null | head -3 | tr '\n' '; ')
 # Escape JSON special chars
 SUMMARY_ESCAPED=$(printf '%s' "$SUMMARY" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
 
-curl -s -X POST "${SUPER_TERMINAL_URL:-http://localhost:3000}/api/plans/log" \
+curl -s -X POST "${X_LAUNCHPAD_URL:-http://localhost:3000}/api/plans/log" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"type\":\"summary\",\"plan_id\":\"$PLAN_ID\",\"content\":$SUMMARY_ESCAPED}" \

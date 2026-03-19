@@ -191,7 +191,7 @@ function getLangExtension(filePath) {
   return [result];
 }
 
-// ─── Dark theme matching Super Terminal ───
+// ─── Dark theme matching X-Launchpad ───
 const superTerminalTheme = EditorView.theme({
   '&': {
     backgroundColor: 'var(--bg-void)',

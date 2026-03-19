@@ -2,7 +2,7 @@
 import { requestFileTree } from './explorer.js';
 import { requestGitStatus } from './source-control.js';
 
-const ICON_ORDER_KEY = 'super-terminal-activity-order';
+const ICON_ORDER_KEY = 'x-launchpad-activity-order';
 
 let activePanel = 'search';
 const splits = []; // [{ id, primary, secondary, ratio, btnEl }]

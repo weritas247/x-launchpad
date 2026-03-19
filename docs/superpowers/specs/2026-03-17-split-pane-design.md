@@ -2,7 +2,7 @@
 Date: 2026-03-17
 
 ## Overview
-Add up to 4-way terminal split pane support to Super Terminal. Users drag tabs to split the terminal area, resize panes by dragging dividers, and each pane hosts an independent session.
+Add up to 4-way terminal split pane support to X-Launchpad. Users drag tabs to split the terminal area, resize panes by dragging dividers, and each pane hosts an independent session.
 
 ---
 

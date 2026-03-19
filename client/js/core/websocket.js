@@ -163,7 +163,7 @@ const _textDecoder = new TextDecoder();
 
 export function getAuthToken() {
   const urlParams = new URLSearchParams(location.search);
-  return urlParams.get('token') || localStorage.getItem('super-terminal-token') || '';
+  return urlParams.get('token') || localStorage.getItem('x-launchpad-token') || '';
 }
 
 export function apiFetch(url, options = {}) {
@@ -184,7 +184,7 @@ export function connect(messageHandler) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   // Pass auth token to WebSocket if present
   const urlParams = new URLSearchParams(location.search);
-  const token = urlParams.get('token') || localStorage.getItem('super-terminal-token') || '';
+  const token = urlParams.get('token') || localStorage.getItem('x-launchpad-token') || '';
   const wsUrl = token
     ? `${proto}//${location.host}?token=${encodeURIComponent(token)}`
     : `${proto}//${location.host}`;

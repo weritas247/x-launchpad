@@ -1,4 +1,4 @@
-# AGENTS.md — claude-web-terminal (Super Terminal)
+# AGENTS.md — claude-web-terminal (X-Launchpad)
 
 **Generated:** 2026-03-17
 

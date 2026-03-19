@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SUPER TERMINAL — Login</title>
+    <title>X-LAUNCHPAD — Login</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="stylesheet" href="fonts/fonts.css" />
     <style>
@@ -249,13 +249,13 @@
 
       // ─── Auth success handler ──────────────────────────
       function onAuthSuccess(token) {
-        localStorage.setItem('super-terminal-token', token);
+        localStorage.setItem('x-launchpad-token', token);
         window.location.href = '/?token=' + encodeURIComponent(token);
       }
 
       // ─── Auto-auth check ───────────────────────────────
       async function init() {
-        const saved = localStorage.getItem('super-terminal-token');
+        const saved = localStorage.getItem('x-launchpad-token');
 
         try {
           const url = saved

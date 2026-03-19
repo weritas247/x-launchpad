@@ -739,7 +739,7 @@ async function startServer() {
     console.error('[supabase] Failed to initialize user count:', err);
   }
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Super Terminal → http://localhost:${PORT}`);
+    console.log(`X-Launchpad → http://localhost:${PORT}`);
     const nets = os.networkInterfaces();
     for (const name of Object.keys(nets)) {
       for (const net of nets[name]!) {

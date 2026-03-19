@@ -1,8 +1,8 @@
-# Super Terminal Mobile UI/UX Design Spec
+# X-Launchpad Mobile UI/UX Design Spec
 
 ## Overview
 
-Super Terminal is a desktop-only browser-based terminal IDE. This spec defines how to make almost all features accessible on mobile devices (phones and tablets) using a **Responsive Overlay** approach: CSS media queries + a lightweight JS module, without modifying existing desktop behavior.
+X-Launchpad is a desktop-only browser-based terminal IDE. This spec defines how to make almost all features accessible on mobile devices (phones and tablets) using a **Responsive Overlay** approach: CSS media queries + a lightweight JS module, without modifying existing desktop behavior.
 
 ## Goals
 
@@ -153,7 +153,7 @@ CSS considerations for moved panels:
 ## 4. Header Simplification
 
 At 768px:
-- Logo text (`SUPER/TERMINAL`) hidden, only icon shown
+- Logo text (`X-LAUNCHPAD`) hidden, only icon shown
 - `SYN` count hidden
 - `RESTORING` badge hidden
 - Latency indicator hidden

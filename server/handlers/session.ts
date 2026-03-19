@@ -20,7 +20,7 @@ const handlers: Record<string, WsHandler> = {
     const name =
       (parsed.name as string) || nameFormat.replace('{n}', String(ctx.sessions.size + 1));
     const planId = parsed.planId as string | undefined;
-    const extraEnv = planId ? { SUPER_TERMINAL_PLAN_ID: planId } : undefined;
+    const extraEnv = planId ? { X_LAUNCHPAD_PLAN_ID: planId } : undefined;
     const sess = ctx.createSession(id, name, parsed.cwd as string | undefined, undefined, extraEnv);
     ctx.wsSession.set(ctx.ws, id);
     if (parsed.cmd) {

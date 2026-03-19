@@ -1,4 +1,4 @@
--- ─── Super Terminal: Supabase schema ────────────────────────────
+-- ─── X-Launchpad: Supabase schema ────────────────────────────
 -- Supabase 대시보드 → SQL Editor 에 붙여넣고 실행하세요.
 
 create table if not exists public.users (

@@ -970,13 +970,13 @@ HASH=$(echo "$COMMIT_INFO" | cut -d'|' -f1)
 # Use awk to get everything after '|||'
 MSG=$(echo "$COMMIT_INFO" | sed 's/^[^|]*|||//')
 
-TOKEN="${SUPER_TERMINAL_TOKEN}"
+TOKEN="${X_LAUNCHPAD_TOKEN}"
 [ -z "$TOKEN" ] && exit 0
 
 # Escape JSON special chars in commit message
 MSG_ESCAPED=$(printf '%s' "$MSG" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
 
-curl -s -X POST "${SUPER_TERMINAL_URL:-http://localhost:3000}/api/plans/log" \
+curl -s -X POST "${X_LAUNCHPAD_URL:-http://localhost:3000}/api/plans/log" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"type\":\"commit\",\"content\":$MSG_ESCAPED,\"commit_hash\":\"$HASH\"}" \
@@ -991,12 +991,12 @@ curl -s -X POST "${SUPER_TERMINAL_URL:-http://localhost:3000}/api/plans/log" \
 SUMMARY="$*"
 [ -z "$SUMMARY" ] && echo "Usage: plan-done <summary text>" && exit 1
 
-TOKEN="${SUPER_TERMINAL_TOKEN}"
-[ -z "$TOKEN" ] && echo "Error: SUPER_TERMINAL_TOKEN not set" && exit 1
+TOKEN="${X_LAUNCHPAD_TOKEN}"
+[ -z "$TOKEN" ] && echo "Error: X_LAUNCHPAD_TOKEN not set" && exit 1
 
 SUMMARY_ESCAPED=$(printf '%s' "$SUMMARY" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
 
-curl -s -X POST "${SUPER_TERMINAL_URL:-http://localhost:3000}/api/plans/log" \
+curl -s -X POST "${X_LAUNCHPAD_URL:-http://localhost:3000}/api/plans/log" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"type\":\"summary\",\"content\":$SUMMARY_ESCAPED}"

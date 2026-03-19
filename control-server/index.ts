@@ -212,7 +212,7 @@ async function main(): Promise<void> {
     console.log(`[control] Control Server → http://${CONTROL_HOST}:${CONTROL_PORT}`);
 
     if (AUTO_START) {
-      console.log('[control] AUTO_START=1, Super Terminal 시작...');
+      console.log('[control] AUTO_START=1, X-Launchpad 시작...');
       await portSwitcher.release();
       await pm.start();
     } else {

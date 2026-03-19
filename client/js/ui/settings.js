@@ -438,7 +438,7 @@ export function initSettingsUI() {
     const blob = new Blob([JSON.stringify(S.settings, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'super-terminal-settings.json';
+    a.download = 'x-launchpad-settings.json';
     a.click();
   });
 

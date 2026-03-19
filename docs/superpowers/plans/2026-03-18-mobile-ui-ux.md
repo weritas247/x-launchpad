@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make Super Terminal's almost all features usable on mobile devices (phones/tablets) via responsive CSS + a mobile JS module.
+**Goal:** Make X-Launchpad's almost all features usable on mobile devices (phones/tablets) via responsive CSS + a mobile JS module.
 
 **Architecture:** CSS-only responsive layout at `@media (max-width: 768px)` breakpoint hides desktop chrome (activity bar, sidebar) and restructures the grid. A new `mobile.js` module handles bottom navigation, sidebar overlay, touch gestures, and keyboard viewport adjustments. Existing JS modules receive minimal hooks (exported functions, mobile-aware positioning).
 
@@ -415,7 +415,7 @@ git commit -m "feat: 모바일 하단 네비게이션 + 사이드바 오버레�
 - [ ] **Step 1: Create mobile.js with core functionality**
 
 ```javascript
-// mobile.js — Mobile UI/UX module for Super Terminal
+// mobile.js — Mobile UI/UX module for X-Launchpad
 import { switchPanel, getActivePanel } from './activity-bar.js';
 import { openSettings } from './settings.js';
 import { S } from './state.js';
