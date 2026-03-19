@@ -11,7 +11,7 @@
 | 항목 | 결정 |
 |------|------|
 | 에디터 엔진 | CodeMirror 6 |
-| 로딩 방식 | npm install → node_modules에서 Express static serve |
+| 로딩 방식 | npm install → esbuild로 단일 번들 생성 (`client/js/codemirror-bundle.js`) |
 | 기본 모드 | 읽기 전용 (CodeMirror `EditorState.readOnly`) |
 | 편집 진입 | Edit 버튼 또는 Ctrl+E |
 | 저장 방식 | Ctrl+S → WebSocket `file_save` → 서버 파일시스템 직접 저장 |
@@ -51,12 +51,12 @@
 ## npm 패키지
 
 ```
+# 런타임
 @codemirror/state
 @codemirror/view
 @codemirror/language
 @codemirror/commands
 @codemirror/search
-@codemirror/autocomplete
 @codemirror/lang-javascript    (JS/TS/JSX/TSX)
 @codemirror/lang-python
 @codemirror/lang-html
@@ -68,37 +68,46 @@
 @codemirror/lang-java
 @codemirror/lang-sql
 @codemirror/lang-xml
+
+# 빌드
+esbuild (devDependency)
 ```
 
-yaml은 커뮤니티 패키지(`codemirror-lang-yaml` 또는 `@codemirror/lang-yaml`)가 있으면 추가, 없으면 plain text fallback.
+@lezer/* 패키지들은 @codemirror의 transitive dependency로 자동 설치된다.
+@codemirror/lang-yaml (공식 패키지 존재)
 
 ## CodeMirror 로딩
 
-Express에서 node_modules를 static으로 serve:
+esbuild로 단일 번들을 생성하여 브라우저에서 로드한다.
 
+**엔트리 파일** (`client/js/codemirror-entry.js`):
 ```js
-// server/index.ts
-app.use('/cm', express.static(path.join(__dirname, '../node_modules/@codemirror')));
+// CodeMirror core + extensions + languages를 하나의 번들로 export
+export { EditorState } from '@codemirror/state';
+export { EditorView, keymap, lineNumbers } from '@codemirror/view';
+export { defaultKeymap, history, historyKeymap, undo, redo } from '@codemirror/commands';
+export { searchKeymap, openSearchPanel } from '@codemirror/search';
+export { javascript } from '@codemirror/lang-javascript';
+// ... 기타 언어
 ```
 
-index.html에 importmap 추가:
-
-```html
-<script type="importmap">
-{
-  "imports": {
-    "@codemirror/state": "/cm/state/dist/index.js",
-    "@codemirror/view": "/cm/view/dist/index.js",
-    "@codemirror/language": "/cm/language/dist/index.js",
-    "@codemirror/commands": "/cm/commands/dist/index.js",
-    "@codemirror/search": "/cm/search/dist/index.js",
-    "@codemirror/autocomplete": "/cm/autocomplete/dist/index.js",
-    "@codemirror/lang-javascript": "/cm/lang-javascript/dist/index.js",
-    ...
-  }
+**빌드 스크립트** (`package.json`):
+```json
+"scripts": {
+  "build:editor": "esbuild client/js/codemirror-entry.js --bundle --format=esm --outfile=client/js/codemirror-bundle.js"
 }
+```
+
+**index.html**:
+```html
+<script type="module">
+  // file-editor.js에서 codemirror-bundle.js를 import
 </script>
 ```
+
+`npm run build:editor`는 npm install 후 한 번만 실행하면 된다. postinstall 스크립트에 추가하여 자동화할 수 있다.
+
+`file-editor.js`는 `<script type="module">`로 로드되며, 기존 non-module 스크립트인 `file-viewer.js`에서는 전역 함수(`window.FileEditor.*`)를 통해 호출한다.
 
 ## UI 디자인
 
@@ -124,7 +133,7 @@ index.html에 importmap 추가:
 | Ctrl+Z | Undo |
 | Ctrl+Shift+Z | Redo |
 | Ctrl+F | 찾기 |
-| Ctrl+H | 찾기/바꾸기 |
+| Ctrl+H | 찾기/바꾸기 (커스텀 keybinding 필요 — `@codemirror/search`는 기본 바인딩 없음) |
 | Escape | 편집 모드 종료 (읽기 전용으로) |
 
 ## 서버: file_save 핸들러
@@ -155,11 +164,12 @@ index.html에 importmap 추가:
 
 | 파일 | 변경 내용 |
 |------|----------|
-| `package.json` | @codemirror/* 패키지 추가 |
-| `server/index.ts` | `/cm` static 경로 추가 |
+| `package.json` | @codemirror/* 패키지 추가, esbuild devDep, `build:editor` 스크립트 |
 | `server/ws-handlers.ts` | `file_save` 핸들러 추가 (~20줄) |
-| `client/index.html` | importmap 추가 |
-| `client/js/file-editor.js` | **신규** — CodeMirror 초기화, readOnly 토글, 언어 매핑 |
+| `client/js/codemirror-entry.js` | **신규** — esbuild 엔트리, CodeMirror re-export |
+| `client/js/codemirror-bundle.js` | **생성됨** — esbuild 번들 출력 |
+| `.gitignore` | `client/js/codemirror-bundle.js` 추가 |
+| `client/js/file-editor.js` | **신규** — CodeMirror 초기화, readOnly 토글, 언어 매핑, `window.FileEditor`로 export |
 | `client/js/file-viewer.js` | highlight.js 렌더링 → CodeMirror 교체, 편집 UI, 미저장 confirm |
 | `client/styles.css` | CodeMirror 테마 커스터마이징, 편집 모드 헤더 스타일 |
 
