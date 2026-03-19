@@ -17,6 +17,7 @@ const catSelect = document.getElementById('plan-cat-select');
 const catTabsEl = document.getElementById('plan-category-tabs');
 
 const boardEl = document.getElementById('plan-board');
+const boardDivider = document.getElementById('plan-board-divider');
 const listColEl = document.getElementById('plan-list-col');
 const editorColEl = document.getElementById('plan-editor-col');
 const viewToggleEl = document.getElementById('plan-view-toggle');
@@ -24,6 +25,10 @@ const statusSelect = document.getElementById('plan-status-select');
 const logsListEl = document.getElementById('plan-logs-list');
 const toastContainer = document.getElementById('plan-toast-container');
 const ctxMenuEl = document.getElementById('plan-ctx-menu');
+const imagesGridEl = document.getElementById('plan-images-grid');
+const lightboxEl = document.getElementById('plan-lightbox');
+const lightboxImg = document.getElementById('plan-lightbox-img');
+const lightboxClose = document.getElementById('plan-lightbox-close');
 
 let plans = [];
 let activeId = null;
@@ -163,6 +168,7 @@ function selectPlan(id) {
   dateEl.textContent = formatDate(plan.updated);
   if (statusSelect) statusSelect.value = plan.status || 'todo';
   loadPlanLogs(id);
+  loadPlanImages(id);
 
   listEl.querySelectorAll('.plan-item').forEach(el => {
     el.classList.toggle('active', el.dataset.id === id);
@@ -224,12 +230,32 @@ function switchView(view) {
     if (boardEl) boardEl.style.display = 'flex';
     if (listColEl) listColEl.style.display = 'none';
     if (editorColEl) editorColEl.style.display = 'none';
+    if (boardDivider) boardDivider.style.display = 'none';
+    restoreBoardSplit();
     renderBoard();
   } else {
     if (boardEl) boardEl.style.display = 'none';
+    if (boardDivider) boardDivider.style.display = 'none';
     if (listColEl) listColEl.style.display = '';
     if (editorColEl) editorColEl.style.display = '';
     renderList();
+  }
+}
+
+function showBoardEditor() {
+  if (boardDivider) boardDivider.style.display = '';
+  if (editorColEl) editorColEl.style.display = '';
+  restoreBoardSplit();
+}
+
+function restoreBoardSplit() {
+  if (!boardEl) return;
+  // Only apply saved split when editor is visible
+  if (editorColEl && editorColEl.style.display !== 'none') {
+    const saved = localStorage.getItem('plan-board-split');
+    boardEl.style.flex = saved ? `0 0 ${saved}px` : '2';
+  } else {
+    boardEl.style.flex = '1';
   }
 }
 
@@ -340,6 +366,35 @@ function initBoardDragDrop() {
   });
 }
 
+// ─── Board Divider Drag ─────────────────────────────
+function initBoardDivider() {
+  if (!boardDivider || !boardEl) return;
+  let startX = 0;
+  let startW = 0;
+
+  boardDivider.addEventListener('mousedown', e => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = boardEl.offsetWidth;
+    boardDivider.classList.add('dragging');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  function onMove(e) {
+    const delta = e.clientX - startX;
+    const newW = Math.max(200, startW + delta);
+    boardEl.style.flex = `0 0 ${newW}px`;
+  }
+
+  function onUp() {
+    boardDivider.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    localStorage.setItem('plan-board-split', String(boardEl.offsetWidth));
+  }
+}
+
 // ─── Context Menu ────────────────────────────────────
 function showPlanCtxMenu(x, y, planId) {
   ctxTargetPlanId = planId;
@@ -352,6 +407,59 @@ function showPlanCtxMenu(x, y, planId) {
 function hidePlanCtxMenu() {
   if (ctxMenuEl) ctxMenuEl.style.display = 'none';
   ctxTargetPlanId = null;
+}
+
+// ─── Plan Images ─────────────────────────────────────
+async function loadPlanImages(planId) {
+  if (!imagesGridEl) return;
+  try {
+    const res = await apiFetch(`/api/plans/${planId}/images`);
+    const data = await res.json();
+    if (!data.ok || !data.images.length) { imagesGridEl.innerHTML = ''; return; }
+    imagesGridEl.innerHTML = data.images.map(img => `
+      <div class="plan-image-thumb" data-url="${escHtml(img.url)}" data-name="${escHtml(img.name)}">
+        <img src="${escHtml(img.url)}" alt="${escHtml(img.name)}" loading="lazy" />
+        <button class="plan-image-delete" title="Delete">✕</button>
+      </div>
+    `).join('');
+  } catch {
+    imagesGridEl.innerHTML = '';
+  }
+}
+
+async function uploadPlanImage(planId, file) {
+  const ext = file.name?.split('.').pop()?.toLowerCase() || 'png';
+  const filename = `img-${Date.now()}.${ext}`;
+  try {
+    await apiFetch(`/api/plans/${planId}/images?filename=${encodeURIComponent(filename)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'image/png' },
+      body: file,
+    });
+    await loadPlanImages(planId);
+  } catch (e) {
+    console.error('[plan] image upload failed:', e);
+  }
+}
+
+async function deletePlanImage(planId, filename) {
+  try {
+    await apiFetch(`/api/plans/${planId}/images/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+    await loadPlanImages(planId);
+  } catch (e) {
+    console.error('[plan] image delete failed:', e);
+  }
+}
+
+function openLightbox(url) {
+  if (!lightboxEl || !lightboxImg) return;
+  lightboxImg.src = url;
+  lightboxEl.style.display = 'flex';
+}
+
+function closeLightbox() {
+  if (lightboxEl) lightboxEl.style.display = 'none';
+  if (lightboxImg) lightboxImg.src = '';
 }
 
 // ─── Activity Log ─────────────────────────────────────
@@ -402,6 +510,27 @@ function isLoggedIn() {
   return !!getAuthToken();
 }
 
+// ─── Modal size persistence ─────────────────────────
+const modalEl = document.getElementById('plan-modal');
+
+function restoreModalSize() {
+  const saved = localStorage.getItem('plan-modal-size');
+  if (saved && modalEl) {
+    try {
+      const { w, h } = JSON.parse(saved);
+      modalEl.style.width = w + 'px';
+      modalEl.style.height = h + 'px';
+    } catch {}
+  }
+}
+
+function saveModalSize() {
+  if (!modalEl) return;
+  const w = modalEl.offsetWidth;
+  const h = modalEl.offsetHeight;
+  localStorage.setItem('plan-modal-size', JSON.stringify({ w, h }));
+}
+
 // ─── Modal open/close ───────────────────────────────
 export async function openPlanModal() {
   if (!isLoggedIn()) return;
@@ -417,11 +546,13 @@ export async function openPlanModal() {
   } else {
     showEmptyState();
   }
+  restoreModalSize();
   overlay.classList.add('open');
 }
 
 export function closePlanModal() {
   flushSave();
+  saveModalSize();
   overlay.classList.remove('open');
 }
 
@@ -528,7 +659,7 @@ export function initPlanPanel() {
     if (!card) return;
     flushSave();
     selectPlan(card.dataset.id);
-    if (editorColEl) editorColEl.style.display = '';
+    showBoardEditor();
     loadPlanLogs(card.dataset.id);
   });
 
@@ -547,7 +678,7 @@ export function initPlanPanel() {
     const action = item.dataset.action;
     if (action === 'edit') {
       selectPlan(ctxTargetPlanId);
-      if (currentView === 'board' && editorColEl) editorColEl.style.display = '';
+      if (currentView === 'board') showBoardEditor();
     } else if (action === 'status') {
       const newStatus = item.dataset.status;
       const plan = plans.find(p => p.id === ctxTargetPlanId);
@@ -575,6 +706,39 @@ export function initPlanPanel() {
 
   // Init drag and drop
   initBoardDragDrop();
+  initBoardDivider();
+
+  // Image paste on editor content area
+  contentInput?.addEventListener('paste', e => {
+    if (!activeId) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) uploadPlanImage(activeId, file);
+        return;
+      }
+    }
+  });
+
+  // Image grid: click to lightbox, delete button
+  imagesGridEl?.addEventListener('click', e => {
+    const delBtn = e.target.closest('.plan-image-delete');
+    if (delBtn) {
+      e.stopPropagation();
+      const thumb = delBtn.closest('.plan-image-thumb');
+      if (thumb && activeId) deletePlanImage(activeId, thumb.dataset.name);
+      return;
+    }
+    const thumb = e.target.closest('.plan-image-thumb');
+    if (thumb) openLightbox(thumb.dataset.url);
+  });
+
+  // Lightbox close
+  lightboxClose?.addEventListener('click', closeLightbox);
+  lightboxEl?.querySelector('.plan-lightbox-backdrop')?.addEventListener('click', closeLightbox);
 
   // Apply initial view
   switchView(currentView);

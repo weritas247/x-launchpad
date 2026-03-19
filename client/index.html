@@ -458,6 +458,8 @@
           <div class="plan-board-cards" id="plan-board-cancelled"></div>
         </div>
       </div>
+      <!-- BOARD DIVIDER (drag to resize board vs editor) -->
+      <div class="plan-board-divider" id="plan-board-divider" style="display:none"></div>
       <!-- LEFT: Plan list -->
       <div class="plan-list-col" id="plan-list-col">
         <div class="plan-list-toolbar">
@@ -489,6 +491,10 @@
               <option value="cancelled">CANCELLED</option>
             </select>
             <button class="plan-btn-delete" id="plan-btn-delete" title="Delete plan">🗑 Delete</button>
+          </div>
+          <div class="plan-images" id="plan-images">
+            <div class="plan-images-header">Images <span class="plan-images-hint">(Ctrl+V to paste)</span></div>
+            <div class="plan-images-grid" id="plan-images-grid"></div>
           </div>
           <div class="plan-logs" id="plan-logs">
             <div class="plan-logs-header">Activity Log</div>
@@ -1016,5 +1022,10 @@
 <script type="module" src="js/mobile.js"></script>
 <script type="module" src="js/main.js"></script>
 <div class="plan-toast-container" id="plan-toast-container"></div>
+<div class="plan-lightbox" id="plan-lightbox" style="display:none">
+  <div class="plan-lightbox-backdrop"></div>
+  <img class="plan-lightbox-img" id="plan-lightbox-img" />
+  <button class="plan-lightbox-close" id="plan-lightbox-close">✕</button>
+</div>
 </body>
 </html>

@@ -598,6 +598,48 @@ app.post('/api/plans/log', async (req, res) => {
   }
 });
 
+// ─── PLAN IMAGES (Supabase Storage) ──────────────────────────────
+app.post('/api/plans/:id/images',
+  express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], limit: '10mb' }),
+  async (req, res) => {
+    const token = extractToken(req);
+    const payload = getTokenPayload(token);
+    if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    const planId = req.params.id;
+    const filename = (req.query.filename as string) || `img-${Date.now()}.png`;
+    try {
+      const result = await userDb.uploadPlanImage(payload.userId, planId, filename, req.body, req.headers['content-type'] || 'image/png');
+      res.json({ ok: true, ...result });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String(e) });
+    }
+  }
+);
+
+app.get('/api/plans/:id/images', async (req, res) => {
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
+  if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  try {
+    const images = await userDb.listPlanImages(payload.userId, req.params.id);
+    res.json({ ok: true, images });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.delete('/api/plans/:id/images/:filename', async (req, res) => {
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
+  if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  try {
+    await userDb.deletePlanImage(payload.userId, req.params.id, req.params.filename);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
 // ─── IMAGE UPLOAD ─────────────────────────────────────────────────
 app.post('/api/upload-image',
   express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], limit: '20mb' }),
@@ -1929,6 +1971,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 async function startServer() {
   try {
     await userDb.initUserCount();
+    await userDb.ensurePlanImagesBucket();
     console.log(`[auth] Email auth: ${userDb.getUserCount()} registered user(s), registration ${isRegistrationAllowed() ? 'allowed' : 'locked'}`);
   } catch (err) {
     console.error('[supabase] Failed to initialize user count:', err);

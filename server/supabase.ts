@@ -202,3 +202,51 @@ export async function appendPlanLog(userId: number, log: { plan_id?: string; typ
   }
   return { plan, log: logRow as PlanLogRow };
 }
+
+// ─── Plan Images (Supabase Storage) ─────────────────────────────
+const PLAN_IMAGES_BUCKET = 'plan-images';
+
+export async function ensurePlanImagesBucket(): Promise<void> {
+  const { error } = await supabase.storage.createBucket(PLAN_IMAGES_BUCKET, { public: true });
+  if (error && !error.message.includes('already exists')) {
+    console.warn('[supabase] Failed to create plan-images bucket:', error.message);
+  }
+}
+
+export async function uploadPlanImage(userId: number, planId: string, filename: string, buffer: Buffer, contentType: string): Promise<{ path: string; url: string }> {
+  // Verify plan belongs to user
+  const { data: plan } = await supabase.from('plans').select('id').eq('id', planId).eq('user_id', userId).single();
+  if (!plan) throw new Error('Plan not found');
+
+  const storagePath = `${userId}/${planId}/${filename}`;
+  const { error } = await supabase.storage.from(PLAN_IMAGES_BUCKET).upload(storagePath, buffer, {
+    contentType,
+    upsert: true,
+  });
+  if (error) throw error;
+
+  const { data: urlData } = supabase.storage.from(PLAN_IMAGES_BUCKET).getPublicUrl(storagePath);
+  return { path: storagePath, url: urlData.publicUrl };
+}
+
+export async function listPlanImages(userId: number, planId: string): Promise<{ name: string; url: string }[]> {
+  const { data: plan } = await supabase.from('plans').select('id').eq('id', planId).eq('user_id', userId).single();
+  if (!plan) throw new Error('Plan not found');
+
+  const prefix = `${userId}/${planId}`;
+  const { data, error } = await supabase.storage.from(PLAN_IMAGES_BUCKET).list(prefix);
+  if (error) throw error;
+  return (data || []).map(f => {
+    const { data: urlData } = supabase.storage.from(PLAN_IMAGES_BUCKET).getPublicUrl(`${prefix}/${f.name}`);
+    return { name: f.name, url: urlData.publicUrl };
+  });
+}
+
+export async function deletePlanImage(userId: number, planId: string, filename: string): Promise<void> {
+  const { data: plan } = await supabase.from('plans').select('id').eq('id', planId).eq('user_id', userId).single();
+  if (!plan) throw new Error('Plan not found');
+
+  const storagePath = `${userId}/${planId}/${filename}`;
+  const { error } = await supabase.storage.from(PLAN_IMAGES_BUCKET).remove([storagePath]);
+  if (error) throw error;
+}
