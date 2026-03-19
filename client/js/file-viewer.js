@@ -1,7 +1,9 @@
 // ─── FILE VIEWER: opens files from explorer as tabs in main view ───
 import { S, terminalMap, tabBar, tabAddBtn, termWrapper, escHtml } from './state.js';
+import { wsSend } from './websocket.js';
+import { registerAction } from './keyboard.js';
 
-// Map<filePath, { tabEl, paneEl }>
+// Map<filePath, { tabEl, paneEl, contentEl, headerEl, editorView, filePath, originalContent, isEditing }>
 const fileTabs = new Map();
 let activeFilePath = null;
 let previewFilePath = null; // single preview tab (replaced on next click)
@@ -39,6 +41,7 @@ export function openFileTab(filePath, content, opts = {}) {
   tabEl.innerHTML = `
     <span class="tab-file-icon">${getFileIcon(fileName)}</span>
     <span class="tab-name">${escHtml(fileName)}</span>
+    <span class="tab-unsaved-dot" style="display:none">●</span>
     <button class="tab-close-btn">✕</button>
   `;
   tabEl.title = filePath;
@@ -63,12 +66,18 @@ export function openFileTab(filePath, content, opts = {}) {
   paneEl.className = 'file-pane';
   paneEl.dataset.filePath = filePath;
 
-  // Header bar
+  // Header bar with edit controls
   const headerEl = document.createElement('div');
   headerEl.className = 'file-pane-header';
   const pathParts = filePath.split('/');
   const shortPath = pathParts.length > 3 ? '…/' + pathParts.slice(-3).join('/') : filePath;
-  headerEl.innerHTML = `<span class="file-pane-path">${escHtml(shortPath)}</span>`;
+  headerEl.innerHTML = `
+    <span class="file-pane-path">${escHtml(shortPath)}</span>
+    <div class="file-pane-actions">
+      <span class="file-pane-status">READ ONLY</span>
+      <button class="file-pane-edit-btn">Edit</button>
+    </div>
+  `;
   paneEl.appendChild(headerEl);
 
   // Content area
@@ -78,90 +87,34 @@ export function openFileTab(filePath, content, opts = {}) {
 
   termWrapper.appendChild(paneEl);
 
-  fileTabs.set(filePath, { tabEl, paneEl, contentEl });
+  const entry = {
+    tabEl,
+    paneEl,
+    contentEl,
+    headerEl,
+    editorView: null,
+    filePath,
+    originalContent: null,
+    isEditing: false,
+  };
+  fileTabs.set(filePath, entry);
   previewFilePath = filePath;
+
+  // Wire up Edit button
+  const editBtn = headerEl.querySelector('.file-pane-edit-btn');
+  editBtn.addEventListener('click', () => {
+    enterEditMode(filePath);
+  });
+
+  // Escape key exits edit mode
+  paneEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && entry.isEditing) {
+      exitEditMode(filePath);
+    }
+  });
 
   updateFileContent(filePath, content, { binary: isBinary, isImage, imageData, imageMime, error });
   activateFileTab(filePath);
-}
-
-// Map file extensions to highlight.js language names
-function getHljsLang(filePath) {
-  const ext = filePath.split('.').pop()?.toLowerCase();
-  const langMap = {
-    js: 'javascript',
-    mjs: 'javascript',
-    cjs: 'javascript',
-    ts: 'typescript',
-    mts: 'typescript',
-    cts: 'typescript',
-    jsx: 'javascript',
-    tsx: 'typescript',
-    py: 'python',
-    rb: 'ruby',
-    rs: 'rust',
-    go: 'go',
-    java: 'java',
-    kt: 'kotlin',
-    scala: 'scala',
-    c: 'c',
-    h: 'c',
-    cpp: 'cpp',
-    cc: 'cpp',
-    cxx: 'cpp',
-    hpp: 'cpp',
-    cs: 'csharp',
-    swift: 'swift',
-    m: 'objectivec',
-    html: 'xml',
-    htm: 'xml',
-    xml: 'xml',
-    svg: 'xml',
-    css: 'css',
-    scss: 'scss',
-    less: 'less',
-    sass: 'scss',
-    json: 'json',
-    yaml: 'yaml',
-    yml: 'yaml',
-    toml: 'ini',
-    md: 'markdown',
-    markdown: 'markdown',
-    sh: 'bash',
-    bash: 'bash',
-    zsh: 'bash',
-    fish: 'bash',
-    sql: 'sql',
-    graphql: 'graphql',
-    gql: 'graphql',
-    php: 'php',
-    lua: 'lua',
-    r: 'r',
-    pl: 'perl',
-    dockerfile: 'dockerfile',
-    makefile: 'makefile',
-    tf: 'hcl',
-    hcl: 'hcl',
-    vue: 'xml',
-    svelte: 'xml',
-    ini: 'ini',
-    conf: 'ini',
-    cfg: 'ini',
-    diff: 'diff',
-    patch: 'diff',
-    zig: 'zig',
-    nim: 'nim',
-    ex: 'elixir',
-    exs: 'elixir',
-    erl: 'erlang',
-    hs: 'haskell',
-    clj: 'clojure',
-  };
-  // Also check filename (e.g. Dockerfile, Makefile)
-  const name = filePath.split('/').pop()?.toLowerCase() || '';
-  if (name === 'dockerfile') return 'dockerfile';
-  if (name === 'makefile' || name === 'gnumakefile') return 'makefile';
-  return langMap[ext] || null;
 }
 
 function updateFileContent(filePath, content, opts = {}) {
@@ -169,6 +122,12 @@ function updateFileContent(filePath, content, opts = {}) {
   if (!entry) return;
 
   const { contentEl } = entry;
+
+  // Destroy any existing editor before replacing content
+  if (entry.editorView) {
+    window.FileEditor.destroyEditor(entry.editorView);
+    entry.editorView = null;
+  }
 
   if (opts.error) {
     contentEl.innerHTML = `<div class="file-pane-error">${escHtml(opts.error)}</div>`;
@@ -182,80 +141,121 @@ function updateFileContent(filePath, content, opts = {}) {
       <img src="${dataUrl}" alt="${escHtml(filePath.split('/').pop())}" />
       <div class="file-pane-image-info">${escHtml(filePath.split('/').pop())}</div>
     </div>`;
+    // Hide edit button for images
+    const editBtn = entry.headerEl.querySelector('.file-pane-edit-btn');
+    if (editBtn) editBtn.style.display = 'none';
     return;
   }
 
   if (opts.binary) {
     contentEl.innerHTML = '<div class="file-pane-error">Binary file — cannot preview</div>';
+    // Hide edit button for binary
+    const editBtn = entry.headerEl.querySelector('.file-pane-edit-btn');
+    if (editBtn) editBtn.style.display = 'none';
     return;
   }
 
   const text = content || '';
-  const lines = text.split('\n');
-  const gutterWidth = String(lines.length).length;
 
-  // Try syntax highlighting with highlight.js
-  const lang = getHljsLang(filePath);
-  let highlightedLines;
+  // Clear the content element for CodeMirror
+  contentEl.innerHTML = '';
 
-  if (lang && typeof hljs !== 'undefined') {
-    try {
-      const result = hljs.highlight(text, { language: lang, ignoreIllegals: true });
-      // Split highlighted HTML by newline — hljs returns a single HTML string
-      highlightedLines = splitHighlightedLines(result.value);
-    } catch {
-      highlightedLines = null;
+  const onSave = (saveContent) => {
+    wsSend({ type: 'file_save', sessionId: S.activeSessionId, filePath, content: saveContent });
+  };
+
+  const onChange = (newContent) => {
+    const currentEntry = fileTabs.get(filePath);
+    if (!currentEntry) return;
+    const isDirty = newContent !== currentEntry.originalContent;
+    const dot = currentEntry.tabEl.querySelector('.tab-unsaved-dot');
+    if (isDirty) {
+      currentEntry.tabEl.classList.add('unsaved');
+      if (dot) dot.style.display = '';
+    } else {
+      currentEntry.tabEl.classList.remove('unsaved');
+      if (dot) dot.style.display = 'none';
     }
-  }
+  };
 
-  if (highlightedLines && highlightedLines.length === lines.length) {
-    contentEl.innerHTML = highlightedLines
-      .map(
-        (html, i) =>
-          `<div class="fl"><span class="fl-ln" style="min-width:${gutterWidth}ch">${i + 1}</span><span class="fl-code">${html || ' '}</span></div>`
-      )
-      .join('');
-  } else {
-    contentEl.innerHTML = lines
-      .map(
-        (line, i) =>
-          `<div class="fl"><span class="fl-ln" style="min-width:${gutterWidth}ch">${i + 1}</span><span class="fl-code">${escHtml(line) || ' '}</span></div>`
-      )
-      .join('');
-  }
+  // Create CodeMirror editor (read-only by default)
+  const editorView = window.FileEditor.createEditor(contentEl, text, filePath, {
+    readOnly: true,
+    onSave,
+    onChange,
+  });
+
+  entry.editorView = editorView;
+  entry.originalContent = text;
+  entry.isEditing = false;
+
+  // Reset header to read-only state
+  renderReadonlyHeader(entry);
 }
 
-// Split highlight.js output HTML by newlines while preserving open span tags across lines
-function splitHighlightedLines(html) {
-  const rawLines = html.split('\n');
-  const result = [];
-  let openSpans = []; // stack of open <span ...> tags carried from previous lines
+function renderReadonlyHeader(entry) {
+  const actionsEl = entry.headerEl.querySelector('.file-pane-actions');
+  if (!actionsEl) return;
+  actionsEl.innerHTML = `
+    <span class="file-pane-status">READ ONLY</span>
+    <button class="file-pane-edit-btn">Edit</button>
+  `;
+  actionsEl.querySelector('.file-pane-edit-btn').addEventListener('click', () => {
+    enterEditMode(entry.filePath);
+  });
+}
 
-  for (const rawLine of rawLines) {
-    // Prepend carried-over open spans, append the raw line content
-    const prefix = openSpans.join('');
-    const fullLine = prefix + rawLine;
-
-    // Parse only the RAW line (not prefix) to update the span stack
-    const newSpans = [...openSpans];
-    const tagRegex = /<(\/?)span([^>]*)>/g;
-    let m;
-    while ((m = tagRegex.exec(rawLine)) !== null) {
-      if (m[1] === '/') {
-        newSpans.pop();
-      } else {
-        newSpans.push(`<span${m[2]}>`);
-      }
+function renderEditingHeader(entry) {
+  const actionsEl = entry.headerEl.querySelector('.file-pane-actions');
+  if (!actionsEl) return;
+  actionsEl.innerHTML = `
+    <span class="file-pane-status editing">EDITING</span>
+    <span class="file-pane-hint">Ctrl+S to save</span>
+    <button class="file-pane-save-btn">Save</button>
+    <button class="file-pane-cancel-btn">Cancel</button>
+  `;
+  actionsEl.querySelector('.file-pane-save-btn').addEventListener('click', () => {
+    if (entry.editorView) {
+      const currentContent = window.FileEditor.getContent(entry.editorView);
+      wsSend({ type: 'file_save', sessionId: S.activeSessionId, filePath: entry.filePath, content: currentContent });
     }
+  });
+  actionsEl.querySelector('.file-pane-cancel-btn').addEventListener('click', () => {
+    exitEditMode(entry.filePath);
+  });
+}
 
-    // Close any unclosed spans at end of line for valid HTML
-    const suffix = '</span>'.repeat(newSpans.length);
-    result.push(fullLine + suffix);
+function enterEditMode(filePath) {
+  const entry = fileTabs.get(filePath);
+  if (!entry || !entry.editorView) return;
+  window.FileEditor.setReadOnly(entry.editorView, false);
+  entry.isEditing = true;
+  renderEditingHeader(entry);
+  entry.editorView.focus();
+}
 
-    openSpans = newSpans;
+function exitEditMode(filePath) {
+  const entry = fileTabs.get(filePath);
+  if (!entry || !entry.editorView) return;
+
+  // Restore original content if changed
+  const currentContent = window.FileEditor.getContent(entry.editorView);
+  if (currentContent !== entry.originalContent) {
+    // Use the view's dispatch to replace all content
+    const view = entry.editorView;
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: entry.originalContent },
+    });
   }
 
-  return result;
+  window.FileEditor.setReadOnly(entry.editorView, true);
+  entry.isEditing = false;
+  renderReadonlyHeader(entry);
+
+  // Clear unsaved indicator since we restored content
+  entry.tabEl.classList.remove('unsaved');
+  const dot = entry.tabEl.querySelector('.tab-unsaved-dot');
+  if (dot) dot.style.display = 'none';
 }
 
 export function activateFileTab(filePath) {
@@ -280,6 +280,20 @@ export function activateFileTab(filePath) {
 export function closeFileTab(filePath) {
   const entry = fileTabs.get(filePath);
   if (!entry) return;
+
+  // Confirm if unsaved changes exist
+  if (entry.isEditing && entry.editorView) {
+    const current = window.FileEditor.getContent(entry.editorView);
+    if (current !== entry.originalContent) {
+      if (!confirm('Unsaved changes. Close anyway?')) return;
+    }
+  }
+
+  // Destroy CodeMirror editor if present
+  if (entry.editorView) {
+    window.FileEditor.destroyEditor(entry.editorView);
+    entry.editorView = null;
+  }
 
   entry.tabEl.remove();
   entry.paneEl.remove();
@@ -319,6 +333,30 @@ export function getActiveFilePath() {
   return activeFilePath;
 }
 
+// Export stub for Task 5: handle server response after file_save
+export function handleFileSaveResult(filePath, success, error) {
+  const entry = fileTabs.get(filePath);
+  if (!entry) return;
+  if (success) {
+    // Update originalContent to saved content
+    if (entry.editorView) {
+      entry.originalContent = window.FileEditor.getContent(entry.editorView);
+    }
+    // Clear unsaved indicator
+    entry.tabEl.classList.remove('unsaved');
+    const dot = entry.tabEl.querySelector('.tab-unsaved-dot');
+    if (dot) dot.style.display = 'none';
+    // Return to read-only mode
+    if (entry.isEditing) {
+      window.FileEditor.setReadOnly(entry.editorView, true);
+      entry.isEditing = false;
+      renderReadonlyHeader(entry);
+    }
+  } else if (error) {
+    alert(`Save failed: ${error}`);
+  }
+}
+
 function getFileIcon(name) {
   const ext = name.split('.').pop()?.toLowerCase();
   const iconMap = {
@@ -347,6 +385,14 @@ function getFileIcon(name) {
   };
   return iconMap[ext] || '📄';
 }
+
+// Register the toggleFileEdit action (keybinding assigned in main.js)
+registerAction('toggleFileEdit', () => {
+  const entry = fileTabs.get(activeFilePath);
+  if (!entry || !entry.editorView) return;
+  if (entry.isEditing) exitEditMode(activeFilePath);
+  else enterEditMode(activeFilePath);
+});
 
 // Lazy import to avoid circular dependency
 let _activateSession = null;
