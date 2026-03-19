@@ -199,13 +199,12 @@ export function initPlanPanel() {
     if (item) selectPlan(item.dataset.id);
   });
 
-  // Enter in title → focus content (use keyCode/code for IME compatibility)
+  // Enter in title → focus content (keyup for IME/한글 compatibility)
   titleInput?.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) {
-      if (e.isComposing) return;
-      e.preventDefault();
-      contentInput.focus();
-    }
+    if ((e.key === 'Enter' || e.keyCode === 13) && !e.isComposing) e.preventDefault();
+  });
+  titleInput?.addEventListener('keyup', e => {
+    if (e.key === 'Enter' || e.keyCode === 13) contentInput.focus();
   });
 
   // Auto-save on input
