@@ -64,3 +64,54 @@ export async function getUserById(id: number): Promise<Omit<UserRow, 'password_h
   if (error && error.code !== 'PGRST116') throw error;
   return data as Omit<UserRow, 'password_hash'> | null;
 }
+
+export interface PlanRow {
+  id: string;
+  user_id: number;
+  title: string;
+  content: string;
+  category: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getPlans(userId: number): Promise<PlanRow[]> {
+  const { data, error } = await supabase
+    .from('plans')
+    .select('*')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as PlanRow[];
+}
+
+export async function createPlan(userId: number, plan: { id: string; title: string; content: string; category: string }): Promise<PlanRow> {
+  const { data, error } = await supabase
+    .from('plans')
+    .insert({ id: plan.id, user_id: userId, title: plan.title, content: plan.content, category: plan.category })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as PlanRow;
+}
+
+export async function updatePlan(userId: number, planId: string, updates: { title?: string; content?: string; category?: string }): Promise<PlanRow> {
+  const { data, error } = await supabase
+    .from('plans')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', planId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as PlanRow;
+}
+
+export async function deletePlan(userId: number, planId: string): Promise<void> {
+  const { error } = await supabase
+    .from('plans')
+    .delete()
+    .eq('id', planId)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
