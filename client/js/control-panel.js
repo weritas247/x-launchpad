@@ -1,6 +1,5 @@
 // Control Panel — 플로팅 버튼 + 미니 대시보드 패널
 const CONTROL_PORT = 3001;
-let lastStatus = {};
 let controlWs = null;
 let panelOpen = false;
 const floatingBtn = document.getElementById('control-floating-btn');
