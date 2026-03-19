@@ -674,6 +674,56 @@ const handlers: Record<string, WsHandler> = {
     );
   },
 
+  file_save(ctx, parsed) {
+    const r = getSession(ctx, parsed);
+    if (!r) return;
+    const { id, session } = r;
+    const filePath = parsed.filePath as string;
+    const content = parsed.content as string;
+
+    if (!filePath || typeof content !== 'string') {
+      ctx.wsSend(ctx.ws, JSON.stringify({
+        type: 'file_save_result',
+        sessionId: id,
+        filePath,
+        success: false,
+        error: 'Missing filePath or content',
+      }));
+      return;
+    }
+
+    // Path traversal protection
+    const resolved = path.resolve(session.cwd, filePath);
+    if (!resolved.startsWith(session.cwd + path.sep) && resolved !== session.cwd) {
+      ctx.wsSend(ctx.ws, JSON.stringify({
+        type: 'file_save_result',
+        sessionId: id,
+        filePath,
+        success: false,
+        error: 'Access denied: path outside project',
+      }));
+      return;
+    }
+
+    try {
+      fs.writeFileSync(resolved, content, 'utf-8');
+      ctx.wsSend(ctx.ws, JSON.stringify({
+        type: 'file_save_result',
+        sessionId: id,
+        filePath,
+        success: true,
+      }));
+    } catch (err: any) {
+      ctx.wsSend(ctx.ws, JSON.stringify({
+        type: 'file_save_result',
+        sessionId: id,
+        filePath,
+        success: false,
+        error: err.message,
+      }));
+    }
+  },
+
   file_search(ctx, parsed) {
     const r = getSession(ctx, parsed);
     if (!r) return;
