@@ -30,7 +30,6 @@ function connectControlWS() {
   controlWs.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'status') {
-      lastStatus = msg;
       updatePanel(msg);
     }
   };
