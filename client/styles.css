@@ -5885,23 +5885,23 @@ body::after {
 .sys-toast {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: 4px;
+  gap: 16px;
+  padding: 16px 28px;
+  border-radius: 8px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 22px;
   letter-spacing: 0.03em;
   pointer-events: auto;
   transform: translateX(120%);
   transition: transform 0.25s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  max-width: 320px;
+  max-width: 640px;
 }
 .sys-toast.show {
   transform: translateX(0);
 }
 .sys-toast-icon {
-  font-size: 13px;
+  font-size: 26px;
   flex-shrink: 0;
 }
 .sys-toast-msg {
