@@ -507,11 +507,11 @@ app.post('/api/plans', async (req, res) => {
   const token = extractToken(req);
   const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  const { id, title, content, category } = req.body || {};
+  const { id, title, content, category, status } = req.body || {};
   if (!id) return res.status(400).json({ ok: false, error: 'Missing id' });
   try {
     const plan = await userDb.createPlan(payload.userId, {
-      id, title: title || '', content: content || '', category: category || 'other',
+      id, title: title || '', content: content || '', category: category || 'other', status: status || 'todo',
     });
     res.json({ ok: true, plan });
   } catch (e) {
@@ -523,9 +523,9 @@ app.put('/api/plans/:id', async (req, res) => {
   const token = extractToken(req);
   const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  const { title, content, category } = req.body || {};
+  const { title, content, category, status } = req.body || {};
   try {
-    const plan = await userDb.updatePlan(payload.userId, req.params.id, { title, content, category });
+    const plan = await userDb.updatePlan(payload.userId, req.params.id, { title, content, category, status });
     res.json({ ok: true, plan });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e) });
@@ -539,6 +539,60 @@ app.delete('/api/plans/:id', async (req, res) => {
   try {
     await userDb.deletePlan(payload.userId, req.params.id);
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.patch('/api/plans/:id/status', async (req, res) => {
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
+  if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  const { status } = req.body || {};
+  const validStatuses = ['todo', 'doing', 'done', 'on_hold', 'cancelled'];
+  if (!status || !validStatuses.includes(status)) {
+    return res.status(400).json({ ok: false, error: 'Invalid status' });
+  }
+  try {
+    const plan = await userDb.updatePlanStatus(payload.userId, req.params.id, status);
+    res.json({ ok: true, plan });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.get('/api/plans/:id/logs', async (req, res) => {
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
+  if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  try {
+    const logs = await userDb.getPlanLogs(payload.userId, req.params.id);
+    res.json({ ok: true, logs });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.post('/api/plans/log', async (req, res) => {
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
+  if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  const { plan_id, type, content, commit_hash } = req.body || {};
+  if (!type || !['commit', 'summary'].includes(type)) {
+    return res.status(400).json({ ok: false, error: 'Invalid type' });
+  }
+  try {
+    const result = await userDb.appendPlanLog(payload.userId, { plan_id, type, content: content || '', commit_hash });
+    if (type === 'summary' && result.plan) {
+      const msg = JSON.stringify({
+        type: 'plan_ai_done',
+        planId: result.plan.id,
+        planTitle: result.plan.title,
+        planStatus: result.plan.status,
+      });
+      wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg); });
+    }
+    res.json({ ok: true, plan: result.plan, log: result.log });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e) });
   }
