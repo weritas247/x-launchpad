@@ -22,9 +22,13 @@ export {
 // Language infrastructure
 export {
   defaultHighlightStyle, syntaxHighlighting,
+  HighlightStyle,
   indentOnInput, bracketMatching, foldGutter, foldKeymap,
   LanguageSupport,
 } from '@codemirror/language';
+
+// Highlight tags (for custom themes)
+export { tags } from '@lezer/highlight';
 
 // Languages
 export { javascript } from '@codemirror/lang-javascript';

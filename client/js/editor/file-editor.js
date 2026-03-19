@@ -5,10 +5,11 @@ import {
   drawSelection, dropCursor,
   defaultKeymap, history, historyKeymap, indentWithTab,
   searchKeymap, openSearchPanel, search, highlightSelectionMatches,
-  defaultHighlightStyle, syntaxHighlighting,
+  syntaxHighlighting, HighlightStyle,
   indentOnInput, bracketMatching, foldGutter, foldKeymap,
   javascript, python, html, css, json, markdown,
   rust, cpp, java, sql, xml, yaml,
+  tags,
 } from '../codemirror-bundle.js';
 
 // ─── Language map (file extension → CodeMirror language function) ───
@@ -40,46 +41,67 @@ function getLangExtension(filePath) {
   return [result];
 }
 
+// ─── GitHub Dark syntax highlighting ───
+const githubDarkHighlight = HighlightStyle.define([
+  { tag: tags.keyword, color: '#ff7b72' },
+  { tag: [tags.name, tags.deleted, tags.character, tags.macroName], color: '#c9d1d9' },
+  { tag: [tags.function(tags.variableName), tags.labelName], color: '#d2a8ff' },
+  { tag: [tags.color, tags.constant(tags.name), tags.standard(tags.name)], color: '#79c0ff' },
+  { tag: [tags.definition(tags.name), tags.separator], color: '#c9d1d9' },
+  { tag: [tags.typeName, tags.className, tags.number, tags.changed, tags.annotation, tags.modifier, tags.self, tags.namespace], color: '#ffa657' },
+  { tag: [tags.operator, tags.operatorKeyword, tags.url, tags.escape, tags.regexp, tags.link, tags.special(tags.string)], color: '#79c0ff' },
+  { tag: [tags.meta, tags.comment], color: '#8b949e' },
+  { tag: tags.strong, fontWeight: 'bold', color: '#c9d1d9' },
+  { tag: tags.emphasis, fontStyle: 'italic', color: '#c9d1d9' },
+  { tag: tags.strikethrough, textDecoration: 'line-through' },
+  { tag: tags.link, color: '#58a6ff', textDecoration: 'underline' },
+  { tag: tags.heading, fontWeight: 'bold', color: '#d2a8ff' },
+  { tag: [tags.atom, tags.bool, tags.special(tags.variableName)], color: '#79c0ff' },
+  { tag: [tags.processingInstruction, tags.string, tags.inserted], color: '#a5d6ff' },
+  { tag: tags.invalid, color: '#f85149' },
+]);
+
 // ─── Dark theme matching X-Launchpad ───
 const superTerminalTheme = EditorView.theme({
   '&': {
-    backgroundColor: 'var(--bg-void)',
-    color: 'var(--text-main)',
+    backgroundColor: '#0d1117',
+    color: '#c9d1d9',
     fontSize: 'var(--font-size, 13px)',
     fontFamily: 'var(--font-mono)',
   },
   '.cm-content': {
-    caretColor: 'var(--accent, #c792ea)',
+    caretColor: '#58a6ff',
     padding: '4px 0',
   },
   '.cm-cursor, .cm-dropCursor': {
-    borderLeftColor: 'var(--accent, #c792ea)',
+    borderLeftColor: '#58a6ff',
   },
   '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(56, 139, 253, 0.25)',
   },
   '.cm-activeLine': {
-    backgroundColor: 'var(--bg-hover)',
+    backgroundColor: 'rgba(110, 118, 129, 0.1)',
   },
   '.cm-gutters': {
-    backgroundColor: 'var(--bg-deep)',
-    color: 'var(--text-ghost)',
+    backgroundColor: '#0d1117',
+    color: '#484f58',
     border: 'none',
     minWidth: '3ch',
   },
   '.cm-activeLineGutter': {
-    backgroundColor: 'var(--bg-hover)',
+    backgroundColor: 'rgba(110, 118, 129, 0.1)',
+    color: '#c9d1d9',
   },
   '.cm-foldPlaceholder': {
-    backgroundColor: 'var(--bg-hover)',
-    color: 'var(--text-dim)',
+    backgroundColor: '#161b22',
+    color: '#8b949e',
     border: 'none',
   },
   '.cm-searchMatch': {
-    backgroundColor: 'rgba(255, 203, 107, 0.3)',
+    backgroundColor: 'rgba(210, 153, 34, 0.3)',
   },
   '.cm-searchMatch.cm-searchMatch-selected': {
-    backgroundColor: 'rgba(255, 203, 107, 0.5)',
+    backgroundColor: 'rgba(210, 153, 34, 0.5)',
   },
 }, { dark: true });
 
@@ -97,7 +119,7 @@ function baseExtensions(filePath) {
     foldGutter(),
     history(),
     search(),
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    syntaxHighlighting(githubDarkHighlight),
     superTerminalTheme,
     keymap.of([
       ...defaultKeymap,
