@@ -363,9 +363,6 @@ export function updateSessionInfo(sessionId, cwd, ai) {
   const cwdEl = entry.sidebarEl.querySelector('[data-cwd]');
   if (cwdEl) cwdEl.textContent = wtName ? `⌥${wtName}  ${shortCwd}` : shortCwd;
 
-  const badgeEl = entry.sidebarEl.querySelector('.session-ai-badge');
-  const metaEl = entry.sidebarEl.querySelector('.session-meta');
-
   // Update tab AI icon
   let tabAiIcon = entry.tabEl.querySelector('.tab-ai-icon');
   if (ai) {

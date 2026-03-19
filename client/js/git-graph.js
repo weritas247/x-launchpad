@@ -15,7 +15,7 @@ let focusedRowIdx = -1;
 let isLoadingMore = false;
 let hasMore = false;
 let currentSkip = 0;
-const PAGE_SIZE = 50;
+// const PAGE_SIZE = 50; // reserved for future pagination
 const MAX_COMMITS = 500;
 let scrollRAF = null;
 
@@ -600,7 +600,7 @@ function coAuthorBadge(coAuthors) {
 }
 
 // ─── STAT BADGE ──────────────────────────────────────
-function statBadge(add, del) {
+function _statBadge(add, del) { // eslint-disable-line no-unused-vars
   if (!add && !del) return '';
   const parts = [];
   if (add) parts.push(`<span class="gg-stat-add">+${add}</span>`);
@@ -742,7 +742,7 @@ function renderGraph(commits) {
 
   // Commit rows
   commitBox.innerHTML = commits
-    .map((c, i) => {
+    .map((c, _i) => {
       const refs =
         c.refs.length > 0 ? `<span class="gg-refs">${c.refs.map(refBadge).join('')}</span>` : '';
       const coAuthors = parseCoAuthors(c.body);

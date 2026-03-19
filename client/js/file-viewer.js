@@ -276,8 +276,6 @@ export function activateFileTab(filePath) {
     paneEl.classList.toggle('active', isActive);
   });
 
-  // Update status bar
-  const fileName = filePath.split('/').pop();
 }
 
 export function closeFileTab(filePath) {

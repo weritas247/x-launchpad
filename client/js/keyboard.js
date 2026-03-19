@@ -2,7 +2,7 @@
 // All keybinding matching & action execution in one place.
 // Called from both xterm custom key handler and document keydown.
 
-import { S, terminalMap, settingsOverlay } from './state.js';
+import { S } from './state.js';
 import { normalizeKey, KB_DEFS } from './constants.js';
 
 const actionMap = new Map(); // action name → callback

@@ -1,5 +1,4 @@
 import { S, terminalMap, folderMap, escHtml } from './state.js';
-import { makeSidebarItemDraggable } from './terminal.js';
 
 export function createFolder(name) {
   const id = 'folder-' + ++S.folderCounter;

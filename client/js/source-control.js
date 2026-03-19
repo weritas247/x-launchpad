@@ -1,5 +1,5 @@
 // ─── SOURCE CONTROL PANEL ────────────────────────────────────────
-import { S, sessionMeta, escHtml } from './state.js';
+import { S, escHtml } from './state.js';
 import { wsSend } from './websocket.js';
 import { showToast } from './toast.js';
 import { confirmModal } from './confirm-modal.js';
@@ -927,7 +927,7 @@ function initDragSelect() {
     updateSelectionVisuals();
   });
 
-  document.addEventListener('mouseup', (e) => {
+  document.addEventListener('mouseup', (_e) => {
     if (dragSelecting) {
       lasso.style.display = 'none';
       dragSelecting = false;

@@ -1,4 +1,4 @@
-import { S, terminalMap } from './state.js';
+import { terminalMap } from './state.js';
 import { wsSend, apiFetch } from './websocket.js';
 
 // Per-session pending images (NOT uploaded yet): Map<sessionId, [{file, objectUrl}]>
