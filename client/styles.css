@@ -959,19 +959,20 @@ body::after {
   gap: 6px;
   white-space: nowrap;
   transition: all 0.12s;
-  max-width: 160px;
+  min-width: 0;
   overflow: hidden;
   animation: fadeIn 0.15s ease;
-  flex-shrink: 0;
+  flex: 1;
 }
 .tab:hover {
   color: var(--text-main);
   background: var(--bg-hover);
 }
 .tab.active {
-  color: var(--text-bright);
+  color: var(--accent);
   background: var(--bg-void);
   border-color: var(--border-lit);
+  border-top: 2px solid var(--accent);
   border-bottom-color: var(--bg-void);
 }
 .tab-indicator {
@@ -1440,6 +1441,9 @@ body::after {
   letter-spacing: 0.04em;
   flex-shrink: 0;
   background: var(--bg-deep);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .file-pane-path {
   color: var(--text-ghost);
@@ -1458,28 +1462,6 @@ body::after {
 .file-pane-content::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 2px;
-}
-.fl {
-  display: flex;
-  padding: 0 14px 0 0;
-  min-height: 1.6em;
-}
-.fl:hover {
-  background: var(--bg-hover);
-}
-.fl-ln {
-  color: var(--text-ghost);
-  text-align: right;
-  padding: 0 12px 0 14px;
-  user-select: none;
-  flex-shrink: 0;
-  font-size: 12px;
-}
-.fl-code {
-  white-space: pre;
-  color: var(--text-main);
-  flex: 1;
-  min-width: 0;
 }
 .file-pane-error {
   padding: 20px;
@@ -1509,60 +1491,94 @@ body::after {
   color: var(--text-ghost);
   letter-spacing: 0.04em;
 }
-.fl-code .hljs-keyword,
-.fl-code .hljs-selector-tag,
-.fl-code .hljs-built_in,
-.fl-code .hljs-type {
+/* ─── CodeMirror in file pane ─── */
+.file-pane-content .cm-editor {
+  height: 100%;
+}
+.file-pane-content .cm-scroller {
+  overflow: auto;
+  font-family: var(--font-mono);
+}
+
+/* ─── File pane header: edit mode ─── */
+.file-pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.file-pane-status {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-ghost);
+}
+.file-pane-status.editing {
   color: var(--accent, #c792ea);
 }
-.fl-code .hljs-string,
-.fl-code .hljs-attr {
-  color: #c3e88d;
+.file-pane-edit-btn,
+.file-pane-save-btn,
+.file-pane-cancel-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--font-mono);
 }
-.fl-code .hljs-number,
-.fl-code .hljs-literal {
-  color: #f78c6c;
+.file-pane-edit-btn {
+  background: var(--bg-hover);
+  color: var(--text-dim);
 }
-.fl-code .hljs-comment,
-.fl-code .hljs-doctag {
+.file-pane-edit-btn:hover {
+  background: var(--border);
+  color: var(--text-main);
+}
+.file-pane-save-btn {
+  background: #a6e3a1;
+  color: #1e1e2e;
+  font-weight: 600;
+}
+.file-pane-save-btn:hover {
+  background: #94d890;
+}
+.file-pane-cancel-btn {
+  background: var(--bg-hover);
+  color: var(--text-dim);
+}
+.file-pane-cancel-btn:hover {
+  background: var(--border);
+}
+.file-pane-save-hint {
+  font-size: 10px;
   color: var(--text-ghost);
+}
+
+/* ─── Unsaved dot on tab ─── */
+.tab-unsaved-dot {
+  color: #f38ba8;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.tab.file-tab.unsaved .tab-name {
   font-style: italic;
 }
-.fl-code .hljs-function,
-.fl-code .hljs-title {
-  color: #82aaff;
+
+/* ─── File pane header messages ─── */
+.file-pane-message {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  animation: fade-in 0.15s ease;
 }
-.fl-code .hljs-variable,
-.fl-code .hljs-params {
-  color: #eeffff;
+.file-pane-message-success {
+  color: #a6e3a1;
 }
-.fl-code .hljs-regexp {
-  color: #89ddff;
+.file-pane-message-error {
+  color: #f38ba8;
 }
-.fl-code .hljs-meta,
-.fl-code .hljs-meta-keyword {
-  color: #ffcb6b;
-}
-.fl-code .hljs-tag {
-  color: #f07178;
-}
-.fl-code .hljs-name {
-  color: #f07178;
-}
-.fl-code .hljs-attribute {
-  color: #c792ea;
-}
-.fl-code .hljs-selector-class,
-.fl-code .hljs-selector-id {
-  color: #ffcb6b;
-}
-.fl-code .hljs-property {
-  color: #82aaff;
-}
-.fl-code .hljs-symbol,
-.fl-code .hljs-bullet {
-  color: #89ddff;
-}
+
 .tab.file-tab .tab-file-icon {
   font-size: 12px;
   flex-shrink: 0;
@@ -5986,9 +6002,6 @@ body::after {
 /* File viewer */
 .file-pane-content {
   font-size: var(--file-viewer-font-size);
-}
-.fl-ln {
-  font-size: calc(var(--file-viewer-font-size) - 1px);
 }
 .file-pane-header {
   font-size: calc(var(--file-viewer-font-size) - 2px);
