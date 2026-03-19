@@ -199,9 +199,13 @@ export function initPlanPanel() {
     if (item) selectPlan(item.dataset.id);
   });
 
-  // Enter in title → focus content
+  // Enter in title → focus content (use keyCode/code for IME compatibility)
   titleInput?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); contentInput.focus(); }
+    if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) {
+      if (e.isComposing) return;
+      e.preventDefault();
+      contentInput.focus();
+    }
   });
 
   // Auto-save on input
