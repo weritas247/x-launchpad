@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Terminal — Offline</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="container">
+    <div class="logo">⚡</div>
+    <div class="title">Super Terminal</div>
+    <div class="subtitle">서버가 꺼져 있습니다</div>
+
+    <button class="power-btn" id="power-btn" title="서버 시작">⏻</button>
+
+    <div class="info-box" id="info-box">
+      <div class="info-row">
+        <span class="info-label">상태</span>
+        <span class="info-value" id="info-status">꺼짐</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">마지막 종료</span>
+        <span class="info-value" id="info-last-exit">—</span>
+      </div>
+    </div>
+
+    <div class="status-msg" id="status-msg"></div>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
