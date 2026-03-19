@@ -66,7 +66,8 @@ CREATE INDEX idx_plan_logs_plan_id ON plan_logs(plan_id);
 **`POST /api/plans/log`**
 - Body: `{ plan_id?: string, type: 'commit' | 'summary', content: string, commit_hash?: string }`
 - `plan_id` 생략 시: 해당 유저의 `status = 'doing'`인 플랜 중 가장 최근 `updated_at` 것에 자동 append
-- DOING 플랜이 없으면 무시 (에러 아님)
+- DOING 플랜이 여러 개일 때: 가장 최근 `updated_at` 하나만 대상. 의도하지 않은 플랜에 기록될 수 있으므로, DOING은 한 번에 하나만 유지하는 것을 권장 (강제하지는 않음)
+- DOING 플랜이 없으면 무시 (에러 아님, 200 OK 반환)
 - `type: 'summary'`일 때 해당 플랜 카드에 `ai_done` 뱃지 플래그 설정
 - JWT 인증 필수
 
@@ -77,7 +78,7 @@ ALTER TABLE plans ADD COLUMN ai_done BOOLEAN NOT NULL DEFAULT false;
 ```
 
 - AI 완료 summary 로그 append 시 `ai_done = true`로 설정
-- 유저가 상태 변경하면 `ai_done = false`로 리셋
+- 유저가 상태 변경하면 `ai_done = false`로 즉시 리셋 (PATCH /api/plans/:id/status에서 처리, UI도 즉시 뱃지 제거)
 
 ---
 
@@ -145,8 +146,10 @@ ALTER TABLE plans ADD COLUMN ai_done BOOLEAN NOT NULL DEFAULT false;
 
 ### 4.2 트리거
 
-- `POST /api/plans/log` (type: summary) 호출 시 서버가 WebSocket으로 알림 broadcast
-- 클라이언트가 수신하면 토스트 표시
+- `POST /api/plans/log` (type: summary) 호출 시 서버가 **기존 Control WebSocket** (`wss`)으로 알림 broadcast
+- 메시지 형식: `{ type: 'plan_ai_done', planId, planTitle, planStatus }`
+- 클라이언트가 `plan_ai_done` 메시지를 수신하면 토스트 표시
+- 이 앱은 이미 Control WebSocket 인프라를 갖추고 있으므로 (session_list, git_status 등) 별도 WebSocket 설정 불필요
 
 ---
 
@@ -154,30 +157,58 @@ ALTER TABLE plans ADD COLUMN ai_done BOOLEAN NOT NULL DEFAULT false;
 
 ### 5.1 커밋 hook
 
-Claude Code `settings.json`에 hook 등록:
+Claude Code의 `PostToolUse` hook으로 Bash 실행 후 git commit 여부를 감지한다.
+
+**감지 방식:** hook 스크립트가 `$TOOL_INPUT`(실행된 명령어)에서 `git commit` 문자열을 grep한다. 매칭되면 `git log -1 --format='%H|||%s'`로 최근 커밋 정보를 추출하고, API를 호출한다.
 
 ```json
 {
   "hooks": {
     "PostToolUse": [{
       "matcher": "Bash",
-      "command": "# git commit 감지 시 API 호출 스크립트"
+      "command": "scripts/plan-commit-hook.sh"
     }]
   }
 }
 ```
 
-실제로는 셸 스크립트가:
-1. 최근 커밋 정보 추출 (`git log -1 --format='%H %s'`)
-2. `POST /api/plans/log` 호출 (type: commit, content: 메시지, commit_hash: hash)
-3. JWT 토큰은 환경변수나 설정파일에서 읽음
+`scripts/plan-commit-hook.sh`:
+```bash
+#!/bin/bash
+# $TOOL_INPUT contains the executed command
+echo "$TOOL_INPUT" | grep -q 'git commit' || exit 0
+COMMIT_INFO=$(git log -1 --format='%H|||%s' 2>/dev/null) || exit 0
+HASH=$(echo "$COMMIT_INFO" | cut -d'|||' -f1)
+MSG=$(echo "$COMMIT_INFO" | cut -d'|||' -f2-)
+TOKEN="${SUPER_TERMINAL_TOKEN}"
+[ -z "$TOKEN" ] && exit 0
+curl -s -X POST "${SUPER_TERMINAL_URL:-http://localhost:3000}/api/plans/log" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"type\":\"commit\",\"content\":\"$MSG\",\"commit_hash\":\"$HASH\"}"
+```
+
+JWT 토큰은 `SUPER_TERMINAL_TOKEN` 환경변수에서 읽는다.
 
 ### 5.2 완료 hook
 
-- Claude 작업 완료 시 (SubagentComplete 또는 수동 트리거)
-- AI가 작업 요약을 생성
-- `POST /api/plans/log` 호출 (type: summary, content: 요약)
-- 서버가 `ai_done = true` 설정 + WebSocket 토스트 broadcast
+Claude Code의 `PostToolUse` hook에서 **유저가 수동으로 트리거**한다. 예: 터미널에서 `plan-done "작업 요약 내용"` 스크립트 실행.
+
+`scripts/plan-done.sh`:
+```bash
+#!/bin/bash
+SUMMARY="$1"
+TOKEN="${SUPER_TERMINAL_TOKEN}"
+[ -z "$TOKEN" ] && echo "SUPER_TERMINAL_TOKEN not set" && exit 1
+curl -s -X POST "${SUPER_TERMINAL_URL:-http://localhost:3000}/api/plans/log" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"type\":\"summary\",\"content\":\"$SUMMARY\"}"
+```
+
+또는 Claude가 작업 완료 시 직접 이 스크립트를 호출하도록 프롬프트에 명시할 수 있다.
+
+서버는 summary 로그 append 시 `ai_done = true` 설정 + WebSocket 토스트 broadcast.
 
 ---
 
