@@ -2983,8 +2983,8 @@ body::after {
   display: block;
 }
 
-/* ═══ TOAST NOTIFICATIONS ═══ */
-#toast-container {
+/* ═══ AI TOAST NOTIFICATIONS ═══ */
+#ai-toast-container {
   position: fixed;
   top: 20px;
   right: 20px;
@@ -2994,7 +2994,7 @@ body::after {
   gap: 8px;
   pointer-events: none;
 }
-.toast {
+#ai-toast-container .toast {
   background: var(--bg-surface);
   border: 1px solid var(--border-lit);
   border-left: 3px solid var(--accent);
@@ -3007,10 +3007,10 @@ body::after {
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.6),
     0 0 12px var(--accent-dim);
-  animation: toast-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: ai-toast-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   position: relative;
 }
-.toast:hover {
+#ai-toast-container .toast:hover {
   border-color: var(--accent);
   box-shadow:
     0 4px 28px rgba(0, 0, 0, 0.7),
@@ -3047,9 +3047,9 @@ body::after {
   color: var(--danger);
 }
 .toast-hide {
-  animation: toast-out 0.3s ease forwards;
+  animation: ai-toast-out 0.3s ease forwards;
 }
-@keyframes toast-in {
+@keyframes ai-toast-in {
   from {
     opacity: 0;
     transform: translateX(20px) scale(0.95);
@@ -3059,7 +3059,7 @@ body::after {
     transform: translateX(0) scale(1);
   }
 }
-@keyframes toast-out {
+@keyframes ai-toast-out {
   from {
     opacity: 1;
     transform: translateX(0);
@@ -5871,8 +5871,8 @@ body::after {
   white-space: nowrap;
 }
 
-/* ═══ TOAST NOTIFICATIONS ═══ */
-#toast-container {
+/* ═══ SYSTEM TOAST ═══ */
+#sys-toast-container {
   position: fixed;
   top: 16px;
   right: 16px;
@@ -5882,7 +5882,7 @@ body::after {
   gap: 6px;
   pointer-events: none;
 }
-.toast {
+.sys-toast {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -5897,29 +5897,29 @@ body::after {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   max-width: 320px;
 }
-.toast.show {
+.sys-toast.show {
   transform: translateX(0);
 }
-.toast-icon {
+.sys-toast-icon {
   font-size: 13px;
   flex-shrink: 0;
 }
-.toast-msg {
+.sys-toast-msg {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.toast-success {
+.sys-toast-success {
   background: #0a1f0a;
   border: 1px solid var(--ok);
   color: var(--ok);
 }
-.toast-error {
+.sys-toast-error {
   background: #1f0a0a;
   border: 1px solid var(--danger);
   color: var(--danger);
 }
-.toast-info {
+.sys-toast-info {
   background: #0a0f1f;
   border: 1px solid var(--accent);
   color: var(--accent);

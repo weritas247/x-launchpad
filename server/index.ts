@@ -55,7 +55,7 @@ import {
   shouldLogMessage,
   type WsContext,
   type Session as WsSession,
-} from './ws-handlers';
+} from './handlers';
 import { env } from './env';
 import { createPlansRouter } from './routes/plans';
 import { createAuthRouter } from './routes/auth';

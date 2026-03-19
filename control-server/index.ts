@@ -4,6 +4,7 @@ dotenv.config({ path: path.join(process.cwd(), '.env.dev') });
 
 import express from 'express';
 import http from 'http';
+import net from 'net';
 import { WebSocketServer, WebSocket } from 'ws';
 import { ProcessManager } from './process-manager';
 import { PortSwitcher } from './port-switcher';
@@ -81,6 +82,7 @@ pm.on('state', () => broadcastState());
 pm.on('log', (line: string) => broadcast({ type: 'log', line }));
 pm.on('started', async () => {
   broadcast({ type: 'started' });
+  await portSwitcher.release();
 });
 pm.on('start_failed', (reason: string) => {
   broadcast({ type: 'start_failed', reason });
@@ -91,6 +93,15 @@ pm.on('exit', () => {
 });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
+app.post('/api/release-port', async (_req, res) => {
+  if (portSwitcher.isBound()) {
+    await portSwitcher.release();
+    res.json({ ok: true, message: 'Port released' });
+  } else {
+    res.json({ ok: true, message: 'Port was not bound' });
+  }
+});
 
 app.get('/api/status', async (_req, res) => {
   const state = pm.getState();
@@ -185,15 +196,32 @@ async function shutdown(): Promise<void> {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
+function isAppRunning(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const sock = net.createConnection({ host: '127.0.0.1', port }, () => {
+      sock.destroy();
+      resolve(true);
+    });
+    sock.on('error', () => resolve(false));
+    sock.setTimeout(500, () => { sock.destroy(); resolve(false); });
+  });
+}
+
 async function main(): Promise<void> {
   server.listen(CONTROL_PORT, CONTROL_HOST, async () => {
     console.log(`[control] Control Server → http://${CONTROL_HOST}:${CONTROL_PORT}`);
 
     if (AUTO_START) {
       console.log('[control] AUTO_START=1, Super Terminal 시작...');
+      await portSwitcher.release();
       await pm.start();
     } else {
-      await portSwitcher.bind();
+      const appAlreadyUp = await isAppRunning(APP_PORT);
+      if (appAlreadyUp) {
+        console.log(`[control] App already running on port ${APP_PORT}, skipping port-switcher bind`);
+      } else {
+        await portSwitcher.bind();
+      }
     }
   });
 }

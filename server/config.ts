@@ -45,7 +45,7 @@ export const DEFAULT_SETTINGS = {
   },
   keybindings: {
     newSession: 'Ctrl+Shift+T',
-    closeSession: 'Ctrl+Shift+W',
+    closeTab: 'Ctrl+w',
     nextTab: 'Ctrl+Tab',
     prevTab: 'Ctrl+Shift+Tab',
     openSettings: 'Ctrl+,',
@@ -89,17 +89,32 @@ export function deepMerge(defaults: any, saved: any): any {
   return result;
 }
 
+function migrateKeybindings(settings: any): void {
+  const kb = settings?.keybindings;
+  if (!kb) return;
+  // closeSession → closeTab (renamed)
+  if (kb.closeSession !== undefined && kb.closeTab === undefined) {
+    kb.closeTab = kb.closeSession;
+  }
+  delete kb.closeSession;
+}
+
 export function loadSettings(settingsPath: string): AppSettings {
   // Try SQLite first
   try {
     const dbSettings = db.getSettings();
-    if (dbSettings) return deepMerge(DEFAULT_SETTINGS, dbSettings as any);
+    if (dbSettings) {
+      migrateKeybindings(dbSettings);
+      return deepMerge(DEFAULT_SETTINGS, dbSettings as any);
+    }
   } catch {}
   // Fall back to JSON file (and migrate to SQLite)
   try {
     if (fs.existsSync(settingsPath)) {
       const raw = fs.readFileSync(settingsPath, 'utf-8');
-      const settings = deepMerge(DEFAULT_SETTINGS, JSON.parse(raw));
+      const parsed = JSON.parse(raw);
+      migrateKeybindings(parsed);
+      const settings = deepMerge(DEFAULT_SETTINGS, parsed);
       try {
         db.saveSettings(settings);
       } catch {} // migrate
