@@ -43,6 +43,9 @@ export class PortSwitcher {
   }
 
   async bind(): Promise<void> {
+    if (this.miniServer?.listening) {
+      return; // 이미 바인딩됨
+    }
     return new Promise((resolve, reject) => {
       this.miniServer = http.createServer(this.miniApp);
       this.miniServer.on('error', (err: NodeJS.ErrnoException) => {

@@ -2,6 +2,7 @@ const powerBtn = document.getElementById('power-btn');
 const statusMsg = document.getElementById('status-msg');
 const infoStatus = document.getElementById('info-status');
 
+let stopping = false;
 let ws = null;
 function connectWS() {
   ws = new WebSocket('ws://127.0.0.1:3001/ws');
@@ -21,6 +22,7 @@ function connectWS() {
       }
     }
     if (msg.type === 'started') {
+      stopping = true;
       statusMsg.textContent = '서버 시작 완료! 리다이렉트 중...';
       statusMsg.className = 'status-msg';
       setTimeout(() => location.reload(), 500);
@@ -31,7 +33,7 @@ function connectWS() {
       powerBtn.classList.remove('starting');
     }
   };
-  ws.onclose = () => setTimeout(connectWS, 3000);
+  ws.onclose = () => { if (!stopping) setTimeout(connectWS, 3000); };
   ws.onerror = () => ws.close();
 }
 connectWS();

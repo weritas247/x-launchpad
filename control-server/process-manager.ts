@@ -143,11 +143,17 @@ export class ProcessManager extends EventEmitter {
     if (!pid) return;
 
     return new Promise((resolve) => {
-      this.child!.once('exit', () => resolve());
+      let settled = false;
+      const done = () => { if (!settled) { settled = true; resolve(); } };
+
+      this.child!.once('exit', done);
+
       try { process.kill(-pid, 'SIGTERM'); } catch {}
+
       setTimeout(() => {
         try { process.kill(-pid, 'SIGKILL'); } catch {}
-        setTimeout(resolve, 500);
+        // Wait for exit event, but force resolve after another 2s as last resort
+        setTimeout(done, 2000);
       }, 5000);
     });
   }

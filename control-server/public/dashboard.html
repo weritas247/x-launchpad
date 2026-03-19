@@ -125,7 +125,7 @@
 
     fetch('/api/logs').then(r => r.json()).then(d => {
       (d.logs || []).forEach(addLog);
-    });
+    }).catch(() => {});
 
     async function apiCall(endpoint) {
       try {
