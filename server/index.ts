@@ -85,8 +85,9 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 const PORT = env.PORT;
-const SETTINGS_PATH = path.join(__dirname, '../../settings.json');
-const SESSIONS_PATH = path.join(__dirname, '../../sessions.json');
+const PROJECT_ROOT = path.resolve(__dirname, __dirname.endsWith('dist/server') ? '../..' : '..');
+const SETTINGS_PATH = path.join(PROJECT_ROOT, 'settings.json');
+const SESSIONS_PATH = path.join(PROJECT_ROOT, 'sessions.json');
 
 // ─── Settings ────────────────────────────────────────────────────
 let currentSettings = loadSettings(SETTINGS_PATH);
@@ -118,12 +119,12 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use(authMiddleware);
-app.use(express.static(path.join(__dirname, '../../client')));
+app.use(express.static(path.join(PROJECT_ROOT, 'client')));
 
 // Auth endpoints (extracted to routes/auth.ts)
 app.use('/api/auth', createAuthRouter());
 app.get('/login', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../../client/login.html'));
+  res.sendFile(path.join(PROJECT_ROOT, 'client/login.html'));
 });
 
 // Settings endpoints
@@ -248,7 +249,7 @@ app.post(
 );
 
 app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../../client/index.html'));
+  res.sendFile(path.join(PROJECT_ROOT, 'client/index.html'));
 });
 
 // Global Express error handler — catches unhandled errors in route handlers
