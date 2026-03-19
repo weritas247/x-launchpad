@@ -19,7 +19,7 @@ import { initExplorer, handleFileTreeData, handleFileReadData, handleFileOpAck, 
 import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange, handleWorktreeListData, handleWorktreeAddAck, handleWorktreeRemoveAck, handleWorktreeSwitchAck } from './source-control.js';
 import { initSearch, handleSearchResults, handleReplaceAck, onSearchSessionChange } from './search.js';
 import { setActivateSessionFn } from './file-viewer.js';
-import { initPlanPanel, handlePlanFileData, onPlanSessionChange, openPlanModal, closePlanModal, isPlanModalOpen } from './plan-panel.js';
+import { initPlanPanel, handlePlanFileData, onPlanSessionChange, openPlanModal, closePlanModal, isPlanModalOpen, showPlanToast } from './plan-panel.js';
 import './mobile.js'; // auto-initializes mobile UI
 
 S.currentTheme = THEMES[0];
@@ -139,6 +139,8 @@ function handleMessage(msg) {
     }
   } else if (msg.type === 'file_op_ack') {
     handleFileOpAck(msg);
+  } else if (msg.type === 'plan_ai_done') {
+    showPlanToast(msg.planId, msg.planTitle, msg.planStatus);
   }
 }
 
