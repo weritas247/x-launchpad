@@ -21,7 +21,8 @@ export interface WsContext {
     name: string,
     restoreCwd?: string,
     restoreCmd?: string,
-    extraEnv?: Record<string, string>
+    extraEnv?: Record<string, string>,
+    planId?: string
   ) => Session;
   broadcastSessionList: (exclude?: WebSocket) => void;
   wsSend: (ws: WebSocket, data: string) => void;
@@ -42,6 +43,7 @@ export interface Session {
   ai: string | null;
   aiPid: number | null;
   cmd?: string;
+  planId?: string;  // 연결된 plan ID (칸반 AI 할당용)
   cwdTimer?: ReturnType<typeof setInterval>;
   pendingCmd?: string;
   resized?: boolean;

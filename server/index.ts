@@ -282,6 +282,7 @@ interface Session {
   ai: string | null;
   aiPid: number | null;
   cmd?: string;
+  planId?: string;  // 연결된 plan ID (칸반 AI 할당용)
   cwdTimer?: ReturnType<typeof setInterval>;
   pendingCmd?: string;
   resized?: boolean;
@@ -299,7 +300,8 @@ function createSession(
   name: string,
   restoreCwd?: string,
   restoreCmd?: string,
-  extraEnv?: Record<string, string>
+  extraEnv?: Record<string, string>,
+  planId?: string
 ): Session {
   const s = currentSettings.shell;
   const shellPath = s.shellPath || (os.platform() === 'win32' ? 'powershell.exe' : env.SHELL);
@@ -354,6 +356,7 @@ function createSession(
     ai: null,
     aiPid: null,
     cmd: restoreCmd,
+    planId: planId || undefined,
     scrollback: '',
     tmuxName: useTmux ? tmuxName : undefined,
   };
@@ -571,7 +574,8 @@ function broadcastSessionList(exclude?: WebSocket) {
     name: s.name,
     createdAt: s.createdAt,
     cwd: s.cwd,
-    ai: s.ai || null,
+    ai: s.ai,
+    planId: s.planId,
   }));
   const msg = JSON.stringify({ type: 'session_list', sessions: list });
   wss.clients.forEach((client) => {
@@ -702,7 +706,8 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     name: s.name,
     createdAt: s.createdAt,
     cwd: s.cwd,
-    ai: s.ai || null,
+    ai: s.ai,
+    planId: s.planId,
   }));
   wsSend(ws, JSON.stringify({ type: 'session_list', sessions: list }));
   wsSend(ws, JSON.stringify({ type: 'settings', settings: currentSettings }));
