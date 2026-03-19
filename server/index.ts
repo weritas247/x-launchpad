@@ -107,7 +107,27 @@ function saveSettings(s: AppSettings): void {
 }
 
 // ─── HTTP ────────────────────────────────────────────────────────
+// Security headers
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
 app.use(express.json());
+
+// Health check — unauthenticated, for load balancers and monitoring
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: Math.floor(process.uptime()),
+    sessions: sessions.size,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use(authMiddleware);
 app.use(express.static(path.join(__dirname, '../../client')));
 
