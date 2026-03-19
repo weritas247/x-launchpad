@@ -19,7 +19,7 @@ import { initExplorer, handleFileTreeData, handleFileReadData, handleFileOpAck, 
 import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange, handleWorktreeListData, handleWorktreeAddAck, handleWorktreeRemoveAck, handleWorktreeSwitchAck } from './source-control.js';
 import { initSearch, handleSearchResults, handleReplaceAck, onSearchSessionChange } from './search.js';
 import { setActivateSessionFn } from './file-viewer.js';
-import { initPlanPanel, handlePlanFileData, onPlanSessionChange } from './plan-panel.js';
+import { initPlanPanel, handlePlanFileData, onPlanSessionChange, openPlanModal, closePlanModal, isPlanModalOpen } from './plan-panel.js';
 import './mobile.js'; // auto-initializes mobile UI
 
 S.currentTheme = THEMES[0];
@@ -157,6 +157,7 @@ registerAction('focusSearch',   () => switchPanel('search'));
 registerAction('focusExplorer', () => switchPanel('explorer'));
 registerAction('focusSourceControl', () => switchPanel('source-control'));
 registerAction('toggleInputPanel', () => toggleInputPanel());
+registerAction('planModal',       () => { isPlanModalOpen() ? closePlanModal() : openPlanModal(); });
 
 document.addEventListener('keydown', e => {
   if (!S.settings) return;
@@ -167,9 +168,11 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     const picker = document.getElementById('session-picker');
     if (picker.style.display !== 'none') { hideSessionPicker(); return; }
+    if (isPlanModalOpen()) { closePlanModal(); return; }
     if (settingsOverlay.classList.contains('open')) { closeSettings(); return; }
   }
 
+  if (isPlanModalOpen()) return;
   if (settingsOverlay.classList.contains('open')) return;
 
   // Split pane navigation: Ctrl+Shift+Arrow

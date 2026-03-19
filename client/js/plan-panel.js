@@ -1,167 +1,215 @@
-// ─── PLAN PANEL: Markdown viewer + annotations ─────────────────
-import { S, escHtml } from './state.js';
-import { wsSend } from './websocket.js';
-import { showToast } from './toast.js';
+// ─── PLAN MODAL: Evernote-style plan editor ─────────────────
+import { escHtml } from './state.js';
 
-const planContent = document.getElementById('plan-content');
-const planFileBar = document.getElementById('plan-file-bar');
-const planFileName = document.getElementById('plan-file-name');
-const annotPanel = document.getElementById('plan-annotations');
-const annotList = document.getElementById('plan-annot-list');
+const STORAGE_KEY = 'plan-notes';
 
-let currentPlanFile = null;
-let currentPlanContent = '';
-let annotations = [];
+// DOM refs
+const overlay = document.getElementById('plan-overlay');
+const listEl = document.getElementById('plan-list-items');
+const editorArea = document.getElementById('plan-editor-area');
+const editorEmpty = document.getElementById('plan-editor-empty');
+const titleInput = document.getElementById('plan-editor-title');
+const contentInput = document.getElementById('plan-editor-content');
+const dateEl = document.getElementById('plan-editor-date');
+const countEl = document.getElementById('sb-plan-count');
 
-const ANNOT_STORAGE_KEY = 'plan-annotations';
+let plans = [];
+let activeId = null;
+let saveTimer = null;
 
-// ─── Markdown rendering (simple parser) ────────────
-function renderMarkdown(md) {
-  let html = escHtml(md);
-
-  // Code blocks (``` ... ```)
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, lang, code) =>
-    `<pre><code class="lang-${lang}">${code}</code></pre>`
-  );
-
-  // Inline code
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-  // Headings
-  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-
-  // Bold, italic
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-
-  // Checkboxes
-  html = html.replace(/^- \[x\] (.+)$/gm, '<li><input type="checkbox" checked disabled> $1</li>');
-  html = html.replace(/^- \[ \] (.+)$/gm, '<li><input type="checkbox" disabled> $1</li>');
-
-  // Unordered lists
-  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
-
-  // Ordered lists
-  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
-
-  // Blockquotes
-  html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
-
-  // Horizontal rule
-  html = html.replace(/^---$/gm, '<hr>');
-
-  // Paragraphs (double newlines)
-  html = html.replace(/\n\n/g, '</p><p>');
-  html = '<p>' + html + '</p>';
-
-  // Clean up empty paragraphs
-  html = html.replace(/<p>\s*<\/p>/g, '');
-  html = html.replace(/<p>(<h[1-3]>)/g, '$1');
-  html = html.replace(/(<\/h[1-3]>)<\/p>/g, '$1');
-  html = html.replace(/<p>(<pre>)/g, '$1');
-  html = html.replace(/(<\/pre>)<\/p>/g, '$1');
-  html = html.replace(/<p>(<ul>)/g, '$1');
-  html = html.replace(/(<\/ul>)<\/p>/g, '$1');
-  html = html.replace(/<p>(<blockquote>)/g, '$1');
-  html = html.replace(/(<\/blockquote>)<\/p>/g, '$1');
-  html = html.replace(/<p>(<hr>)/g, '$1');
-
-  return html;
-}
-
-// ─── Annotations ────────────────────────────────────
-function loadAnnotations() {
+// ─── Storage ────────────────────────────────────────
+function loadPlans() {
   try {
-    const saved = localStorage.getItem(ANNOT_STORAGE_KEY);
-    if (saved) annotations = JSON.parse(saved);
-  } catch {}
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) plans = JSON.parse(raw);
+  } catch { plans = []; }
 }
 
-function saveAnnotations() {
-  try { localStorage.setItem(ANNOT_STORAGE_KEY, JSON.stringify(annotations)); } catch {}
+function savePlans() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(plans)); } catch {}
+  updateCount();
 }
 
-function renderAnnotations() {
-  if (!annotList) return;
-  const fileAnnots = annotations.filter(a => a.file === currentPlanFile);
-  if (fileAnnots.length === 0) {
-    annotPanel.style.display = 'none';
-    return;
+function updateCount() {
+  if (countEl) countEl.textContent = plans.length;
+}
+
+// ─── CRUD ───────────────────────────────────────────
+function createPlan() {
+  const plan = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    title: '',
+    content: '',
+    created: Date.now(),
+    updated: Date.now()
+  };
+  plans.unshift(plan);
+  savePlans();
+  renderList();
+  selectPlan(plan.id);
+  titleInput.focus();
+}
+
+function deletePlan(id) {
+  const idx = plans.findIndex(p => p.id === id);
+  plans = plans.filter(p => p.id !== id);
+  savePlans();
+  if (activeId === id) {
+    if (plans.length > 0) {
+      const next = plans[Math.min(idx, plans.length - 1)];
+      selectPlan(next.id);
+    } else {
+      activeId = null;
+      showEmptyState();
+    }
   }
-  annotPanel.style.display = '';
-  annotList.innerHTML = fileAnnots.map((a, i) => {
-    const typeLabel = { insert: '+', delete: '−', replace: '↔', comment: '?' }[a.type] || '?';
-    return `<div class="plan-annot-item" data-idx="${i}">
-      <span class="plan-annot-type ${a.type}">${typeLabel}</span>
-      <span>${escHtml(a.text.slice(0, 60))}${a.text.length > 60 ? '…' : ''}</span>
+  renderList();
+}
+
+function selectPlan(id) {
+  activeId = id;
+  const plan = plans.find(p => p.id === id);
+  if (!plan) { showEmptyState(); return; }
+
+  editorEmpty.style.display = 'none';
+  editorArea.style.display = 'flex';
+  titleInput.value = plan.title;
+  contentInput.value = plan.content;
+  dateEl.textContent = formatDate(plan.updated);
+
+  // highlight in list
+  listEl.querySelectorAll('.plan-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.id === id);
+  });
+}
+
+function showEmptyState() {
+  editorArea.style.display = 'none';
+  editorEmpty.style.display = 'flex';
+}
+
+// ─── Auto-save on input ─────────────────────────────
+function scheduleSave() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    if (!activeId) return;
+    const plan = plans.find(p => p.id === activeId);
+    if (!plan) return;
+    plan.title = titleInput.value;
+    plan.content = contentInput.value;
+    plan.updated = Date.now();
+    savePlans();
+    renderList();
+    dateEl.textContent = formatDate(plan.updated);
+  }, 300);
+}
+
+// ─── Rendering ──────────────────────────────────────
+function renderList() {
+  if (!listEl) return;
+  listEl.innerHTML = plans.map(p => {
+    const title = escHtml(p.title || 'Untitled');
+    const preview = escHtml((p.content || '').slice(0, 80).replace(/\n/g, ' '));
+    const date = formatDate(p.updated);
+    const active = p.id === activeId ? ' active' : '';
+    return `<div class="plan-item${active}" data-id="${p.id}">
+      <div class="plan-item-title">${title}</div>
+      <div class="plan-item-preview">${preview || 'No content'}</div>
+      <div class="plan-item-date">${date}</div>
     </div>`;
   }).join('');
 }
 
-function addAnnotation(type = 'comment') {
-  const text = prompt(`${type} annotation:`);
-  if (!text || !currentPlanFile) return;
-  annotations.push({ file: currentPlanFile, type, text, created: Date.now() });
-  saveAnnotations();
-  renderAnnotations();
+function formatDate(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (d.toDateString() === now.toDateString()) return `Today ${time}`;
+  const diff = Math.floor((now - d) / 86400000);
+  if (diff === 1) return `Yesterday ${time}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`;
 }
 
-// ─── File loading ───────────────────────────────────
-function loadPlanFile(filePath) {
-  if (!S.activeSessionId) return;
-  currentPlanFile = filePath;
-  wsSend({ type: 'file_read', sessionId: S.activeSessionId, filePath });
-}
-
-export function handlePlanFileData(msg) {
-  if (msg.error) {
-    showToast(`Plan file error: ${msg.error}`, 'error');
-    return;
+// ─── Modal open/close ───────────────────────────────
+export function openPlanModal() {
+  loadPlans();
+  // validate activeId still exists
+  if (activeId && !plans.find(p => p.id === activeId)) activeId = null;
+  renderList();
+  if (activeId) {
+    selectPlan(activeId);
+  } else if (plans.length > 0) {
+    selectPlan(plans[0].id);
+  } else {
+    showEmptyState();
   }
-  if (msg.binary) {
-    planContent.innerHTML = '<div class="plan-empty">Binary files are not supported</div>';
-    return;
+  overlay.classList.add('open');
+}
+
+export function closePlanModal() {
+  // flush any pending save
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    if (activeId) {
+      const plan = plans.find(p => p.id === activeId);
+      if (plan) {
+        plan.title = titleInput.value;
+        plan.content = contentInput.value;
+        plan.updated = Date.now();
+        savePlans();
+      }
+    }
   }
-  currentPlanContent = msg.content || '';
-  planFileBar.style.display = 'flex';
-  planFileName.textContent = (msg.filePath || '').split('/').pop();
-  planFileName.title = msg.filePath || '';
-  planContent.innerHTML = renderMarkdown(currentPlanContent);
-  renderAnnotations();
+  overlay.classList.remove('open');
 }
 
-function openFileDialog() {
-  const filePath = prompt('Enter path to markdown file (relative to CWD):');
-  if (!filePath) return;
-  loadPlanFile(filePath);
-}
-
-function closePlanFile() {
-  currentPlanFile = null;
-  currentPlanContent = '';
-  planFileBar.style.display = 'none';
-  planContent.innerHTML = '<div class="plan-empty">No plan file loaded.<br/>Click 📄 to open a markdown file.</div>';
-  annotPanel.style.display = 'none';
+export function isPlanModalOpen() {
+  return overlay.classList.contains('open');
 }
 
 // ─── Init ───────────────────────────────────────────
 export function initPlanPanel() {
-  loadAnnotations();
+  loadPlans();
+  updateCount();
 
-  document.getElementById('plan-open-file')?.addEventListener('click', openFileDialog);
-  document.getElementById('plan-refresh')?.addEventListener('click', () => {
-    if (currentPlanFile) loadPlanFile(currentPlanFile);
+  // Statusbar click
+  document.getElementById('sb-plan')?.addEventListener('click', openPlanModal);
+
+  // Close button
+  document.getElementById('plan-modal-close')?.addEventListener('click', closePlanModal);
+
+  // Overlay click to close
+  overlay?.addEventListener('click', e => {
+    if (e.target === overlay) closePlanModal();
   });
-  document.getElementById('plan-file-close')?.addEventListener('click', closePlanFile);
-  document.getElementById('plan-annot-add')?.addEventListener('click', () => addAnnotation('comment'));
+
+  // New plan
+  document.getElementById('plan-btn-new')?.addEventListener('click', createPlan);
+
+  // Delete plan
+  document.getElementById('plan-btn-delete')?.addEventListener('click', () => {
+    if (activeId) deletePlan(activeId);
+  });
+
+  // List click delegation
+  listEl?.addEventListener('click', e => {
+    const item = e.target.closest('.plan-item');
+    if (item) selectPlan(item.dataset.id);
+  });
+
+  // Enter in title → focus content
+  titleInput?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); contentInput.focus(); }
+  });
+
+  // Auto-save on input
+  titleInput?.addEventListener('input', scheduleSave);
+  contentInput?.addEventListener('input', scheduleSave);
+
 }
 
-export function onPlanSessionChange() {
-  if (currentPlanFile) loadPlanFile(currentPlanFile);
-}
+// Keep these exports for backward compatibility with main.js
+export function handlePlanFileData() {}
+export function onPlanSessionChange() {}

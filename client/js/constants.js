@@ -71,6 +71,7 @@ export const KB_DEFS = [
   { key:'focusSearch',     label:'Focus Search' },
   { key:'focusExplorer',   label:'Focus Explorer' },
   { key:'focusSourceControl', label:'Focus Source Control' },
+  { key:'planModal',         label:'Plan Notes' },
 ];
 
 /** IME(한글 등) 활성 시에도 물리 키 기준으로 단축키가 동작하도록 e.code 사용 */

@@ -180,6 +180,7 @@ const DEFAULT_SETTINGS = {
     focusExplorer: 'Ctrl+Shift+e',
     focusSourceControl: 'Ctrl+Shift+g',
     toggleInputPanel: 'Meta+i',
+    planModal: 'Ctrl+p',
   },
   advanced: {
     customCss: '',
