@@ -1,4 +1,16 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(npm rebuild:*)",
+      "Bash(gh api:*)",
+      "Bash(wc -l /Users/matthew_team42/dev/cluade-code-my-terminal/client/js/*.js)",
+      "Bash(npm install:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(curl:*)",
+      "Bash(git push:*)"
+    ]
+  },
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -10,11 +22,6 @@
           }
         ]
       }
-    ]
-  },
-  "permissions": {
-    "allow": [
-      "Bash(npm rebuild:*)"
     ]
   }
 }
