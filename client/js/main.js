@@ -19,7 +19,7 @@ import { initExplorer, handleFileTreeData, handleFileReadData, handleFileOpAck, 
 import { initSourceControl, handleGitStatusData, handleGitDiffData, handleGitCommitAck, handleGitPushAck, handleGitGenerateMessage, onSourceControlSessionChange, handleWorktreeListData, handleWorktreeAddAck, handleWorktreeRemoveAck, handleWorktreeSwitchAck } from './source-control.js';
 import { initSearch, handleSearchResults, handleReplaceAck, onSearchSessionChange } from './search.js';
 import { setActivateSessionFn } from './file-viewer.js';
-import { initPlanPanel, handlePlanFileData, onPlanSessionChange, openPlanModal, closePlanModal, isPlanModalOpen, showPlanToast } from './plan-panel.js';
+import { initPlanPanel, handlePlanFileData, onPlanSessionChange, openPlanModal, closePlanModal, isPlanModalOpen, showPlanToast, onAiSessionCreated, onAiSessionReady, onAiPromptSent, updateAiTasksBadge } from './plan-panel.js';
 import './mobile.js'; // auto-initializes mobile UI
 
 S.currentTheme = THEMES[0];
@@ -52,6 +52,7 @@ function handleMessage(msg) {
     applySettings(msg.settings);
   } else if (msg.type === 'session_created') {
     attachTerminal(msg.sessionId, msg.name);
+    onAiSessionCreated(msg.sessionId);
     if (S.pendingSplitQueue.length > 0) {
       const pending = S.pendingSplitQueue.shift();
       pending.resolve(msg.sessionId);
@@ -74,7 +75,9 @@ function handleMessage(msg) {
     updateSessionInfo(msg.sessionId, msg.cwd, msg.ai);
     tabStatusOnAiChange(msg.sessionId, msg.ai);
     onAiChangeUsage(msg.sessionId, msg.ai);
+    if (msg.ai) onAiSessionReady(msg.sessionId, msg.ai);
     if (msg.sessionId === S.activeSessionId) {
+      updateProjectName(msg.cwd);
       requestBranch(msg.sessionId);
       inputPanelSessionChange();
       // Refresh all relevant side panels when CWD changes (e.g. worktree switch)
@@ -86,6 +89,8 @@ function handleMessage(msg) {
       // Always refresh source control status in background for badge updates
       if (panel !== 'source-control') onSourceControlSessionChange();
     }
+  } else if (msg.type === 'ai_prompt_sent') {
+    onAiPromptSent(msg.sessionId);
   // output and scrollback are now handled by per-session data WebSocket in terminal.js
   } else if (msg.type === 'git_graph_data') {
     handleGitGraphData(msg);
@@ -272,6 +277,17 @@ document.getElementById('sp-close').addEventListener('click', hideSessionPicker)
 document.getElementById('session-picker').addEventListener('click', e => {
   if (e.target === e.currentTarget) hideSessionPicker();
 });
+function updateProjectName(cwd) {
+  const el = document.getElementById('sb-project');
+  const nameEl = document.getElementById('sb-project-name');
+  const sepEl = document.getElementById('sb-project-sep');
+  if (!cwd) { el.style.display = 'none'; sepEl.style.display = 'none'; return; }
+  const parts = cwd.replace(/\/$/, '').split('/');
+  nameEl.textContent = parts[parts.length - 1] || '~';
+  el.style.display = '';
+  sepEl.style.display = '';
+}
+
 function getCurrentSessionCwd() {
   if (!S.activeSessionId) return undefined;
   const meta = sessionMeta.get(S.activeSessionId);

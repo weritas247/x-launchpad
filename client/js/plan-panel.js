@@ -1,6 +1,8 @@
 // ─── PLAN MODAL: Evernote-style plan editor ─────────────────
-import { escHtml } from './state.js';
-import { apiFetch, getAuthToken } from './websocket.js';
+import { escHtml, S, sessionMeta } from './state.js';
+import { apiFetch, getAuthToken, wsSend } from './websocket.js';
+import { AI_REGISTRY } from './constants.js';
+import { activateSession } from './session.js';
 
 const CATEGORIES = { feature: '기능', bug: '버그', other: '기타' };
 
@@ -116,7 +118,7 @@ function filteredPlans() {
 }
 
 // ─── CRUD ───────────────────────────────────────────
-function createPlan() {
+async function createPlan() {
   const cat = activeCategory === 'all' ? 'feature' : activeCategory;
   const plan = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -130,10 +132,16 @@ function createPlan() {
   };
   plans.unshift(plan);
   updateCount();
-  renderList();
-  selectPlan(plan.id);
+  await apiCreatePlan(plan);
+  if (currentView === 'board') {
+    renderBoard();
+    selectPlan(plan.id);
+    showBoardEditor();
+  } else {
+    renderList();
+    selectPlan(plan.id);
+  }
   titleInput.focus();
-  apiCreatePlan(plan);
 }
 
 function deletePlan(id) {
@@ -151,7 +159,12 @@ function deletePlan(id) {
       showEmptyState();
     }
   }
-  renderList();
+  if (currentView === 'board') {
+    renderBoard();
+    if (activeId === null) hideBoardEditor();
+  } else {
+    renderList();
+  }
   apiDeletePlan(id);
 }
 
@@ -207,7 +220,8 @@ function switchCategory(cat) {
   catTabsEl.querySelectorAll('.plan-cat-tab').forEach(el => {
     el.classList.toggle('active', el.dataset.cat === cat);
   });
-  renderList();
+  if (currentView === 'board') renderBoard();
+  else renderList();
   const filtered = filteredPlans();
   if (activeId && filtered.find(p => p.id === activeId)) {
     selectPlan(activeId);
@@ -242,10 +256,22 @@ function switchView(view) {
   }
 }
 
+const editorCloseBtn = document.getElementById('plan-editor-close');
+
 function showBoardEditor() {
   if (boardDivider) boardDivider.style.display = '';
   if (editorColEl) editorColEl.style.display = '';
+  if (editorCloseBtn) editorCloseBtn.style.display = 'block';
   restoreBoardSplit();
+}
+
+function hideBoardEditor() {
+  flushSave();
+  if (editorColEl) editorColEl.style.display = 'none';
+  if (boardDivider) boardDivider.style.display = 'none';
+  if (editorCloseBtn) editorCloseBtn.style.display = 'none';
+  if (boardEl) boardEl.style.flex = '1';
+  activeId = null;
 }
 
 function restoreBoardSplit() {
@@ -294,12 +320,17 @@ function renderBoard() {
       const date = formatDate(p.updated);
       const catLabel = CATEGORIES[p.category] || '기타';
       const aiBadge = p.ai_done ? '<span class="plan-board-card-ai-badge">✅ AI</span>' : '';
+      const aiSessions = (p.ai_sessions || []).map(s => {
+        const reg = AI_REGISTRY[s.ai] || {};
+        const icon = reg.icon ? `<img src="${reg.icon}" alt="">` : '🤖';
+        return `<span class="plan-board-card-ai-session" data-session-id="${escHtml(s.sessionId)}" title="${escHtml(reg.label || s.ai)} session">${icon}${escHtml(s.sessionId.slice(-6))}</span>`;
+      }).join('');
       return `<div class="plan-board-card" draggable="true" data-id="${p.id}" data-cat="${p.category || 'other'}">
         <div class="plan-board-card-title">${title}</div>
         <div class="plan-board-card-preview">${preview || 'No content'}</div>
         <div class="plan-board-card-footer">
           <span class="plan-board-card-cat">${catLabel}</span>
-          <span>${aiBadge}</span>
+          <span>${aiBadge}${aiSessions}</span>
           <span class="plan-board-card-date">${date}</span>
         </div>
       </div>`;
@@ -401,7 +432,7 @@ function showPlanCtxMenu(x, y, planId) {
   if (!ctxMenuEl) return;
   ctxMenuEl.style.display = 'block';
   ctxMenuEl.style.left = Math.min(x, window.innerWidth - 180) + 'px';
-  ctxMenuEl.style.top = Math.min(y, window.innerHeight - 250) + 'px';
+  ctxMenuEl.style.top = Math.min(y, window.innerHeight - 400) + 'px';
 }
 
 function hidePlanCtxMenu() {
@@ -596,6 +627,7 @@ export function initPlanPanel() {
 
   // New plan
   document.getElementById('plan-btn-new')?.addEventListener('click', createPlan);
+  document.getElementById('plan-btn-new-global')?.addEventListener('click', createPlan);
 
   // Delete plan
   document.getElementById('plan-btn-delete')?.addEventListener('click', () => {
@@ -653,10 +685,23 @@ export function initPlanPanel() {
     }
   });
 
+  // AI session badge click → navigate to session tab
+  boardEl?.addEventListener('click', e => {
+    const badge = e.target.closest('.plan-board-card-ai-session');
+    if (badge) {
+      e.stopPropagation();
+      const sid = badge.dataset.sessionId;
+      if (sid) activateSession(sid);
+      return;
+    }
+  }, true);
+
   // Board card click → editor
   boardEl?.addEventListener('click', e => {
     const card = e.target.closest('.plan-board-card');
     if (!card) return;
+    // skip if clicking AI session badge
+    if (e.target.closest('.plan-board-card-ai-session')) return;
     flushSave();
     selectPlan(card.dataset.id);
     showBoardEditor();
@@ -673,6 +718,7 @@ export function initPlanPanel() {
 
   // Context menu actions
   ctxMenuEl?.addEventListener('click', async e => {
+    e.stopPropagation();
     const item = e.target.closest('.plan-ctx-item');
     if (!item || !ctxTargetPlanId) return;
     const action = item.dataset.action;
@@ -697,6 +743,10 @@ export function initPlanPanel() {
       }
     } else if (action === 'delete') {
       deletePlan(ctxTargetPlanId);
+    } else if (action === 'ai-assign') {
+      const aiType = item.dataset.ai;
+      assignAiToplan(ctxTargetPlanId, aiType);
+      closePlanModal();
     }
     hidePlanCtxMenu();
   });
@@ -707,6 +757,11 @@ export function initPlanPanel() {
   // Init drag and drop
   initBoardDragDrop();
   initBoardDivider();
+
+  // Editor close button (board view only)
+  editorCloseBtn?.addEventListener('click', () => {
+    if (currentView === 'board') hideBoardEditor();
+  });
 
   // Image paste on editor content area
   contentInput?.addEventListener('paste', e => {
@@ -743,6 +798,174 @@ export function initPlanPanel() {
   // Apply initial view
   switchView(currentView);
 }
+
+// ─── AI Assignment ──────────────────────────────────
+// Map: sessionId → { planId, ai, prompt }  — pending AI sessions waiting for AI readiness
+const pendingAiSessions = new Map();
+
+let _pendingAiAssign = null;
+
+async function assignAiToplan(planId, aiType) {
+  const plan = plans.find(p => p.id === planId);
+  if (!plan) return;
+
+  // Build the prompt from plan content
+  const title = plan.title || 'Untitled';
+  const content = plan.content || '';
+  let prompt = `다음 이슈를 처리해주세요:\n\n제목: ${title}\n\n${content}`;
+
+  // Fetch attached images and include URLs
+  try {
+    const res = await apiFetch(`/api/plans/${planId}/images`);
+    const data = await res.json();
+    if (data.ok && data.images && data.images.length) {
+      prompt += '\n\n첨부 이미지:\n' + data.images.map(img => img.url).join('\n');
+    }
+  } catch { /* ignore */ }
+
+  // Get current cwd from active session
+  const meta = S.activeSessionId ? sessionMeta.get(S.activeSessionId) : null;
+  const cwd = meta?.cwd || undefined;
+
+  // Create AI session
+  wsSend({ type: 'session_create', name: `${aiType}:${title.slice(0, 20)}`, cmd: aiType, cwd, planId });
+
+  // Store pending: will be resolved when session_created comes back
+  _pendingAiAssign = { planId, aiType, prompt };
+}
+
+// Called from main.js when session_created arrives — checks if it's an AI-assigned session
+export function onAiSessionCreated(sessionId) {
+  if (!_pendingAiAssign) return false;
+  const { planId, aiType, prompt } = _pendingAiAssign;
+  _pendingAiAssign = null;
+
+  // Store pending session waiting for AI readiness
+  pendingAiSessions.set(sessionId, { planId, aiType, prompt });
+  updateAiTasksBadge();
+  return true;
+}
+
+// Called from main.js when session_info with ai field arrives
+export function onAiSessionReady(sessionId) {
+  const pending = pendingAiSessions.get(sessionId);
+  if (!pending || pending.sent) return;
+  pending.sent = true;
+  // AI process detected — ask server to wait for actual prompt readiness, then send
+  wsSend({ type: 'send_when_ready', sessionId, data: pending.prompt });
+}
+
+// Called from main.js when server confirms prompt was sent to AI
+export function onAiPromptSent(sessionId) {
+  const pending = pendingAiSessions.get(sessionId);
+  if (!pending) return;
+  const { planId, aiType } = pending;
+  pendingAiSessions.delete(sessionId);
+
+  const plan = plans.find(p => p.id === planId);
+  if (!plan) return;
+
+  // Add AI session badge
+  if (!plan.ai_sessions) plan.ai_sessions = [];
+  plan.ai_sessions.push({ sessionId, ai: aiType });
+
+  // Move to DOING
+  if (plan.status !== 'doing') {
+    plan.status = 'doing';
+    apiFetch(`/api/plans/${planId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'doing' }),
+    }).catch(err => console.error('[plan] status change failed:', err));
+  }
+
+  renderBoard();
+  updateCount();
+  updateAiTasksBadge();
+}
+
+// ─── AI Tasks Dashboard ─────────────────────────────
+const aiDashOverlay = document.getElementById('ai-dash-overlay');
+const aiDashBody = document.getElementById('ai-dash-body');
+const sbAiTasks = document.getElementById('sb-ai-tasks');
+const sbAiTasksCount = document.getElementById('sb-ai-tasks-count');
+const sbAiTasksSep = document.getElementById('sb-ai-tasks-sep');
+
+// Collect all active AI sessions across plans
+function getActiveAiTasks() {
+  const tasks = [];
+  for (const plan of plans) {
+    if (!plan.ai_sessions) continue;
+    for (const s of plan.ai_sessions) {
+      tasks.push({ planId: plan.id, planTitle: plan.title || 'Untitled', planStatus: plan.status, ...s });
+    }
+  }
+  // Also include pending sessions not yet confirmed
+  for (const [sessionId, info] of pendingAiSessions) {
+    tasks.push({ planId: info.planId, planTitle: plans.find(p => p.id === info.planId)?.title || 'Untitled', planStatus: 'pending', sessionId, ai: info.aiType, pending: true });
+  }
+  return tasks;
+}
+
+export function updateAiTasksBadge() {
+  const tasks = getActiveAiTasks();
+  const count = tasks.length;
+  sbAiTasks.style.display = '';
+  sbAiTasksSep.style.display = '';
+  sbAiTasksCount.textContent = count;
+}
+
+function renderAiDashboard() {
+  const tasks = getActiveAiTasks();
+  if (!tasks.length) {
+    aiDashBody.innerHTML = '<div class="ai-dash-empty">활성 AI 작업이 없습니다</div>';
+    return;
+  }
+  aiDashBody.innerHTML = tasks.map(t => {
+    const reg = AI_REGISTRY[t.ai] || {};
+    const icon = reg.icon || 'icons/codex.png';
+    const label = reg.label || t.ai;
+    const statusCls = t.pending ? ' pending' : '';
+    const statusText = t.pending ? '대기중…' : (t.planStatus === 'doing' ? '작업중' : t.planStatus || '—');
+    const sid = t.sessionId || '';
+    return `<div class="ai-dash-card" data-session-id="${escHtml(sid)}">
+      <img class="ai-dash-card-icon" src="${escHtml(icon)}" alt="${escHtml(label)}">
+      <div class="ai-dash-card-info">
+        <div class="ai-dash-card-plan">${escHtml(t.planTitle)}</div>
+        <div class="ai-dash-card-meta">${escHtml(label)} · ${escHtml(sid.slice(-8))}</div>
+      </div>
+      <span class="ai-dash-card-status${statusCls}">${statusText}</span>
+      ${sid ? `<button class="ai-dash-card-go" data-sid="${escHtml(sid)}">이동 →</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+export function openAiDashboard() {
+  renderAiDashboard();
+  aiDashOverlay.classList.add('open');
+}
+
+export function closeAiDashboard() {
+  aiDashOverlay.classList.remove('open');
+}
+
+// Event listeners
+sbAiTasks?.addEventListener('click', () => openAiDashboard());
+document.getElementById('ai-dash-close')?.addEventListener('click', () => closeAiDashboard());
+aiDashOverlay?.addEventListener('click', e => { if (e.target === aiDashOverlay) closeAiDashboard(); });
+aiDashBody?.addEventListener('click', e => {
+  const goBtn = e.target.closest('.ai-dash-card-go');
+  if (goBtn) {
+    const sid = goBtn.dataset.sid;
+    if (sid) { activateSession(sid); closeAiDashboard(); }
+    return;
+  }
+  const card = e.target.closest('.ai-dash-card');
+  if (card && card.dataset.sessionId) {
+    activateSession(card.dataset.sessionId);
+    closeAiDashboard();
+  }
+});
 
 // Backward compatibility exports (no-ops now)
 export function handlePlanFileData() {}

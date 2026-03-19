@@ -56,6 +56,22 @@ export function updateStatusBar() {
   const c = terminalMap.size;
   hdrCount.textContent = c;
   sessionEmpty.style.display = c === 0 ? 'block' : 'none';
+
+  // Update project name in statusbar
+  const meta = S.activeSessionId ? sessionMeta.get(S.activeSessionId) : null;
+  const cwd = meta?.cwd;
+  const el = document.getElementById('sb-project');
+  const nameEl = document.getElementById('sb-project-name');
+  const sepEl = document.getElementById('sb-project-sep');
+  if (cwd) {
+    const parts = cwd.replace(/\/$/, '').split('/');
+    nameEl.textContent = parts[parts.length - 1] || '~';
+    el.style.display = '';
+    sepEl.style.display = '';
+  } else {
+    el.style.display = 'none';
+    sepEl.style.display = 'none';
+  }
 }
 
 export function showEmptyState()  { emptyState.style.display = 'flex'; }

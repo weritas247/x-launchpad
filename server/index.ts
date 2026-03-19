@@ -980,12 +980,13 @@ const wsSubscriptions = new Map<WebSocket, Set<string>>();
 // Per-session data WebSocket connections (terminal I/O)
 const dataWsMap = new Map<string, Set<WebSocket>>();
 
-function createSession(id: string, name: string, restoreCwd?: string, restoreCmd?: string): Session {
+function createSession(id: string, name: string, restoreCwd?: string, restoreCmd?: string, extraEnv?: Record<string, string>): Session {
   const s = currentSettings.shell;
   const shellPath = s.shellPath || (os.platform() === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash'));
   const mergedEnv = {
     ...(process.env as Record<string, string>),
     ...s.env,
+    ...(extraEnv || {}),
     LANG: (process.env.LANG && process.env.LANG.includes('UTF')) ? process.env.LANG : 'en_US.UTF-8',
     LC_ALL: (process.env.LC_ALL && process.env.LC_ALL.includes('UTF')) ? process.env.LC_ALL : 'en_US.UTF-8',
     LC_CTYPE: (process.env.LC_CTYPE && process.env.LC_CTYPE.includes('UTF')) ? process.env.LC_CTYPE : 'en_US.UTF-8',
@@ -1265,6 +1266,51 @@ function runCmdWhenReady(sess: Session, cmd: string) {
   setTimeout(() => { if (!sent) finish(); }, 6000);
 }
 
+/**
+ * Monitor PTY output for AI prompt readiness, then send text using bracketed paste + Enter.
+ * Detects prompts like: Claude's ❯, Gemini's >, Codex's $, or generic prompt patterns.
+ */
+function sendWhenAiReady(sess: Session, text: string, ws: WebSocket) {
+  let sent = false;
+  let disposed = false;
+  let buf = '';
+
+  function finish() {
+    if (sent) return;
+    sent = true;
+    if (!disposed) { disposed = true; unsub.dispose(); }
+    // Use bracketed paste mode so multi-line text is treated as a single paste
+    const BPS = '\x1b[200~';
+    const BPE = '\x1b[201~';
+    sess.pty.write(BPS + text + BPE);
+    // Send Enter after delay to let CLI process the pasted text
+    setTimeout(() => {
+      sess.pty.write('\r');
+      wsSend(ws, JSON.stringify({ type: 'ai_prompt_sent', sessionId: sess.id, ok: true }));
+    }, 500);
+  }
+
+  // AI prompt patterns: Claude ❯/>, Gemini >, Codex $, generic prompt chars
+  const promptRe = /[❯›>$%#]\s*$/;
+
+  const unsub = sess.pty.onData((chunk: string) => {
+    if (sent) return;
+    buf += chunk;
+    const clean = stripEscape(buf);
+    // Check if we see a prompt-like pattern after some initial output
+    if (clean.length > 20 && promptRe.test(clean)) {
+      finish();
+    }
+    // Safety: if buffer gets huge, just send it
+    if (buf.length > 8000 && !sent) {
+      finish();
+    }
+  });
+
+  // Fallback: send after 15 seconds regardless
+  setTimeout(() => { if (!sent) finish(); }, 15000);
+}
+
 function broadcastSessionList(exclude?: WebSocket) {
   persistSessions();
   const list = Array.from(sessions.values()).map(s => ({
@@ -1426,7 +1472,9 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const id = `session-${Date.now()}`;
       const nameFormat = currentSettings.shell.sessionNameFormat || 'shell-{n}';
       const name = (parsed.name as string) || nameFormat.replace('{n}', String(sessions.size + 1));
-      const sess = createSession(id, name, parsed.cwd as string | undefined);
+      const planId = parsed.planId as string | undefined;
+      const extraEnv = planId ? { SUPER_TERMINAL_PLAN_ID: planId } : undefined;
+      const sess = createSession(id, name, parsed.cwd as string | undefined, undefined, extraEnv);
       wsSession.set(ws, id);
       if (parsed.cmd) {
         sess.cmd = parsed.cmd as string;
@@ -1501,6 +1549,15 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       if (!id) return;
       const session = sessions.get(id);
       if (session) session.pty.write(parsed.data as string);
+
+    } else if (parsed.type === 'send_when_ready') {
+      // Wait for AI prompt readiness, then send input using bracketed paste + Enter
+      const id = parsed.sessionId as string;
+      const text = parsed.data as string;
+      if (!id || !text) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      sendWhenAiReady(session, text, ws);
 
     } else if (parsed.type === 'resize') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
