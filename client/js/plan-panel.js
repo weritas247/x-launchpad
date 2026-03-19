@@ -1,7 +1,7 @@
 // ─── PLAN MODAL: Evernote-style plan editor ─────────────────
 import { escHtml } from './state.js';
+import { apiFetch, getAuthToken } from './websocket.js';
 
-const STORAGE_KEY = 'plan-notes';
 const CATEGORIES = { feature: '기능', bug: '버그', other: '기타' };
 
 // DOM refs
@@ -18,29 +18,66 @@ const catTabsEl = document.getElementById('plan-category-tabs');
 
 let plans = [];
 let activeId = null;
-let activeCategory = 'all'; // filter
+let activeCategory = 'all';
 let saveTimer = null;
 
-// ─── Storage ────────────────────────────────────────
-function loadPlans() {
+// ─── API ─────────────────────────────────────────────
+async function loadPlans() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) plans = JSON.parse(raw);
-    // migrate old plans without category
-    let migrated = false;
-    plans.forEach(p => { if (!p.category) { p.category = 'other'; migrated = true; } });
-    if (migrated) savePlans();
-  } catch { plans = []; }
+    const res = await apiFetch('/api/plans');
+    const data = await res.json();
+    if (data.ok) {
+      plans = data.plans.map(p => ({
+        id: p.id,
+        title: p.title || '',
+        content: p.content || '',
+        category: p.category || 'other',
+        created: new Date(p.created_at).getTime(),
+        updated: new Date(p.updated_at).getTime(),
+      }));
+    } else {
+      plans = [];
+    }
+  } catch {
+    plans = [];
+  }
+  updateCount();
 }
 
-function savePlans() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(plans)); } catch {}
-  updateCount();
+async function apiCreatePlan(plan) {
+  try {
+    await apiFetch('/api/plans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: plan.id, title: plan.title, content: plan.content, category: plan.category }),
+    });
+  } catch (e) {
+    console.error('[plan] create failed:', e);
+  }
+}
+
+async function apiUpdatePlan(plan) {
+  try {
+    await apiFetch(`/api/plans/${plan.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: plan.title, content: plan.content, category: plan.category }),
+    });
+  } catch (e) {
+    console.error('[plan] update failed:', e);
+  }
+}
+
+async function apiDeletePlan(id) {
+  try {
+    await apiFetch(`/api/plans/${id}`, { method: 'DELETE' });
+  } catch (e) {
+    console.error('[plan] delete failed:', e);
+  }
 }
 
 function updateCount() {
   if (countEl) countEl.textContent = plans.length;
-  // tab count badges
   const allEl = document.getElementById('plan-count-all');
   const featEl = document.getElementById('plan-count-feature');
   const bugEl = document.getElementById('plan-count-bug');
@@ -66,20 +103,21 @@ function createPlan() {
     content: '',
     category: cat,
     created: Date.now(),
-    updated: Date.now()
+    updated: Date.now(),
   };
   plans.unshift(plan);
-  savePlans();
+  updateCount();
   renderList();
   selectPlan(plan.id);
   titleInput.focus();
+  apiCreatePlan(plan);
 }
 
 function deletePlan(id) {
   const filtered = filteredPlans();
   const idx = filtered.findIndex(p => p.id === id);
   plans = plans.filter(p => p.id !== id);
-  savePlans();
+  updateCount();
   if (activeId === id) {
     const newFiltered = filteredPlans();
     if (newFiltered.length > 0) {
@@ -91,6 +129,7 @@ function deletePlan(id) {
     }
   }
   renderList();
+  apiDeletePlan(id);
 }
 
 function selectPlan(id) {
@@ -105,7 +144,6 @@ function selectPlan(id) {
   catSelect.value = plan.category || 'other';
   dateEl.textContent = formatDate(plan.updated);
 
-  // highlight in list
   listEl.querySelectorAll('.plan-item').forEach(el => {
     el.classList.toggle('active', el.dataset.id === id);
   });
@@ -131,9 +169,10 @@ function flushSave() {
   plan.content = contentInput.value;
   plan.category = catSelect.value;
   plan.updated = Date.now();
-  savePlans();
+  updateCount();
   renderList();
   dateEl.textContent = formatDate(plan.updated);
+  apiUpdatePlan(plan);
 }
 
 // ─── Category tabs ──────────────────────────────────
@@ -143,7 +182,6 @@ function switchCategory(cat) {
     el.classList.toggle('active', el.dataset.cat === cat);
   });
   renderList();
-  // select first in filtered list or show empty
   const filtered = filteredPlans();
   if (activeId && filtered.find(p => p.id === activeId)) {
     selectPlan(activeId);
@@ -185,10 +223,15 @@ function formatDate(ts) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`;
 }
 
+// ─── Auth check ─────────────────────────────────────
+function isLoggedIn() {
+  return !!getAuthToken();
+}
+
 // ─── Modal open/close ───────────────────────────────
-export function openPlanModal() {
-  loadPlans();
-  updateCount();
+export async function openPlanModal() {
+  if (!isLoggedIn()) return;
+  await loadPlans();
   if (activeId && !plans.find(p => p.id === activeId)) activeId = null;
   renderList();
   const filtered = filteredPlans();
@@ -213,11 +256,23 @@ export function isPlanModalOpen() {
 
 // ─── Init ───────────────────────────────────────────
 export function initPlanPanel() {
-  loadPlans();
-  updateCount();
+  const sbPlan = document.getElementById('sb-plan');
+
+  // Hide plan buttons if not logged in
+  if (!isLoggedIn()) {
+    if (sbPlan) sbPlan.style.display = 'none';
+    const activityPlanBtn = document.querySelector('.activity-btn[data-panel="plan"]');
+    if (activityPlanBtn) activityPlanBtn.style.display = 'none';
+    const bnavPlanBtn = document.querySelector('.bnav-btn[data-panel="plan"]');
+    if (bnavPlanBtn) bnavPlanBtn.style.display = 'none';
+    return;
+  }
+
+  // Load count on init
+  loadPlans().then(() => updateCount());
 
   // Statusbar click
-  document.getElementById('sb-plan')?.addEventListener('click', openPlanModal);
+  sbPlan?.addEventListener('click', openPlanModal);
 
   // Close button
   document.getElementById('plan-modal-close')?.addEventListener('click', closePlanModal);
@@ -265,6 +320,6 @@ export function initPlanPanel() {
   contentInput?.addEventListener('input', scheduleSave);
 }
 
-// Keep these exports for backward compatibility with main.js
+// Backward compatibility exports (no-ops now)
 export function handlePlanFileData() {}
 export function onPlanSessionChange() {}
