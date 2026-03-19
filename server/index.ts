@@ -523,6 +523,21 @@ app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../../client/index.html'));
 });
 
+// Global Express error handler — catches unhandled errors in route handlers
+app.use(
+  (
+    err: Error,
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction
+  ) => {
+    console.error('[express] Unhandled error:', err.message, err.stack);
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: 'Internal server error' });
+    }
+  }
+);
+
 // ─── SESSION MANAGEMENT ──────────────────────────────────────────
 const SCROLLBACK_LIMIT = 128 * 1024;
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
@@ -1732,12 +1747,30 @@ async function startServer() {
 }
 startServer();
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  db.close();
-  process.exit(0);
-});
-process.on('SIGINT', () => {
-  db.close();
-  process.exit(0);
-});
+// Graceful shutdown — persist state and clean up resources
+function shutdown(signal: string) {
+  console.log(`[shutdown] Received ${signal}, cleaning up...`);
+  try {
+    persistSessions();
+  } catch {}
+  try {
+    // Close all WebSocket connections gracefully
+    wss.clients.forEach((ws) => ws.close(1001, 'Server shutting down'));
+    wssData.clients.forEach((ws) => ws.close(1001, 'Server shutting down'));
+  } catch {}
+  try {
+    db.close();
+  } catch {}
+  server.close(() => {
+    console.log(`[shutdown] Server closed`);
+    process.exit(0);
+  });
+  // Force exit after 5s if graceful shutdown hangs
+  setTimeout(() => {
+    console.warn('[shutdown] Forced exit after timeout');
+    process.exit(1);
+  }, 5000);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
