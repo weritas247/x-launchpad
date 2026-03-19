@@ -101,6 +101,7 @@ import {
   onHeadlessFailed,
   onHeadlessSync,
   updateAiTasksBadge,
+  syncAiSessionsFromList,
 } from '../sidebar/plan-panel';
 import { initControlPanel } from '../terminal/control-panel';
 // Side-effect imports — modules with self-initializing code
@@ -122,6 +123,7 @@ setInterval(() => {
 function handleMessage(msg) {
   if (msg.type === 'session_list') {
     syncSessionList(msg.sessions, S.wsJustReconnected);
+    syncAiSessionsFromList(msg.sessions);  // AI 세션 ↔ 플랜 연결 복원
     if (S.wsJustReconnected) {
       msg.sessions.forEach((s) => {
         suppressTabStatus(s.id, 2000);

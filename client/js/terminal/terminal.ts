@@ -167,7 +167,7 @@ export function syncSessionList(sessions, isReconnect = false) {
   const newIds = [];
   sessions.forEach((s) => {
     if (!sessionMeta.has(s.id)) {
-      sessionMeta.set(s.id, { name: s.name, createdAt: s.createdAt, cwd: s.cwd || null, ai: s.ai || null });
+      sessionMeta.set(s.id, { name: s.name, createdAt: s.createdAt, cwd: s.cwd || null, ai: s.ai || null, planId: s.planId });
       attachTerminal(s.id, s.name);
       newIds.push(s.id);
     } else {
@@ -175,6 +175,7 @@ export function syncSessionList(sessions, isReconnect = false) {
       const meta = sessionMeta.get(s.id);
       if (s.cwd) meta.cwd = s.cwd;
       if (s.ai !== undefined) meta.ai = s.ai || null;
+      if (s.planId) meta.planId = s.planId;
     }
   });
   if (newIds.length > 0) {

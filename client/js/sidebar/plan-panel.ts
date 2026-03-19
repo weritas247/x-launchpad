@@ -1100,13 +1100,15 @@ export function onAiPromptSent(sessionId) {
 
   // Add AI session badge + persist to DB
   if (!plan.ai_sessions) plan.ai_sessions = [];
-  const entry = { sessionId, ai: aiType, ts: Date.now() };
-  plan.ai_sessions.push(entry);
-  apiFetch(`/api/plans/${planId}/ai-sessions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(entry),
-  }).catch((err) => console.error('[plan] ai-session save failed:', err));
+  if (!plan.ai_sessions.some((s) => s.sessionId === sessionId)) {
+    const entry = { sessionId, ai: aiType, ts: Date.now() };
+    plan.ai_sessions.push(entry);
+    apiFetch(`/api/plans/${planId}/ai-sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+    }).catch((err) => console.error('[plan] ai-session save failed:', err));
+  }
 
   // Move to DOING
   if (plan.status !== 'doing') {
@@ -1221,6 +1223,24 @@ export function onHeadlessSync(jobs) {
   for (const j of jobs) {
     headlessJobs.set(j.sessionId, { planId: j.planId, ai: 'claude', status: 'running' });
   }
+  renderBoard();
+  updateAiTasksBadge();
+}
+
+// Called on session_list to restore plan.ai_sessions from server state
+export function syncAiSessionsFromList(sessions) {
+  let changed = false;
+  for (const s of sessions) {
+    if (!s.ai || !s.planId) continue;
+    const plan = plans.find((p) => p.id === s.planId);
+    if (!plan) continue;
+    if (!plan.ai_sessions) plan.ai_sessions = [];
+    if (plan.ai_sessions.some((as) => as.sessionId === s.id)) continue;
+    plan.ai_sessions.push({ sessionId: s.id, ai: s.ai });
+    changed = true;
+  }
+  if (!changed) return;
+  renderBoard();
   updateAiTasksBadge();
 }
 
