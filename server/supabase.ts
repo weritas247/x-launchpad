@@ -9,6 +9,12 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Service role client for Storage operations (bypasses RLS)
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseAdmin = serviceRoleKey
+  ? createClient(supabaseUrl, serviceRoleKey)
+  : supabase;
+
 export interface UserRow {
   id: number;
   email: string;
@@ -207,7 +213,7 @@ export async function appendPlanLog(userId: number, log: { plan_id?: string; typ
 const PLAN_IMAGES_BUCKET = 'plan-images';
 
 export async function ensurePlanImagesBucket(): Promise<void> {
-  const { error } = await supabase.storage.createBucket(PLAN_IMAGES_BUCKET, { public: true });
+  const { error } = await supabaseAdmin.storage.createBucket(PLAN_IMAGES_BUCKET, { public: true });
   if (error && !error.message.includes('already exists')) {
     console.warn('[supabase] Failed to create plan-images bucket:', error.message);
   }
@@ -219,13 +225,13 @@ export async function uploadPlanImage(userId: number, planId: string, filename: 
   if (!plan) throw new Error('Plan not found');
 
   const storagePath = `${userId}/${planId}/${filename}`;
-  const { error } = await supabase.storage.from(PLAN_IMAGES_BUCKET).upload(storagePath, buffer, {
+  const { error } = await supabaseAdmin.storage.from(PLAN_IMAGES_BUCKET).upload(storagePath, buffer, {
     contentType,
     upsert: true,
   });
   if (error) throw error;
 
-  const { data: urlData } = supabase.storage.from(PLAN_IMAGES_BUCKET).getPublicUrl(storagePath);
+  const { data: urlData } = supabaseAdmin.storage.from(PLAN_IMAGES_BUCKET).getPublicUrl(storagePath);
   return { path: storagePath, url: urlData.publicUrl };
 }
 
@@ -234,10 +240,10 @@ export async function listPlanImages(userId: number, planId: string): Promise<{ 
   if (!plan) throw new Error('Plan not found');
 
   const prefix = `${userId}/${planId}`;
-  const { data, error } = await supabase.storage.from(PLAN_IMAGES_BUCKET).list(prefix);
+  const { data, error } = await supabaseAdmin.storage.from(PLAN_IMAGES_BUCKET).list(prefix);
   if (error) throw error;
   return (data || []).map(f => {
-    const { data: urlData } = supabase.storage.from(PLAN_IMAGES_BUCKET).getPublicUrl(`${prefix}/${f.name}`);
+    const { data: urlData } = supabaseAdmin.storage.from(PLAN_IMAGES_BUCKET).getPublicUrl(`${prefix}/${f.name}`);
     return { name: f.name, url: urlData.publicUrl };
   });
 }
@@ -247,6 +253,6 @@ export async function deletePlanImage(userId: number, planId: string, filename: 
   if (!plan) throw new Error('Plan not found');
 
   const storagePath = `${userId}/${planId}/${filename}`;
-  const { error } = await supabase.storage.from(PLAN_IMAGES_BUCKET).remove([storagePath]);
+  const { error } = await supabaseAdmin.storage.from(PLAN_IMAGES_BUCKET).remove([storagePath]);
   if (error) throw error;
 }
