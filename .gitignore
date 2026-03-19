@@ -10,3 +10,4 @@ data.db-shm
 .superpowers/
 .env.dev
 pasted-image-*.png
+client/js/codemirror-bundle.js
