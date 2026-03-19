@@ -130,14 +130,14 @@ function createEditor(container, content, filePath, { readOnly = true, onSave, o
 
   if (onChange) {
     extensions.push(EditorView.updateListener.of((update) => {
-      if (update.docChanged) onChange();
+      if (update.docChanged) onChange(update.state.doc.toString());
     }));
   }
 
   if (onSave) {
     extensions.push(keymap.of([{
       key: 'Mod-s',
-      run: () => { onSave(); return true; },
+      run: (view) => { onSave(view.state.doc.toString()); return true; },
       preventDefault: true,
     }]));
   }

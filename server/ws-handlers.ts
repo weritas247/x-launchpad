@@ -693,8 +693,9 @@ const handlers: Record<string, WsHandler> = {
     }
 
     // Path traversal protection
-    const resolved = path.resolve(session.cwd, filePath);
-    if (!resolved.startsWith(session.cwd + path.sep) && resolved !== session.cwd) {
+    const resolvedCwd = path.resolve(session.cwd);
+    const resolved = path.resolve(resolvedCwd, filePath);
+    if (!resolved.startsWith(resolvedCwd + path.sep) && resolved !== resolvedCwd) {
       ctx.wsSend(ctx.ws, JSON.stringify({
         type: 'file_save_result',
         sessionId: id,

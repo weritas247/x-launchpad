@@ -210,7 +210,7 @@ function renderEditingHeader(entry) {
   if (!actionsEl) return;
   actionsEl.innerHTML = `
     <span class="file-pane-status editing">EDITING</span>
-    <span class="file-pane-hint">Ctrl+S to save</span>
+    <span class="file-pane-save-hint">Ctrl+S to save</span>
     <button class="file-pane-save-btn">Save</button>
     <button class="file-pane-cancel-btn">Cancel</button>
   `;
