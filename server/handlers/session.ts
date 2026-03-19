@@ -67,6 +67,7 @@ const handlers: Record<string, WsHandler> = {
         sessionId: id,
         cwd: sess.cwd,
         ai: sess.ai,
+        planId: sess.planId,
       })
     );
   },

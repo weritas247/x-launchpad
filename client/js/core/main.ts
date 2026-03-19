@@ -177,9 +177,16 @@ function handleMessage(msg) {
     }, 50);
   } else if (msg.type === 'session_info') {
     updateSessionInfo(msg.sessionId, msg.cwd, msg.ai);
+    // sessionMeta에 planId도 저장
+    const meta = sessionMeta.get(msg.sessionId);
+    if (meta && msg.planId) meta.planId = msg.planId;
     tabStatusOnAiChange(msg.sessionId, msg.ai);
 
     if (msg.ai) onAiSessionReady(msg.sessionId);
+    // AI + planId가 있으면 plan.ai_sessions에도 반영
+    if (msg.ai && msg.planId) {
+      syncAiSessionsFromList([{ id: msg.sessionId, ai: msg.ai, planId: msg.planId }]);
+    }
     if (msg.sessionId === S.activeSessionId) {
       updateProjectName(msg.cwd);
       requestBranch(msg.sessionId);

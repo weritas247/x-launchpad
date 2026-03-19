@@ -535,6 +535,7 @@ function createSession(
             sessionId: id,
             cwd: newCwd,
             ai: newAi,
+            planId: session.planId,
           });
           wss.clients.forEach((c) => {
             if (c.readyState === WebSocket.OPEN) c.send(msg);
