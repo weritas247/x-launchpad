@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.dev' });
 
-// Suppress unhandled rejections from supabase background operations
+// ─── Global error handlers ───────────────────────────────────────
 process.on('unhandledRejection', (reason) => {
   const code = (reason as any)?.code;
   if (code === 'PGRST205' || code === 'PGRST116') {
@@ -12,6 +12,12 @@ process.on('unhandledRejection', (reason) => {
     return;
   }
   console.error('[UnhandledRejection]', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[UncaughtException]', err.message, err.stack);
+  // Give time for error to be logged, then exit
+  setTimeout(() => process.exit(1), 100);
 });
 
 import express from 'express';
