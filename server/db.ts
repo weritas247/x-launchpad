@@ -24,6 +24,7 @@ db.exec(`
     cwd TEXT DEFAULT '',
     cmd TEXT DEFAULT '',
     scrollback TEXT DEFAULT '',
+    plan_id TEXT DEFAULT '',
     updated_at INTEGER DEFAULT (strftime('%s','now'))
   );
 
@@ -77,10 +78,15 @@ export function saveSettings(settings: Record<string, unknown>): void {
   setSetting('app_settings', JSON.stringify(settings));
 }
 
+// Migration: add plan_id column if missing (기존 DB 업그레이드)
+try {
+  db.exec(`ALTER TABLE sessions ADD COLUMN plan_id TEXT DEFAULT ''`);
+} catch {}
+
 // ─── Sessions ───────────────────────────────────────
 const stmtListSessions = db.prepare('SELECT * FROM sessions ORDER BY created_at');
 const stmtUpsertSession = db.prepare(
-  "INSERT OR REPLACE INTO sessions (id, name, created_at, cwd, cmd, scrollback, updated_at) VALUES (?, ?, ?, ?, ?, ?, strftime('%s','now'))"
+  "INSERT OR REPLACE INTO sessions (id, name, created_at, cwd, cmd, scrollback, plan_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))"
 );
 const stmtDeleteSession = db.prepare('DELETE FROM sessions WHERE id = ?');
 const stmtClearSessions = db.prepare('DELETE FROM sessions');
@@ -92,6 +98,7 @@ export interface SessionRow {
   cwd: string;
   cmd: string;
   scrollback: string;
+  plan_id: string;
 }
 
 export function listSessions(): SessionRow[] {
@@ -104,9 +111,10 @@ export function upsertSession(
   createdAt: number,
   cwd: string,
   cmd?: string,
-  scrollback?: string
+  scrollback?: string,
+  planId?: string
 ): void {
-  stmtUpsertSession.run(id, name, createdAt, cwd, cmd || '', scrollback || '');
+  stmtUpsertSession.run(id, name, createdAt, cwd, cmd || '', scrollback || '', planId || '');
 }
 
 export function deleteSession(id: string): void {
@@ -114,12 +122,12 @@ export function deleteSession(id: string): void {
 }
 
 export function saveSessions(
-  sessions: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string; scrollback?: string }>
+  sessions: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string; scrollback?: string; planId?: string }>
 ): void {
   const transaction = db.transaction(() => {
     stmtClearSessions.run();
     for (const s of sessions) {
-      stmtUpsertSession.run(s.id, s.name, s.createdAt, s.cwd, s.cmd || '', s.scrollback || '');
+      stmtUpsertSession.run(s.id, s.name, s.createdAt, s.cwd, s.cmd || '', s.scrollback || '', s.planId || '');
     }
   });
   transaction();
