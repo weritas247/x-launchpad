@@ -333,27 +333,30 @@ export function getActiveFilePath() {
   return activeFilePath;
 }
 
-// Export stub for Task 5: handle server response after file_save
+function showHeaderMessage(entry, message, type) {
+  const existing = entry.headerEl.querySelector('.file-pane-message');
+  if (existing) existing.remove();
+  const el = document.createElement('span');
+  el.className = `file-pane-message file-pane-message-${type}`;
+  el.textContent = message;
+  const actions = entry.headerEl.querySelector('.file-pane-actions');
+  if (actions) actions.prepend(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
 export function handleFileSaveResult(filePath, success, error) {
   const entry = fileTabs.get(filePath);
   if (!entry) return;
   if (success) {
-    // Update originalContent to saved content
     if (entry.editorView) {
       entry.originalContent = window.FileEditor.getContent(entry.editorView);
     }
-    // Clear unsaved indicator
     entry.tabEl.classList.remove('unsaved');
     const dot = entry.tabEl.querySelector('.tab-unsaved-dot');
     if (dot) dot.style.display = 'none';
-    // Return to read-only mode
-    if (entry.isEditing) {
-      window.FileEditor.setReadOnly(entry.editorView, true);
-      entry.isEditing = false;
-      renderReadonlyHeader(entry);
-    }
-  } else if (error) {
-    alert(`Save failed: ${error}`);
+    showHeaderMessage(entry, 'Saved', 'success');
+  } else {
+    showHeaderMessage(entry, `Save failed: ${error}`, 'error');
   }
 }
 

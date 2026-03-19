@@ -60,6 +60,7 @@ export const DEFAULT_SETTINGS = {
     focusSourceControl: 'Ctrl+Shift+g',
     toggleInputPanel: 'Meta+i',
     planModal: 'Ctrl+p',
+    toggleFileEdit: 'Ctrl+e',
   },
   advanced: {
     customCss: '',

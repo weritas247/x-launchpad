@@ -36,6 +36,7 @@ import {
   handleGitRemoteUrlData,
   handleGitCheckoutAck,
   handleGitPullAck,
+  handleGitPushAckInGraph,
   handleGitGraphSearchData,
   requestBranch,
   handleGitGraphKeydown,
@@ -88,7 +89,7 @@ import {
   handleReplaceAck,
   onSearchSessionChange,
 } from './search.js';
-import { setActivateSessionFn } from './file-viewer.js';
+import { setActivateSessionFn, handleFileSaveResult } from './file-viewer.js';
 import {
   initPlanPanel,
   handlePlanFileData,
@@ -220,6 +221,7 @@ function handleMessage(msg) {
     handleGitCommitAck(msg);
   } else if (msg.type === 'git_push_ack') {
     handleGitPushAck(msg);
+    handleGitPushAckInGraph(msg);
   } else if (msg.type === 'git_generate_message_data') {
     handleGitGenerateMessage(msg);
   } else if (msg.type === 'git_worktree_list_data') {
@@ -240,6 +242,8 @@ function handleMessage(msg) {
     if (msg.filePath && /\.(md|markdown)$/i.test(msg.filePath)) {
       handlePlanFileData(msg);
     }
+  } else if (msg.type === 'file_save_result') {
+    handleFileSaveResult(msg.filePath, msg.success, msg.error);
   } else if (msg.type === 'file_op_ack') {
     handleFileOpAck(msg);
   } else if (msg.type === 'plan_ai_done') {
