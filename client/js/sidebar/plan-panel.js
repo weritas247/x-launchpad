@@ -14,7 +14,8 @@ const editorEmpty = document.getElementById('plan-editor-empty');
 const titleInput = document.getElementById('plan-editor-title');
 const contentInput = document.getElementById('plan-editor-content');
 const dateEl = document.getElementById('plan-editor-date');
-const countEl = document.getElementById('sb-plan-count');
+const todoCountEl = document.getElementById('sb-plan-todo');
+const doingCountEl = document.getElementById('sb-plan-doing');
 const catSelect = document.getElementById('plan-cat-select');
 const catTabsEl = document.getElementById('plan-category-tabs');
 
@@ -111,7 +112,10 @@ async function apiDeletePlan(id) {
 }
 
 function updateCount() {
-  if (countEl) countEl.textContent = plans.length;
+  const todoCount = plans.filter((p) => (p.status || 'todo') === 'todo').length;
+  const doingCount = plans.filter((p) => p.status === 'doing').length;
+  if (todoCountEl) todoCountEl.textContent = todoCount;
+  if (doingCountEl) doingCountEl.textContent = doingCount;
   const allEl = document.getElementById('plan-count-all');
   const featEl = document.getElementById('plan-count-feature');
   const bugEl = document.getElementById('plan-count-bug');

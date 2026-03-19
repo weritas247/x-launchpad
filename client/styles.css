@@ -2522,6 +2522,33 @@ body::after {
   box-shadow: 0 0 10px rgba(255, 51, 102, 0.1);
 }
 
+/* Statusbar kanban badges */
+.sb-kanban-badges {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.sb-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+.sb-badge-todo {
+  background: rgba(100, 149, 237, 0.18);
+  color: #6495ed;
+}
+.sb-badge-doing {
+  background: rgba(255, 179, 71, 0.18);
+  color: #ffb347;
+}
+
 /* Statusbar clickable items hover */
 .sb-plan {
   cursor: pointer;
