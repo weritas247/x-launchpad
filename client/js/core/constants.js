@@ -271,6 +271,7 @@ export const THEMES = [
 export const AI_REGISTRY = {
   claude: {
     label: 'Claude',
+    cmd: 'claude --dangerously-skip-permissions',
     icon: 'icons/claude.webp',
     notifyIcon: '✦',
     rgb: [191, 128, 255],

@@ -881,10 +881,12 @@ async function assignAiToplan(planId, aiType) {
   const cwd = meta?.cwd || undefined;
 
   // Create AI session
+  const reg = AI_REGISTRY[aiType] || {};
+  const cmd = reg.cmd || aiType;
   wsSend({
     type: 'session_create',
     name: `${aiType}:${title.slice(0, 20)}`,
-    cmd: aiType,
+    cmd,
     cwd,
     planId,
   });
