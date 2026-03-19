@@ -442,6 +442,22 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
 .plan-close{background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-dim);font-size:16px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);transition:all .12s}
 .plan-close:hover{color:var(--danger);border-color:var(--danger);background:rgba(255,51,102,.1)}
 
+/* Category tabs */
+.plan-category-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg-deep);padding:0 16px}
+.plan-cat-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--text-dim);font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;padding:8px 14px;cursor:pointer;transition:all .12s}
+.plan-cat-tab:hover{color:var(--text-main);background:var(--bg-hover)}
+.plan-cat-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* Category select in editor */
+.plan-cat-select{background:var(--bg-surface);border:1px solid var(--border);border-radius:4px;color:var(--text-main);font-family:var(--font-mono);font-size:10px;padding:3px 8px;cursor:pointer;outline:none;transition:border-color .12s;letter-spacing:.04em}
+.plan-cat-select:focus{border-color:var(--accent)}
+
+/* Category badge in list */
+.plan-item-cat{display:inline-block;font-size:9px;letter-spacing:.06em;padding:1px 6px;border-radius:3px;margin-bottom:3px}
+.plan-item-cat[data-cat="feature"]{background:rgba(57,255,120,.12);color:var(--ok)}
+.plan-item-cat[data-cat="bug"]{background:rgba(255,51,102,.12);color:var(--danger)}
+.plan-item-cat[data-cat="other"]{background:rgba(123,92,250,.12);color:var(--accent2)}
+
 .plan-body{display:flex;flex:1;overflow:hidden}
 
 /* LEFT COLUMN: Plan list */

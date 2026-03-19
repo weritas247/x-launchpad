@@ -2,6 +2,7 @@
 import { escHtml } from './state.js';
 
 const STORAGE_KEY = 'plan-notes';
+const CATEGORIES = { feature: '기능', bug: '버그', other: '기타' };
 
 // DOM refs
 const overlay = document.getElementById('plan-overlay');
@@ -12,9 +13,12 @@ const titleInput = document.getElementById('plan-editor-title');
 const contentInput = document.getElementById('plan-editor-content');
 const dateEl = document.getElementById('plan-editor-date');
 const countEl = document.getElementById('sb-plan-count');
+const catSelect = document.getElementById('plan-cat-select');
+const catTabsEl = document.getElementById('plan-category-tabs');
 
 let plans = [];
 let activeId = null;
+let activeCategory = 'all'; // filter
 let saveTimer = null;
 
 // ─── Storage ────────────────────────────────────────
@@ -22,6 +26,8 @@ function loadPlans() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) plans = JSON.parse(raw);
+    // migrate old plans without category
+    plans.forEach(p => { if (!p.category) p.category = 'other'; });
   } catch { plans = []; }
 }
 
@@ -34,12 +40,20 @@ function updateCount() {
   if (countEl) countEl.textContent = plans.length;
 }
 
+// ─── Filtered list ──────────────────────────────────
+function filteredPlans() {
+  if (activeCategory === 'all') return plans;
+  return plans.filter(p => p.category === activeCategory);
+}
+
 // ─── CRUD ───────────────────────────────────────────
 function createPlan() {
+  const cat = activeCategory === 'all' ? 'feature' : activeCategory;
   const plan = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     title: '',
     content: '',
+    category: cat,
     created: Date.now(),
     updated: Date.now()
   };
@@ -51,12 +65,14 @@ function createPlan() {
 }
 
 function deletePlan(id) {
-  const idx = plans.findIndex(p => p.id === id);
+  const filtered = filteredPlans();
+  const idx = filtered.findIndex(p => p.id === id);
   plans = plans.filter(p => p.id !== id);
   savePlans();
   if (activeId === id) {
-    if (plans.length > 0) {
-      const next = plans[Math.min(idx, plans.length - 1)];
+    const newFiltered = filteredPlans();
+    if (newFiltered.length > 0) {
+      const next = newFiltered[Math.min(idx, newFiltered.length - 1)];
       selectPlan(next.id);
     } else {
       activeId = null;
@@ -75,6 +91,7 @@ function selectPlan(id) {
   editorArea.style.display = 'flex';
   titleInput.value = plan.title;
   contentInput.value = plan.content;
+  catSelect.value = plan.category || 'other';
   dateEl.textContent = formatDate(plan.updated);
 
   // highlight in list
@@ -91,28 +108,54 @@ function showEmptyState() {
 // ─── Auto-save on input ─────────────────────────────
 function scheduleSave() {
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    if (!activeId) return;
-    const plan = plans.find(p => p.id === activeId);
-    if (!plan) return;
-    plan.title = titleInput.value;
-    plan.content = contentInput.value;
-    plan.updated = Date.now();
-    savePlans();
-    renderList();
-    dateEl.textContent = formatDate(plan.updated);
-  }, 300);
+  saveTimer = setTimeout(flushSave, 300);
+}
+
+function flushSave() {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  if (!activeId) return;
+  const plan = plans.find(p => p.id === activeId);
+  if (!plan) return;
+  plan.title = titleInput.value;
+  plan.content = contentInput.value;
+  plan.category = catSelect.value;
+  plan.updated = Date.now();
+  savePlans();
+  renderList();
+  dateEl.textContent = formatDate(plan.updated);
+}
+
+// ─── Category tabs ──────────────────────────────────
+function switchCategory(cat) {
+  activeCategory = cat;
+  catTabsEl.querySelectorAll('.plan-cat-tab').forEach(el => {
+    el.classList.toggle('active', el.dataset.cat === cat);
+  });
+  renderList();
+  // select first in filtered list or show empty
+  const filtered = filteredPlans();
+  if (activeId && filtered.find(p => p.id === activeId)) {
+    selectPlan(activeId);
+  } else if (filtered.length > 0) {
+    selectPlan(filtered[0].id);
+  } else {
+    activeId = null;
+    showEmptyState();
+  }
 }
 
 // ─── Rendering ──────────────────────────────────────
 function renderList() {
   if (!listEl) return;
-  listEl.innerHTML = plans.map(p => {
+  const filtered = filteredPlans();
+  listEl.innerHTML = filtered.map(p => {
     const title = escHtml(p.title || 'Untitled');
     const preview = escHtml((p.content || '').slice(0, 80).replace(/\n/g, ' '));
     const date = formatDate(p.updated);
     const active = p.id === activeId ? ' active' : '';
+    const catLabel = CATEGORIES[p.category] || '기타';
     return `<div class="plan-item${active}" data-id="${p.id}">
+      <span class="plan-item-cat" data-cat="${p.category || 'other'}">${catLabel}</span>
       <div class="plan-item-title">${title}</div>
       <div class="plan-item-preview">${preview || 'No content'}</div>
       <div class="plan-item-date">${date}</div>
@@ -134,13 +177,13 @@ function formatDate(ts) {
 // ─── Modal open/close ───────────────────────────────
 export function openPlanModal() {
   loadPlans();
-  // validate activeId still exists
   if (activeId && !plans.find(p => p.id === activeId)) activeId = null;
   renderList();
-  if (activeId) {
+  const filtered = filteredPlans();
+  if (activeId && filtered.find(p => p.id === activeId)) {
     selectPlan(activeId);
-  } else if (plans.length > 0) {
-    selectPlan(plans[0].id);
+  } else if (filtered.length > 0) {
+    selectPlan(filtered[0].id);
   } else {
     showEmptyState();
   }
@@ -148,20 +191,7 @@ export function openPlanModal() {
 }
 
 export function closePlanModal() {
-  // flush any pending save
-  if (saveTimer) {
-    clearTimeout(saveTimer);
-    saveTimer = null;
-    if (activeId) {
-      const plan = plans.find(p => p.id === activeId);
-      if (plan) {
-        plan.title = titleInput.value;
-        plan.content = contentInput.value;
-        plan.updated = Date.now();
-        savePlans();
-      }
-    }
-  }
+  flushSave();
   overlay.classList.remove('open');
 }
 
@@ -185,6 +215,12 @@ export function initPlanPanel() {
     if (e.target === overlay) closePlanModal();
   });
 
+  // Category tab clicks
+  catTabsEl?.addEventListener('click', e => {
+    const tab = e.target.closest('.plan-cat-tab');
+    if (tab) { flushSave(); switchCategory(tab.dataset.cat); }
+  });
+
   // New plan
   document.getElementById('plan-btn-new')?.addEventListener('click', createPlan);
 
@@ -196,7 +232,7 @@ export function initPlanPanel() {
   // List click delegation
   listEl?.addEventListener('click', e => {
     const item = e.target.closest('.plan-item');
-    if (item) selectPlan(item.dataset.id);
+    if (item) { flushSave(); selectPlan(item.dataset.id); }
   });
 
   // Enter in title → focus content (keyup for IME/한글 compatibility)
@@ -207,10 +243,14 @@ export function initPlanPanel() {
     if (e.key === 'Enter' || e.keyCode === 13) contentInput.focus();
   });
 
+  // Category change in editor
+  catSelect?.addEventListener('change', () => {
+    scheduleSave();
+  });
+
   // Auto-save on input
   titleInput?.addEventListener('input', scheduleSave);
   contentInput?.addEventListener('input', scheduleSave);
-
 }
 
 // Keep these exports for backward compatibility with main.js

@@ -424,6 +424,12 @@
       <span class="plan-title-text">Plans</span>
       <button class="plan-close" id="plan-modal-close">✕</button>
     </div>
+    <div class="plan-category-tabs" id="plan-category-tabs">
+      <button class="plan-cat-tab active" data-cat="all">All</button>
+      <button class="plan-cat-tab" data-cat="feature">기능</button>
+      <button class="plan-cat-tab" data-cat="bug">버그</button>
+      <button class="plan-cat-tab" data-cat="other">기타</button>
+    </div>
     <div class="plan-body">
       <!-- LEFT: Plan list -->
       <div class="plan-list-col">
@@ -443,6 +449,11 @@
           <textarea class="plan-editor-content" id="plan-editor-content" placeholder="Write your plan here..." spellcheck="false"></textarea>
           <div class="plan-editor-footer">
             <span class="plan-editor-date" id="plan-editor-date"></span>
+            <select class="plan-cat-select" id="plan-cat-select">
+              <option value="feature">기능</option>
+              <option value="bug">버그</option>
+              <option value="other">기타</option>
+            </select>
             <button class="plan-btn-delete" id="plan-btn-delete" title="Delete plan">🗑 Delete</button>
           </div>
         </div>
