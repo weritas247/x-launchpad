@@ -3,6 +3,14 @@
   "version": "1.0.0",
   "description": "Super Terminal — browser-based multi-session terminal with AI detection, themes, and xterm.js + node-pty",
   "main": "dist/server/index.js",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/weritas247/claude-web-terminal.git"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/server/index.js",
