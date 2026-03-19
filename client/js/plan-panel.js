@@ -38,6 +38,15 @@ function savePlans() {
 
 function updateCount() {
   if (countEl) countEl.textContent = plans.length;
+  // tab count badges
+  const allEl = document.getElementById('plan-count-all');
+  const featEl = document.getElementById('plan-count-feature');
+  const bugEl = document.getElementById('plan-count-bug');
+  const otherEl = document.getElementById('plan-count-other');
+  if (allEl) allEl.textContent = plans.length;
+  if (featEl) featEl.textContent = plans.filter(p => p.category === 'feature').length;
+  if (bugEl) bugEl.textContent = plans.filter(p => p.category === 'bug').length;
+  if (otherEl) otherEl.textContent = plans.filter(p => p.category === 'other').length;
 }
 
 // ─── Filtered list ──────────────────────────────────
