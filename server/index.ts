@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.dev' });
 
-// Suppress unhandled rejections from supabase background operations (e.g. schema cache fetch when table doesn't exist yet)
+// Suppress unhandled rejections from supabase background operations
 process.on('unhandledRejection', (reason) => {
   const code = (reason as any)?.code;
   if (code === 'PGRST205' || code === 'PGRST116') {
@@ -20,16 +20,25 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as os from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-
-import { execSync } from 'child_process';
 const execFileAsync = promisify(execFile);
+
 import * as gitService from './git-service';
 import * as db from './db';
 import * as userDb from './supabase';
-import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
-import * as crypto from 'crypto';
 
+// ─── Extracted modules ───────────────────────────────────────────
+import { DEFAULT_SETTINGS, AppSettings, loadSettings, saveSettings as saveSettingsToStore } from './config';
+import { tmuxAvailable, TMUX_SOCKET, tmuxSessionExists, tmuxCreateSession, tmuxKillSession, tmuxGetCwd, tmuxGetPanePid, tmuxListSessions } from './tmux';
+import {
+  isAuthEnabled, isSetupRequired, isRegistrationAllowed, getAuthMode,
+  verifyToken, getTokenPayload, issueJwt, extractToken, authMiddleware,
+  checkRateLimit, recordAuthFailure, tokenAuthEnabled, BCRYPT_ROUNDS,
+} from './auth';
+import { getClaudeUsage, getClaudePrompts } from './claude-service';
+import { runCmdWhenReady, sendWhenAiReady } from './pty-utils';
+
+// ─── Server setup ────────────────────────────────────────────────
 /** Safe WebSocket send — no-ops if socket is not OPEN */
 function wsSend(ws: WebSocket, data: string): void {
   if (ws.readyState === WebSocket.OPEN) ws.send(data);
@@ -37,319 +46,30 @@ function wsSend(ws: WebSocket, data: string): void {
 
 const app = express();
 const server = http.createServer(app);
-// Control WS: session management, settings, git, file ops (JSON)
 const wss = new WebSocketServer({ noServer: true });
-// Data WS: per-session terminal I/O (binary)
 const wssData = new WebSocketServer({ noServer: true });
 
-// Route upgrade requests to the right WSS
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
   if (url.pathname === '/pty') {
-    wssData.handleUpgrade(req, socket, head, (ws) => {
-      wssData.emit('connection', ws, req);
-    });
+    wssData.handleUpgrade(req, socket, head, (ws) => { wssData.emit('connection', ws, req); });
   } else {
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      wss.emit('connection', ws, req);
-    });
+    wss.handleUpgrade(req, socket, head, (ws) => { wss.emit('connection', ws, req); });
   }
 });
+
 const PORT = parseInt(process.env.PORT || '3000', 10);
-const SETTINGS_PATH  = path.join(__dirname, '../../settings.json');
-const SESSIONS_PATH  = path.join(__dirname, '../../sessions.json');
+const SETTINGS_PATH = path.join(__dirname, '../../settings.json');
+const SESSIONS_PATH = path.join(__dirname, '../../sessions.json');
 
-// ─── TMUX INTEGRATION ────────────────────────────────────────────
-// tmux is opt-in: set ENABLE_TMUX=1 for remote/unstable network use
-const TMUX_SOCKET = path.join(os.tmpdir(), 'super-terminal-tmux');
-let tmuxAvailable = false;
-const tmuxRequested = process.env.ENABLE_TMUX === '1';
-if (tmuxRequested) {
-  try {
-    execSync('tmux -V', { stdio: 'ignore' });
-    tmuxAvailable = true;
-    console.log(`[tmux] Enabled — socket: ${TMUX_SOCKET}`);
-  } catch {
-    console.log('[tmux] Requested but not found — falling back to direct PTY');
-  }
-} else {
-  console.log('[tmux] Disabled (set ENABLE_TMUX=1 to enable)');
+// ─── Settings ────────────────────────────────────────────────────
+let currentSettings = loadSettings(SETTINGS_PATH);
+
+function saveSettings(s: AppSettings): void {
+  saveSettingsToStore(s, SETTINGS_PATH);
 }
 
-function tmuxExec(args: string[], timeout = 3000): string {
-  return execSync(`tmux -S "${TMUX_SOCKET}" ${args.join(' ')}`, {
-    encoding: 'utf-8', timeout,
-  }).trim();
-}
-
-function tmuxSessionExists(name: string): boolean {
-  try {
-    tmuxExec(['has-session', '-t', name]);
-    return true;
-  } catch { return false; }
-}
-
-function tmuxCreateSession(name: string, cwd: string, shell: string): void {
-  const safeCwd = fs.existsSync(cwd) ? cwd : (process.env.HOME || '/');
-  tmuxExec(['new-session', '-d', '-s', name, '-c', safeCwd, shell]);
-  // Hide all tmux chrome — our UI provides its own
-  try { tmuxExec(['set-option', '-t', name, 'status', 'off']); } catch {}
-  try { tmuxExec(['set-option', '-t', name, 'pane-border-status', 'off']); } catch {}
-  try { tmuxExec(['set-option', '-t', name, 'set-titles', 'off']); } catch {}
-  // Disable tmux prefix key to avoid capturing user shortcuts
-  try { tmuxExec(['set-option', '-t', name, 'prefix', 'None']); } catch {}
-  try { tmuxExec(['set-option', '-t', name, 'prefix2', 'None']); } catch {}
-}
-
-function tmuxKillSession(name: string): void {
-  try { tmuxExec(['kill-session', '-t', name]); } catch {}
-}
-
-function tmuxGetCwd(name: string): string | null {
-  try {
-    return tmuxExec(['display-message', '-t', name, '-p', '#{pane_current_path}']);
-  } catch { return null; }
-}
-
-function tmuxGetPanePid(name: string): number | null {
-  try {
-    const pid = tmuxExec(['display-message', '-t', name, '-p', '#{pane_pid}']);
-    return parseInt(pid) || null;
-  } catch { return null; }
-}
-
-function tmuxListSessions(): string[] {
-  try {
-    const out = tmuxExec(['list-sessions', '-F', '#{session_name}']);
-    return out.split('\n').filter(Boolean);
-  } catch { return []; }
-}
-
-// ─── DEFAULT SETTINGS ─────────────────────────────────────────────
-const DEFAULT_SETTINGS = {
-  appearance: {
-    theme: 'cyber',
-    fontFamily: '"JetBrains Mono",monospace',
-    fontSize: 12,
-    sidebarFontSize: 12,
-    statusBarFontSize: 11,
-    tabBarFontSize: 8,
-    inputPanelFontSize: 11,
-    fileViewerFontSize: 13,
-    gitGraphFontSize: 12,
-    lineHeight: 1.25,
-    cursorStyle: 'block',
-    cursorBlink: true,
-    backgroundOpacity: 1.0,
-    crtScanlines: true,
-    crtScanlinesIntensity: 0.07,
-    crtFlicker: true,
-    vignette: true,
-    glowIntensity: 0.4,
-    screenDimOpacity: 0.05,
-  },
-  terminal: {
-    scrollback: 5000,
-    bellStyle: 'none',
-    copyOnSelect: false,
-    rightClickPaste: true,
-    trimCopied: true,
-    wordSeparators: ' ()[]{}\'":;,`|',
-    renderer: 'canvas',
-  },
-  shell: {
-    shellPath: process.env.SHELL || '/bin/bash',
-    startDirectory: process.env.HOME || '/',
-    env: {} as Record<string, string>,
-    sessionNameFormat: 'shell-{n}',
-    autoReconnect: true,
-  },
-  keybindings: {
-    newSession: 'Ctrl+Shift+T',
-    closeSession: 'Ctrl+Shift+W',
-    nextTab: 'Ctrl+Tab',
-    prevTab: 'Ctrl+Shift+Tab',
-    openSettings: 'Ctrl+,',
-    fullscreen: 'F11',
-    renameSession: 'Ctrl+Shift+r',
-    clearTerminal: 'Meta+k',
-    splitSession: '',
-    gitGraph: 'Ctrl+g',
-    toggleSidebar: 'Ctrl+b',
-    focusSearch: 'Ctrl+Shift+f',
-    focusExplorer: 'Ctrl+Shift+e',
-    focusSourceControl: 'Ctrl+Shift+g',
-    toggleInputPanel: 'Meta+i',
-    planModal: 'Ctrl+p',
-  },
-  advanced: {
-    customCss: '',
-    wsReconnectInterval: 3000,
-    logLevel: 'info',
-  },
-};
-
-// ─── SETTINGS PERSISTENCE ─────────────────────────────────────────
-function deepMerge(defaults: any, saved: any): any {
-  const result = { ...defaults };
-  for (const key of Object.keys(saved)) {
-    if (saved[key] && typeof saved[key] === 'object' && !Array.isArray(saved[key])
-        && defaults[key] && typeof defaults[key] === 'object') {
-      result[key] = deepMerge(defaults[key], saved[key]);
-    } else {
-      result[key] = saved[key];
-    }
-  }
-  return result;
-}
-
-function loadSettings(): typeof DEFAULT_SETTINGS {
-  // Try SQLite first
-  try {
-    const dbSettings = db.getSettings();
-    if (dbSettings) return deepMerge(DEFAULT_SETTINGS, dbSettings as any);
-  } catch {}
-  // Fall back to JSON file (and migrate to SQLite)
-  try {
-    if (fs.existsSync(SETTINGS_PATH)) {
-      const raw = fs.readFileSync(SETTINGS_PATH, 'utf-8');
-      const settings = deepMerge(DEFAULT_SETTINGS, JSON.parse(raw));
-      try { db.saveSettings(settings); } catch {} // migrate
-      return settings;
-    }
-  } catch {}
-  return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
-}
-
-function saveSettings(s: typeof DEFAULT_SETTINGS): void {
-  db.saveSettings(s);
-  // Also write JSON file for backwards compatibility
-  try { fs.writeFileSync(SETTINGS_PATH, JSON.stringify(s, null, 2), 'utf-8'); } catch {}
-}
-
-let currentSettings = loadSettings();
-
-// ─── AUTHENTICATION ──────────────────────────────────────────────
-import { timingSafeEqual } from 'crypto';
-const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
-const tokenAuthEnabled = AUTH_TOKEN.length > 0;
-
-function isAuthEnabled(): boolean {
-  return tokenAuthEnabled || userDb.getUserCount() > 0 || isSetupRequired();
-}
-
-function isSetupRequired(): boolean {
-  return userDb.getUserCount() === 0 && !tokenAuthEnabled;
-}
-
-function isRegistrationAllowed(): boolean {
-  if (ALLOW_REGISTRATION) return true;
-  return userDb.getUserCount() === 0;
-}
-
-function getAuthMode(): 'email' | 'token' | 'none' {
-  const hasUsers = userDb.getUserCount() > 0;
-  if (hasUsers) return 'email';
-  if (tokenAuthEnabled) return 'token';
-  return 'none';
-}
-
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
-const BCRYPT_ROUNDS = 12;
-const ALLOW_REGISTRATION = process.env.ALLOW_REGISTRATION === '1';
-
-function getJwtSecret(): string {
-  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
-  let secret = db.getSetting('jwt_secret');
-  if (!secret) {
-    secret = crypto.randomBytes(64).toString('hex');
-    db.setSetting('jwt_secret', secret);
-    console.log('[auth] Generated and persisted new JWT secret');
-  }
-  return secret;
-}
-
-const JWT_SECRET = getJwtSecret();
-
-// Rate limiting for auth failures
-const authFailures = new Map<string, { count: number; resetAt: number }>();
-const AUTH_MAX_FAILURES = 5;
-const AUTH_WINDOW_MS = 60_000;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = authFailures.get(ip);
-  if (!entry || now > entry.resetAt) {
-    authFailures.set(ip, { count: 0, resetAt: now + AUTH_WINDOW_MS });
-    return true;
-  }
-  return entry.count < AUTH_MAX_FAILURES;
-}
-
-function recordAuthFailure(ip: string): void {
-  const entry = authFailures.get(ip);
-  if (entry) entry.count++;
-}
-
-function verifyToken(token: string): boolean {
-  if (!token) return false;
-  // 1) Try JWT verification
-  try {
-    jwt.verify(token, JWT_SECRET);
-    return true;
-  } catch {}
-  // 2) Fall back to legacy AUTH_TOKEN
-  if (tokenAuthEnabled && AUTH_TOKEN) {
-    try {
-      return timingSafeEqual(Buffer.from(token), Buffer.from(AUTH_TOKEN));
-    } catch {}
-  }
-  return false;
-}
-
-function getTokenPayload(token: string): { userId: number; email: string } | null {
-  try {
-    const payload = jwt.verify(token, JWT_SECRET) as unknown as { sub: number; email: string };
-    return { userId: payload.sub, email: payload.email };
-  } catch {
-    return null;
-  }
-}
-
-function issueJwt(user: { id: number; email: string }): string {
-  return jwt.sign({ sub: user.id, email: user.email }, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN as string | number,
-  } as jwt.SignOptions);
-}
-
-function extractToken(req: express.Request): string {
-  const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7);
-  return (req.query.token as string) || '';
-}
-
-// Auth middleware — skip for login page and static assets
-function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
-  if (!isAuthEnabled()) return next();
-  if (['/api/auth/login', '/api/auth/check', '/api/auth/register'].includes(req.path)) return next();
-  if (req.path === '/login' || req.path === '/login.html') return next();
-
-  const token = extractToken(req);
-  if (token && verifyToken(token)) return next();
-
-  if (req.path.startsWith('/api/')) {
-    res.status(401).json({ error: 'Unauthorized' });
-  } else if (req.path === '/' || req.path === '/index.html') {
-    res.redirect('/login');
-  } else {
-    next();
-  }
-}
-
-if (tokenAuthEnabled) {
-  console.log('[auth] Legacy token authentication enabled');
-}
-// ─── HTTP ─────────────────────────────────────────────────────────
+// ─── HTTP ────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(authMiddleware);
 app.use(express.static(path.join(__dirname, '../../client')));
@@ -360,66 +80,31 @@ app.post('/api/auth/login', async (req, res) => {
   if (!checkRateLimit(ip)) {
     return res.status(429).json({ ok: false, error: 'Too many attempts. Try again later.' });
   }
-
   const { email, password, token } = req.body || {};
-
-  // Legacy token login
   if (token && !email) {
-    if (tokenAuthEnabled && verifyToken(token)) {
-      return res.json({ ok: true });
-    }
+    if (tokenAuthEnabled && verifyToken(token)) return res.json({ ok: true });
     recordAuthFailure(ip);
     return res.status(401).json({ ok: false, error: 'Invalid credentials' });
   }
-
-  // Email login
   if (!email || !password) {
     return res.status(400).json({ ok: false, error: 'Email and password required' });
   }
-
   const user = await userDb.getUserByEmail(email);
-  if (!user) {
-    recordAuthFailure(ip);
-    return res.status(401).json({ ok: false, error: 'Invalid credentials' });
-  }
-
+  if (!user) { recordAuthFailure(ip); return res.status(401).json({ ok: false, error: 'Invalid credentials' }); }
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) {
-    recordAuthFailure(ip);
-    return res.status(401).json({ ok: false, error: 'Invalid credentials' });
-  }
-
+  if (!valid) { recordAuthFailure(ip); return res.status(401).json({ ok: false, error: 'Invalid credentials' }); }
   const jwtToken = issueJwt(user);
-  res.json({
-    ok: true,
-    token: jwtToken,
-    user: { id: user.id, email: user.email, name: user.name },
-  });
+  res.json({ ok: true, token: jwtToken, user: { id: user.id, email: user.email, name: user.name } });
 });
 
 app.post('/api/auth/register', async (req, res) => {
   const ip = req.ip || 'unknown';
-  if (!checkRateLimit(ip)) {
-    return res.status(429).json({ ok: false, error: 'Too many attempts. Try again later.' });
-  }
-
-  if (!isRegistrationAllowed()) {
-    return res.status(403).json({ ok: false, error: 'Registration is not allowed' });
-  }
-
+  if (!checkRateLimit(ip)) return res.status(429).json({ ok: false, error: 'Too many attempts. Try again later.' });
+  if (!isRegistrationAllowed()) return res.status(403).json({ ok: false, error: 'Registration is not allowed' });
   const { email, password, name } = req.body || {};
-
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ ok: false, error: 'Valid email is required' });
-  }
-
-  if (!password || password.length < 8) {
-    return res.status(400).json({ ok: false, error: 'Password must be at least 8 characters' });
-  }
-  if (password.length > 128) {
-    return res.status(400).json({ ok: false, error: 'Password must be at most 128 characters' });
-  }
-
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ ok: false, error: 'Valid email is required' });
+  if (!password || password.length < 8) return res.status(400).json({ ok: false, error: 'Password must be at least 8 characters' });
+  if (password.length > 128) return res.status(400).json({ ok: false, error: 'Password must be at most 128 characters' });
   try {
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const userId = await userDb.createUser(email, hash, name || '');
@@ -427,11 +112,7 @@ app.post('/api/auth/register', async (req, res) => {
     if (!user) throw new Error('User creation failed');
     const jwtToken = issueJwt(user);
     console.log(`[auth] New user registered: ${email} (id: ${userId})`);
-    res.json({
-      ok: true,
-      token: jwtToken,
-      user: { id: user.id, email: user.email, name: user.name },
-    });
+    res.json({ ok: true, token: jwtToken, user: { id: user.id, email: user.email, name: user.name } });
   } catch (err: any) {
     console.error('[auth] Registration error:', err?.message || err?.code || err);
     recordAuthFailure(ip);
@@ -442,252 +123,148 @@ app.post('/api/auth/register', async (req, res) => {
 app.get('/api/auth/check', async (req, res) => {
   const authOn = isAuthEnabled();
   if (!authOn) return res.json({ ok: true, authEnabled: false, authMode: 'none', registrationAllowed: isRegistrationAllowed(), setupRequired: false });
-
   const token = extractToken(req);
   const valid = token ? verifyToken(token) : false;
-
-  const result: any = {
-    ok: valid,
-    authEnabled: true,
-    authMode: getAuthMode(),
-    registrationAllowed: isRegistrationAllowed(),
-    setupRequired: isSetupRequired(),
-    tokenAuthEnabled,
-  };
-
+  const result: any = { ok: valid, authEnabled: true, authMode: getAuthMode(), registrationAllowed: isRegistrationAllowed(), setupRequired: isSetupRequired(), tokenAuthEnabled };
   if (valid && token) {
     const payload = getTokenPayload(token);
     if (payload) {
       const user = await userDb.getUserById(payload.userId);
-      if (user) {
-        result.user = { id: user.id, email: user.email, name: user.name };
-      }
+      if (user) result.user = { id: user.id, email: user.email, name: user.name };
     }
   }
-
   res.json(result);
 });
 
-app.get('/login', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../../client/login.html'));
-});
+app.get('/login', (_req, res) => { res.sendFile(path.join(__dirname, '../../client/login.html')); });
 
-app.get('/api/settings', (_req, res) => {
-  res.json(currentSettings);
-});
-
+// Settings endpoints
+app.get('/api/settings', (_req, res) => { res.json(currentSettings); });
 app.post('/api/settings', (req, res) => {
   try {
-    currentSettings = req.body as typeof DEFAULT_SETTINGS;
+    currentSettings = req.body as AppSettings;
     saveSettings(currentSettings);
     res.json({ ok: true });
-  } catch (e) {
-    res.status(400).json({ ok: false, error: String(e) });
-  }
+  } catch (e) { res.status(400).json({ ok: false, error: String(e) }); }
 });
-
-app.get('/api/settings/default', (_req, res) => {
-  res.json(DEFAULT_SETTINGS);
-});
+app.get('/api/settings/default', (_req, res) => { res.json(DEFAULT_SETTINGS); });
 
 // ─── PLANS API ───────────────────────────────────────────────────
 app.get('/api/plans', async (req, res) => {
-  const token = extractToken(req);
-  const payload = getTokenPayload(token);
+  const token = extractToken(req); const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  try {
-    const plans = await userDb.getPlans(payload.userId);
-    res.json({ ok: true, plans });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+  try { const plans = await userDb.getPlans(payload.userId); res.json({ ok: true, plans }); }
+  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
 app.post('/api/plans', async (req, res) => {
-  const token = extractToken(req);
-  const payload = getTokenPayload(token);
+  const token = extractToken(req); const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
   const { id, title, content, category, status } = req.body || {};
   if (!id) return res.status(400).json({ ok: false, error: 'Missing id' });
   try {
-    const plan = await userDb.createPlan(payload.userId, {
-      id, title: title || '', content: content || '', category: category || 'other', status: status || 'todo',
-    });
+    const plan = await userDb.createPlan(payload.userId, { id, title: title || '', content: content || '', category: category || 'other', status: status || 'todo' });
     res.json({ ok: true, plan });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+  } catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
 app.put('/api/plans/:id', async (req, res) => {
-  const token = extractToken(req);
-  const payload = getTokenPayload(token);
+  const token = extractToken(req); const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
   const { title, content, category, status } = req.body || {};
-  try {
-    const plan = await userDb.updatePlan(payload.userId, req.params.id, { title, content, category, status });
-    res.json({ ok: true, plan });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+  try { const plan = await userDb.updatePlan(payload.userId, req.params.id, { title, content, category, status }); res.json({ ok: true, plan }); }
+  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
 app.delete('/api/plans/:id', async (req, res) => {
-  const token = extractToken(req);
-  const payload = getTokenPayload(token);
+  const token = extractToken(req); const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  try {
-    await userDb.deletePlan(payload.userId, req.params.id);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+  try { await userDb.deletePlan(payload.userId, req.params.id); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
 app.patch('/api/plans/:id/status', async (req, res) => {
-  const token = extractToken(req);
-  const payload = getTokenPayload(token);
+  const token = extractToken(req); const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
   const { status } = req.body || {};
   const validStatuses = ['todo', 'doing', 'done', 'on_hold', 'cancelled'];
-  if (!status || !validStatuses.includes(status)) {
-    return res.status(400).json({ ok: false, error: 'Invalid status' });
-  }
-  try {
-    const plan = await userDb.updatePlanStatus(payload.userId, req.params.id, status);
-    res.json({ ok: true, plan });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+  if (!status || !validStatuses.includes(status)) return res.status(400).json({ ok: false, error: 'Invalid status' });
+  try { const plan = await userDb.updatePlanStatus(payload.userId, req.params.id, status); res.json({ ok: true, plan }); }
+  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
 app.get('/api/plans/:id/logs', async (req, res) => {
-  const token = extractToken(req);
-  const payload = getTokenPayload(token);
+  const token = extractToken(req); const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  try {
-    const logs = await userDb.getPlanLogs(payload.userId, req.params.id);
-    res.json({ ok: true, logs });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+  try { const logs = await userDb.getPlanLogs(payload.userId, req.params.id); res.json({ ok: true, logs }); }
+  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
 app.post('/api/plans/log', async (req, res) => {
-  const token = extractToken(req);
-  const payload = getTokenPayload(token);
+  const token = extractToken(req); const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
   const { plan_id, type, content, commit_hash } = req.body || {};
-  if (!type || !['commit', 'summary'].includes(type)) {
-    return res.status(400).json({ ok: false, error: 'Invalid type' });
-  }
+  if (!type || !['commit', 'summary'].includes(type)) return res.status(400).json({ ok: false, error: 'Invalid type' });
   try {
     const result = await userDb.appendPlanLog(payload.userId, { plan_id, type, content: content || '', commit_hash });
     if (type === 'summary' && result.plan) {
-      const msg = JSON.stringify({
-        type: 'plan_ai_done',
-        planId: result.plan.id,
-        planTitle: result.plan.title,
-        planStatus: result.plan.status,
-      });
+      const msg = JSON.stringify({ type: 'plan_ai_done', planId: result.plan.id, planTitle: result.plan.title, planStatus: result.plan.status });
       wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg); });
     }
     res.json({ ok: true, plan: result.plan, log: result.log });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+  } catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
 // ─── PLAN IMAGES (Supabase Storage) ──────────────────────────────
-app.post('/api/plans/:id/images',
-  express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], limit: '10mb' }),
-  async (req, res) => {
-    const token = extractToken(req);
-    const payload = getTokenPayload(token);
-    if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-    const planId = req.params.id;
-    const filename = (req.query.filename as string) || `img-${Date.now()}.png`;
-    try {
-      const result = await userDb.uploadPlanImage(payload.userId, planId, filename, req.body, req.headers['content-type'] || 'image/png');
-      res.json({ ok: true, ...result });
-    } catch (e) {
-      res.status(500).json({ ok: false, error: String(e) });
-    }
-  }
-);
+app.post('/api/plans/:id/images', express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], limit: '10mb' }), async (req, res) => {
+  const token = extractToken(req); const payload = getTokenPayload(token);
+  if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  const planId = req.params.id;
+  const filename = (req.query.filename as string) || `img-${Date.now()}.png`;
+  try { const result = await userDb.uploadPlanImage(payload.userId, planId, filename, req.body, req.headers['content-type'] || 'image/png'); res.json({ ok: true, ...result }); }
+  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
+});
 
 app.get('/api/plans/:id/images', async (req, res) => {
-  const token = extractToken(req);
-  const payload = getTokenPayload(token);
+  const token = extractToken(req); const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  try {
-    const images = await userDb.listPlanImages(payload.userId, req.params.id);
-    res.json({ ok: true, images });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+  try { const images = await userDb.listPlanImages(payload.userId, req.params.id); res.json({ ok: true, images }); }
+  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
 app.delete('/api/plans/:id/images/:filename', async (req, res) => {
-  const token = extractToken(req);
-  const payload = getTokenPayload(token);
+  const token = extractToken(req); const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  try {
-    await userDb.deletePlanImage(payload.userId, req.params.id, req.params.filename);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+  try { await userDb.deletePlanImage(payload.userId, req.params.id, req.params.filename); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
-// ─── IMAGE UPLOAD ─────────────────────────────────────────────────
-app.post('/api/upload-image',
-  express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], limit: '20mb' }),
-  (req, res) => {
-    const sessionId = req.query.sessionId as string;
-    const originalName = req.query.filename as string;
-    if (!sessionId || !originalName) {
-      return res.status(400).json({ ok: false, error: 'Missing sessionId or filename' });
-    }
-    const session = sessions.get(sessionId);
-    if (!session) {
-      return res.status(404).json({ ok: false, error: 'Session not found' });
-    }
-    const targetDir = (session.cwd && fs.existsSync(session.cwd))
-      ? session.cwd
-      : (currentSettings.shell.startDirectory || process.env.HOME || '/tmp');
-    const ext = path.extname(originalName).toLowerCase() || '.png';
-    const allowedExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
-    if (!allowedExts.includes(ext)) {
-      return res.status(400).json({ ok: false, error: 'Unsupported image format' });
-    }
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 23);
-    const safeName = `pasted-image-${timestamp}${ext}`;
-    const fullPath = path.join(targetDir, safeName);
-    try {
-      fs.writeFileSync(fullPath, req.body);
-      res.json({ ok: true, filename: safeName, fullPath });
-    } catch (e) {
-      res.status(500).json({ ok: false, error: String(e) });
-    }
-  }
-);
+// ─── IMAGE UPLOAD ────────────────────────────────────────────────
+app.post('/api/upload-image', express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], limit: '20mb' }), (req, res) => {
+  const sessionId = req.query.sessionId as string;
+  const originalName = req.query.filename as string;
+  if (!sessionId || !originalName) return res.status(400).json({ ok: false, error: 'Missing sessionId or filename' });
+  const session = sessions.get(sessionId);
+  if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
+  const targetDir = (session.cwd && fs.existsSync(session.cwd)) ? session.cwd : (currentSettings.shell.startDirectory || process.env.HOME || '/tmp');
+  const ext = path.extname(originalName).toLowerCase() || '.png';
+  const allowedExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+  if (!allowedExts.includes(ext)) return res.status(400).json({ ok: false, error: 'Unsupported image format' });
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 23);
+  const safeName = `pasted-image-${timestamp}${ext}`;
+  const fullPath = path.join(targetDir, safeName);
+  try { fs.writeFileSync(fullPath, req.body); res.json({ ok: true, filename: safeName, fullPath }); }
+  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
+});
 
-// ─── DELETE UPLOADED IMAGE ─────────────────────────────────────────
 app.post('/api/delete-image', (req, res) => {
   const filePath = req.body?.filePath as string;
-  if (!filePath || !filePath.includes('pasted-image-')) {
-    return res.status(400).json({ ok: false });
-  }
-  try {
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+  if (!filePath || !filePath.includes('pasted-image-')) return res.status(400).json({ ok: false });
+  try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
-// ─── REVEAL IN FINDER ─────────────────────────────────────────────
+// ─── FILE OPERATIONS ─────────────────────────────────────────────
 app.post('/api/reveal-in-finder', (req, res) => {
   const sessionId = req.body?.sessionId as string;
   if (!sessionId) return res.status(400).json({ ok: false });
@@ -700,7 +277,6 @@ app.post('/api/reveal-in-finder', (req, res) => {
   });
 });
 
-// ─── FILE DOWNLOAD ───────────────────────────────────────────────
 app.get('/api/download', (req, res) => {
   const sessionId = req.query.sessionId as string;
   const filePath = req.query.path as string;
@@ -717,245 +293,27 @@ app.get('/api/download', (req, res) => {
   res.download(fullPath);
 });
 
-// ─── FILE UPLOAD ─────────────────────────────────────────────────
-app.post('/api/upload',
-  express.raw({ type: 'application/octet-stream', limit: '50mb' }),
-  (req, res) => {
-    const sessionId = req.query.sessionId as string;
-    const fileName = req.query.filename as string;
-    const targetDir = req.query.dir as string | undefined;
-    if (!sessionId || !fileName) return res.status(400).json({ ok: false, error: 'Missing params' });
-    const session = sessions.get(sessionId);
-    if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
-    const cwd = session.cwd || process.env.HOME || '/tmp';
-    const dir = targetDir ? path.resolve(cwd, targetDir) : cwd;
-    if (!dir.startsWith(path.resolve(cwd))) return res.status(403).json({ ok: false, error: 'Access denied' });
-    const safeName = path.basename(fileName); // strip directory components
-    const fullPath = path.join(dir, safeName);
-    try {
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(fullPath, req.body);
-      res.json({ ok: true, filename: safeName, fullPath });
-    } catch (e) {
-      res.status(500).json({ ok: false, error: String(e) });
-    }
-  }
-);
-
-app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../../client/index.html'));
+app.post('/api/upload', express.raw({ type: 'application/octet-stream', limit: '50mb' }), (req, res) => {
+  const sessionId = req.query.sessionId as string;
+  const fileName = req.query.filename as string;
+  const targetDir = req.query.dir as string | undefined;
+  if (!sessionId || !fileName) return res.status(400).json({ ok: false, error: 'Missing params' });
+  const session = sessions.get(sessionId);
+  if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
+  const cwd = session.cwd || process.env.HOME || '/tmp';
+  const dir = targetDir ? path.resolve(cwd, targetDir) : cwd;
+  if (!dir.startsWith(path.resolve(cwd))) return res.status(403).json({ ok: false, error: 'Access denied' });
+  const safeName = path.basename(fileName);
+  const fullPath = path.join(dir, safeName);
+  try { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(fullPath, req.body); res.json({ ok: true, filename: safeName, fullPath }); }
+  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
-// ─── CLAUDE USAGE TRACKING ───────────────────────────────────────
+app.get('/', (_req, res) => { res.sendFile(path.join(__dirname, '../../client/index.html')); });
+
+// ─── SESSION MANAGEMENT ──────────────────────────────────────────
+const SCROLLBACK_LIMIT = 128 * 1024;
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
-const CLAUDE_PROJECTS_DIR = path.join(CLAUDE_DIR, 'projects');
-
-interface ClaudeUsage {
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheCreateTokens: number;
-  totalCost: number;
-  sessionId: string | null;
-  model: string | null;
-}
-
-// Model pricing per million tokens (input / output)
-const MODEL_PRICING: Record<string, { input: number; output: number; cacheRead: number; cacheCreate: number }> = {
-  'claude-opus-4-6':   { input: 15, output: 75, cacheRead: 1.5, cacheCreate: 18.75 },
-  'claude-sonnet-4-6': { input: 3, output: 15, cacheRead: 0.30, cacheCreate: 3.75 },
-  'claude-haiku-4-5':  { input: 0.80, output: 4, cacheRead: 0.08, cacheCreate: 1 },
-  // Fallback for older models
-  'claude-sonnet-4-5': { input: 3, output: 15, cacheRead: 0.30, cacheCreate: 3.75 },
-};
-
-function cwdToProjectDir(cwd: string): string {
-  // Convert /Users/foo/Dev/project → -Users-foo-Dev-project
-  // Claude Code also replaces underscores with hyphens in project dir names
-  return cwd.replace(/[/_]/g, '-');
-}
-
-function getClaudeUsage(cwd: string): ClaudeUsage | null {
-  try {
-    const projectKey = cwdToProjectDir(cwd);
-    const projectDir = path.join(CLAUDE_PROJECTS_DIR, projectKey);
-    if (!fs.existsSync(projectDir)) return null;
-
-    // Find active session from ~/.claude/sessions/
-    let activeSessionId: string | null = null;
-    try {
-      const sessDir = path.join(CLAUDE_DIR, 'sessions');
-      if (fs.existsSync(sessDir)) {
-        const sessFiles = fs.readdirSync(sessDir).filter(f => f.endsWith('.json'));
-        for (const sf of sessFiles) {
-          try {
-            const raw = fs.readFileSync(path.join(sessDir, sf), 'utf-8');
-            const sess = JSON.parse(raw);
-            if (sess.cwd === cwd && sess.sessionId) {
-              activeSessionId = sess.sessionId;
-            }
-          } catch {}
-        }
-      }
-    } catch {}
-
-    // Find the most recent JSONL file (or the active session's file)
-    let targetJsonl: string | null = null;
-    if (activeSessionId) {
-      const candidate = path.join(projectDir, `${activeSessionId}.jsonl`);
-      if (fs.existsSync(candidate)) targetJsonl = candidate;
-    }
-    if (!targetJsonl) {
-      // Fallback: find the most recently modified .jsonl
-      const jsonls = fs.readdirSync(projectDir)
-        .filter(f => f.endsWith('.jsonl'))
-        .map(f => ({ name: f, mtime: fs.statSync(path.join(projectDir, f)).mtimeMs }))
-        .sort((a, b) => b.mtime - a.mtime);
-      if (jsonls.length > 0) targetJsonl = path.join(projectDir, jsonls[0].name);
-    }
-    if (!targetJsonl) return null;
-
-    // Parse JSONL and aggregate usage
-    const content = fs.readFileSync(targetJsonl, 'utf-8');
-    const lines = content.trim().split('\n');
-
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let cacheReadTokens = 0;
-    let cacheCreateTokens = 0;
-    let totalCost = 0;
-    let model: string | null = null;
-    let claudeSessionId: string | null = null;
-
-    for (const line of lines) {
-      try {
-        const entry = JSON.parse(line);
-        if (entry.type !== 'assistant' || !entry.message?.usage) continue;
-
-        const usage = entry.message.usage;
-        const m = entry.message.model || '';
-        if (m) model = m;
-        if (entry.sessionId) claudeSessionId = entry.sessionId;
-
-        const inp = usage.input_tokens || 0;
-        const out = usage.output_tokens || 0;
-        const cacheRead = usage.cache_read_input_tokens || 0;
-        const cacheCreate = usage.cache_creation_input_tokens || 0;
-
-        inputTokens += inp;
-        outputTokens += out;
-        cacheReadTokens += cacheRead;
-        cacheCreateTokens += cacheCreate;
-
-        // Calculate cost
-        const pricing = MODEL_PRICING[m] || MODEL_PRICING['claude-sonnet-4-6'];
-        totalCost += (inp / 1_000_000) * pricing.input
-                   + (out / 1_000_000) * pricing.output
-                   + (cacheRead / 1_000_000) * pricing.cacheRead
-                   + (cacheCreate / 1_000_000) * pricing.cacheCreate;
-      } catch {}
-    }
-
-    if (inputTokens === 0 && outputTokens === 0) return null;
-
-    return { inputTokens, outputTokens, cacheReadTokens, cacheCreateTokens, totalCost, sessionId: claudeSessionId, model };
-  } catch {
-    return null;
-  }
-}
-
-function getClaudePrompts(cwd: string, aiPid: number | null): { text: string; timestamp: string }[] {
-  try {
-    const projectKey = cwdToProjectDir(cwd);
-    const projectDir = path.join(CLAUDE_PROJECTS_DIR, projectKey);
-    if (!fs.existsSync(projectDir)) return [];
-
-    // Find active session: prefer PID-based lookup, fall back to CWD match
-    let activeSessionId: string | null = null;
-    const sessDir = path.join(CLAUDE_DIR, 'sessions');
-
-    // 1) PID-based: ~/.claude/sessions/{aiPid}.json → exact match
-    if (aiPid) {
-      try {
-        const pidFile = path.join(sessDir, `${aiPid}.json`);
-        console.log(`[claude_prompts] checking pidFile=${pidFile} exists=${fs.existsSync(pidFile)}`);
-        if (fs.existsSync(pidFile)) {
-          const sess = JSON.parse(fs.readFileSync(pidFile, 'utf-8'));
-          if (sess.sessionId) {
-            activeSessionId = sess.sessionId;
-            console.log(`[claude_prompts] PID match → sessionId=${activeSessionId}`);
-          }
-        }
-      } catch {}
-    }
-
-    // 2) Fallback: CWD match (last match wins)
-    if (!activeSessionId) {
-      try {
-        if (fs.existsSync(sessDir)) {
-          const sessFiles = fs.readdirSync(sessDir).filter(f => f.endsWith('.json'));
-          for (const sf of sessFiles) {
-            try {
-              const raw = fs.readFileSync(path.join(sessDir, sf), 'utf-8');
-              const sess = JSON.parse(raw);
-              if (sess.cwd === cwd && sess.sessionId) activeSessionId = sess.sessionId;
-            } catch {}
-          }
-        }
-      } catch {}
-    }
-
-    console.log(`[claude_prompts] resolved activeSessionId=${activeSessionId}`);
-    let targetJsonl: string | null = null;
-    if (activeSessionId) {
-      const candidate = path.join(projectDir, `${activeSessionId}.jsonl`);
-      if (fs.existsSync(candidate)) targetJsonl = candidate;
-    }
-    if (!targetJsonl) {
-      const jsonls = fs.readdirSync(projectDir)
-        .filter(f => f.endsWith('.jsonl'))
-        .map(f => ({ name: f, mtime: fs.statSync(path.join(projectDir, f)).mtimeMs }))
-        .sort((a, b) => b.mtime - a.mtime);
-      if (jsonls.length > 0) targetJsonl = path.join(projectDir, jsonls[0].name);
-      console.log(`[claude_prompts] fallback to most recent jsonl`);
-    }
-    if (!targetJsonl) return [];
-    console.log(`[claude_prompts] reading ${path.basename(targetJsonl)}`);
-
-    const content = fs.readFileSync(targetJsonl, 'utf-8');
-    const lines = content.trim().split('\n');
-    const prompts: { text: string; timestamp: string }[] = [];
-
-    for (const line of lines) {
-      try {
-        const entry = JSON.parse(line);
-        // Only real user prompts: type=user, no toolUseResult, no isMeta
-        if (entry.type !== 'user' || entry.toolUseResult || entry.isMeta) continue;
-        const msg = entry.message;
-        if (!msg) continue;
-        let text = '';
-        if (typeof msg.content === 'string') {
-          text = msg.content;
-        } else if (Array.isArray(msg.content)) {
-          for (const block of msg.content) {
-            if (block.type === 'text' && block.text) { text = block.text; break; }
-          }
-        }
-        const trimmed = text.trim();
-        if (!trimmed) continue;
-        // Skip system-generated command messages (e.g. /clear, /help)
-        if (trimmed.startsWith('<command-name>') || trimmed.startsWith('<local-command-caveat>')) continue;
-        prompts.push({ text: trimmed, timestamp: entry.timestamp || '' });
-      } catch {}
-    }
-    return prompts;
-  } catch {
-    return [];
-  }
-}
-
-// ─── SESSION MANAGEMENT ───────────────────────────────────────────
-const SCROLLBACK_LIMIT = 128 * 1024; // keep last 128KB of output per session
 
 interface Session {
   id: string;
@@ -964,20 +322,18 @@ interface Session {
   createdAt: number;
   cwd: string;
   ai: string | null;
-  aiPid: number | null;  // PID of detected AI process (e.g. Claude)
+  aiPid: number | null;
   cmd?: string;
   cwdTimer?: ReturnType<typeof setInterval>;
   pendingCmd?: string;
   resized?: boolean;
-  scrollback: string; // ring buffer of recent output
-  tmuxName?: string;  // tmux session name (if tmux-backed)
+  scrollback: string;
+  tmuxName?: string;
 }
 
 const sessions = new Map<string, Session>();
 const wsSession = new Map<WebSocket, string>();
-// Extra subscriptions: receive output without changing active session
 const wsSubscriptions = new Map<WebSocket, Set<string>>();
-// Per-session data WebSocket connections (terminal I/O)
 const dataWsMap = new Map<string, Set<WebSocket>>();
 
 function createSession(id: string, name: string, restoreCwd?: string, restoreCmd?: string, extraEnv?: Record<string, string>): Session {
@@ -993,95 +349,68 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     TERM: 'xterm-256color',
   };
   const cwd0 = restoreCwd || s.startDirectory || process.env.HOME || '/';
-
-  // Sanitize tmux session name: replace dots/colons which tmux doesn't like
   const tmuxName = id.replace(/[.:]/g, '-');
   const useTmux = tmuxAvailable;
 
   let ptyProcess: pty.IPty;
   if (useTmux) {
-    // Create tmux session if it doesn't already exist (survives server restart)
     if (!tmuxSessionExists(tmuxName)) {
       tmuxCreateSession(tmuxName, cwd0, shellPath);
       console.log(`[tmux] Created session: ${tmuxName}`);
     } else {
       console.log(`[tmux] Reattaching to existing session: ${tmuxName}`);
     }
-    // Attach to tmux session via PTY
     ptyProcess = pty.spawn('tmux', ['-S', TMUX_SOCKET, 'attach-session', '-t', tmuxName], {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
+      name: 'xterm-256color', cols: 80, rows: 24,
       cwd: fs.existsSync(cwd0) ? cwd0 : (process.env.HOME || '/'),
       env: mergedEnv,
     });
   } else {
     ptyProcess = pty.spawn(shellPath, ['-i'], {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
+      name: 'xterm-256color', cols: 80, rows: 24,
       cwd: fs.existsSync(cwd0) ? cwd0 : (process.env.HOME || '/'),
       env: mergedEnv,
     });
   }
+
   const session: Session = { id, name, pty: ptyProcess, createdAt: Date.now(), cwd: cwd0, ai: null, aiPid: null, cmd: restoreCmd, scrollback: '', tmuxName: useTmux ? tmuxName : undefined };
   sessions.set(id, session);
 
-  // PTY output → clients with this session active OR subscribed
-  // Batch rapid output chunks to avoid per-character streaming flicker
+  // PTY output batching
   let outputBuf = '';
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
-  const FLUSH_DELAY = 16; // ms — batch within one animation frame
-
-  // Pre-compute binary header for this session's output frames
-  const sessionIdBuf = Buffer.from(id, 'utf-8');
-  const binHeader = Buffer.alloc(1 + 2 + sessionIdBuf.length);
-  binHeader[0] = 0x01; // type: terminal output
-  binHeader.writeUInt16BE(sessionIdBuf.length, 1);
-  sessionIdBuf.copy(binHeader, 3);
+  const FLUSH_DELAY = 16;
 
   function flushOutput() {
     flushTimer = null;
     if (!outputBuf) return;
-    // Accumulate scrollback for reconnect replay (always, even if no client)
     session.scrollback += outputBuf;
     if (session.scrollback.length > SCROLLBACK_LIMIT) {
       session.scrollback = session.scrollback.slice(-SCROLLBACK_LIMIT);
     }
-    // Send raw output via per-session data WebSocket (no framing needed — 1 WS = 1 session)
     const data = outputBuf;
     outputBuf = '';
     const clients = dataWsMap.get(id);
     if (!clients || clients.size === 0) return;
     clients.forEach(ws => {
       if (ws.readyState !== WebSocket.OPEN) return;
-      if ((ws as any).bufferedAmount > 1024 * 1024) return; // backpressure
+      if ((ws as any).bufferedAmount > 1024 * 1024) return;
       ws.send(data);
     });
   }
 
   const ptyDataSub = ptyProcess.onData((chunk: string) => {
-    // Strip inline image protocols that xterm.js cannot render:
-    // - iTerm2 inline images: OSC 1337 ; File=... ST
-    // - Sixel graphics: DCS ... ST
     const filtered = chunk
       .replace(/\x1b\]1337;[^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
       .replace(/\x1bP[pq][^\x1b]*\x1b\\/g, '');
     if (!filtered) return;
-
     outputBuf += filtered;
-
-    // Flush immediately if buffer is large (interactive responsiveness)
     if (outputBuf.length > 64 * 1024) {
       if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
       flushOutput();
       return;
     }
-
-    // Otherwise debounce — batch rapid small chunks together
-    if (!flushTimer) {
-      flushTimer = setTimeout(flushOutput, FLUSH_DELAY);
-    }
+    if (!flushTimer) flushTimer = setTimeout(flushOutput, FLUSH_DELAY);
   });
 
   ptyProcess.onExit(({ exitCode }) => {
@@ -1089,29 +418,21 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     if (session.cwdTimer) clearInterval(session.cwdTimer);
     if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
     ptyDataSub.dispose();
-    // Clean up data WebSocket connections for this session
     const dataClients = dataWsMap.get(id);
-    if (dataClients) {
-      dataClients.forEach(ws => ws.close(1000, 'Session ended'));
-      dataWsMap.delete(id);
-    }
-    // For tmux sessions, only remove if tmux session itself is gone
-    // (PTY exit just means detach — the shell survives)
+    if (dataClients) { dataClients.forEach(ws => ws.close(1000, 'Session ended')); dataWsMap.delete(id); }
     if (session.tmuxName && tmuxSessionExists(session.tmuxName)) {
       console.log(`[tmux] PTY detached but tmux session '${session.tmuxName}' still alive — keeping`);
-      // Re-attach on next client connect via restoreSessions logic
       return;
     }
     sessions.delete(id);
     broadcastSessionList();
   });
 
-  // Poll CWD + detect running AI (active session: 2s, background: 10s)
+  // Poll CWD + detect running AI
   const CWD_POLL_ACTIVE = 2000;
   const CWD_POLL_BG = 10000;
   let lastPollTime = 0;
   session.cwdTimer = setInterval(() => {
-    // Throttle background sessions: only poll every 10s
     const isActive = Array.from(wsSession.values()).includes(id);
     const interval = isActive ? CWD_POLL_ACTIVE : CWD_POLL_BG;
     const now = Date.now();
@@ -1120,41 +441,28 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     void (async () => { try {
       let newCwd = cwd0;
       let shellPid = ptyProcess.pid;
-
       if (session.tmuxName) {
-        // tmux: get CWD and pane PID directly from tmux
         const tmuxCwd = tmuxGetCwd(session.tmuxName);
         if (tmuxCwd) newCwd = tmuxCwd;
         const panePid = tmuxGetPanePid(session.tmuxName);
         if (panePid) shellPid = panePid;
       } else {
-        // Direct PTY: use lsof
         try {
-          const { stdout } = await execFileAsync('lsof', ['-p', String(shellPid), '-a', '-d', 'cwd', '-Fn'], {
-            encoding: 'utf-8', timeout: 500,
-          });
+          const { stdout } = await execFileAsync('lsof', ['-p', String(shellPid), '-a', '-d', 'cwd', '-Fn'], { encoding: 'utf-8', timeout: 500 });
           const match = stdout.match(/\nn(.+)/);
           if (match) newCwd = match[1].trim();
         } catch {}
       }
-
       let newAi: string | null = null;
       let newAiPid: number | null = null;
       try {
-        const { stdout: psOut } = await execFileAsync('ps', ['-eo', 'pid,ppid,args'], {
-          encoding: 'utf-8', timeout: 800,
-        });
+        const { stdout: psOut } = await execFileAsync('ps', ['-eo', 'pid,ppid,args'], { encoding: 'utf-8', timeout: 800 });
         const rows = psOut.trim().split('\n').slice(1);
         const parentOf = new Map<number, number>();
         const cmdOf = new Map<number, string>();
         for (const row of rows) {
           const m = row.trim().match(/^(\d+)\s+(\d+)\s+(.*)/);
-          if (m) {
-            const p = parseInt(m[1]);
-            const pp = parseInt(m[2]);
-            parentOf.set(p, pp);
-            cmdOf.set(p, m[3]);
-          }
+          if (m) { parentOf.set(parseInt(m[1]), parseInt(m[2])); cmdOf.set(parseInt(m[1]), m[3]); }
         }
         const rootPid = shellPid;
         const descendants = new Set<number>([rootPid]);
@@ -1167,7 +475,6 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
             cur = parentOf.get(cur) ?? 0;
           }
         }
-        // Collect all AI-matching PIDs (not just first) so we can pick the session-file PID
         const aiCandidates: { pid: number; ai: string }[] = [];
         for (const dp of descendants) {
           const cmd = (cmdOf.get(dp) || '').toLowerCase();
@@ -1181,29 +488,21 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
           else if (/codex/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'codex' });
         }
         if (aiCandidates.length > 0) {
-          // For Claude: prefer the PID that has a session file in ~/.claude/sessions/
           const claudeCandidates = aiCandidates.filter(c => c.ai === 'claude');
           if (claudeCandidates.length > 0) {
             newAi = 'claude';
             const sessDir = path.join(CLAUDE_DIR, 'sessions');
             const matched = claudeCandidates.find(c => fs.existsSync(path.join(sessDir, `${c.pid}.json`)));
             newAiPid = matched ? matched.pid : claudeCandidates[0].pid;
-          } else {
-            newAi = aiCandidates[0].ai;
-            newAiPid = aiCandidates[0].pid;
-          }
+          } else { newAi = aiCandidates[0].ai; newAiPid = aiCandidates[0].pid; }
         }
       } catch {}
-
       if (newCwd !== session.cwd || newAi !== session.ai || newAiPid !== session.aiPid) {
-        session.cwd = newCwd;
-        session.ai = newAi;
-        session.aiPid = newAiPid;
+        session.cwd = newCwd; session.ai = newAi; session.aiPid = newAiPid;
         const msg = JSON.stringify({ type: 'session_info', sessionId: id, cwd: newCwd, ai: newAi });
         wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg); });
       }
-    } catch (e) { console.error(`[cwd-poll] Error for ${id}:`, e); }
-    })();
+    } catch (e) { console.error(`[cwd-poll] Error for ${id}:`, e); } })();
   }, 2000);
 
   console.log(`[session] Created: ${id} (${name})`);
@@ -1211,121 +510,21 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
 }
 
 function persistSessions() {
-  const data = Array.from(sessions.values()).map(s => ({
-    id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd, cmd: s.cmd,
-  }));
+  const data = Array.from(sessions.values()).map(s => ({ id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd, cmd: s.cmd }));
   try { db.saveSessions(data); } catch {}
-  // Also write JSON file for backwards compatibility
   try { fs.writeFileSync(SESSIONS_PATH, JSON.stringify(data, null, 2), 'utf-8'); } catch {}
-}
-
-function stripEscape(s: string): string {
-  return s
-    .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '') // CSI sequences
-    .replace(/\x1b[()][AB012]/g, '')          // character set
-    .replace(/\x1b./g, '')                    // other ESC sequences
-    .replace(/[\x00-\x09\x0b-\x1f\x7f]/g, '') // control chars except \n
-    .replace(/\r/g, '');
-}
-
-function runCmdWhenReady(sess: Session, cmd: string) {
-  let sent = false;
-  let disposed = false;
-
-  function finish(delay = 0) {
-    if (sent) return;
-    sent = true;
-    if (!disposed) { disposed = true; unsub.dispose(); }
-    if (delay > 0) {
-      setTimeout(() => sess.pty.write(cmd + '\r'), delay);
-    } else {
-      sess.pty.write(cmd + '\r');
-    }
-  }
-
-  // Primary: detect shell prompt in PTY output
-  let buf = '';
-  let gotFirstData = false;
-  const unsub = sess.pty.onData((chunk: string) => {
-    if (sent) return;
-    buf += chunk;
-    gotFirstData = true;
-    const clean = stripEscape(buf);
-    if (/[$%>#❯›]\s*$/.test(clean)) {
-      finish(100);
-    }
-    if (buf.length > 4000 && !sent) {
-      finish();
-    }
-  });
-
-  // Fallback A: if we got data but prompt regex never matched, send after 3s
-  setTimeout(() => { if (!sent && gotFirstData) finish(); }, 3000);
-
-  // Fallback B: hard timeout — send no matter what after 6s
-  setTimeout(() => { if (!sent) finish(); }, 6000);
-}
-
-/**
- * Monitor PTY output for AI prompt readiness, then send text using bracketed paste + Enter.
- * Detects prompts like: Claude's ❯, Gemini's >, Codex's $, or generic prompt patterns.
- */
-function sendWhenAiReady(sess: Session, text: string, ws: WebSocket) {
-  let sent = false;
-  let disposed = false;
-  let buf = '';
-
-  function finish() {
-    if (sent) return;
-    sent = true;
-    if (!disposed) { disposed = true; unsub.dispose(); }
-    // Use bracketed paste mode so multi-line text is treated as a single paste
-    const BPS = '\x1b[200~';
-    const BPE = '\x1b[201~';
-    sess.pty.write(BPS + text + BPE);
-    // Send Enter after delay to let CLI process the pasted text
-    setTimeout(() => {
-      sess.pty.write('\r');
-      wsSend(ws, JSON.stringify({ type: 'ai_prompt_sent', sessionId: sess.id, ok: true }));
-    }, 500);
-  }
-
-  // AI prompt patterns: Claude ❯/>, Gemini >, Codex $, generic prompt chars
-  const promptRe = /[❯›>$%#]\s*$/;
-
-  const unsub = sess.pty.onData((chunk: string) => {
-    if (sent) return;
-    buf += chunk;
-    const clean = stripEscape(buf);
-    // Check if we see a prompt-like pattern after some initial output
-    if (clean.length > 20 && promptRe.test(clean)) {
-      finish();
-    }
-    // Safety: if buffer gets huge, just send it
-    if (buf.length > 8000 && !sent) {
-      finish();
-    }
-  });
-
-  // Fallback: send after 15 seconds regardless
-  setTimeout(() => { if (!sent) finish(); }, 15000);
 }
 
 function broadcastSessionList(exclude?: WebSocket) {
   persistSessions();
-  const list = Array.from(sessions.values()).map(s => ({
-    id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd,
-  }));
+  const list = Array.from(sessions.values()).map(s => ({ id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd }));
   const msg = JSON.stringify({ type: 'session_list', sessions: list });
   wss.clients.forEach(client => {
-    if (client !== exclude && client.readyState === WebSocket.OPEN) {
-      client.send(msg);
-    }
+    if (client !== exclude && client.readyState === WebSocket.OPEN) client.send(msg);
   });
 }
 
-// ─── RESTORE SESSIONS ON STARTUP ──────────────────────────────────
-// Map session names to their CLI commands
+// ─── RESTORE SESSIONS ON STARTUP ─────────────────────────────────
 const NAME_TO_CMD: Record<string, string> = {
   claude: 'claude --dangerously-skip-permissions', gemini: 'gemini', codex: 'codex',
   opencode: 'opencode', aider: 'aider', copilot: 'copilot',
@@ -1338,132 +537,77 @@ function cmdForSession(s: { name: string; cmd?: string }): string | undefined {
 
 function restoreSessions() {
   try {
-    // Try SQLite first, fall back to JSON file
     let saved: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string }>;
     const dbSessions = db.listSessions();
     if (dbSessions.length > 0) {
       saved = dbSessions.map(r => ({ id: r.id, name: r.name, createdAt: r.created_at, cwd: r.cwd, cmd: r.cmd || undefined }));
     } else if (fs.existsSync(SESSIONS_PATH)) {
-      const raw = fs.readFileSync(SESSIONS_PATH, 'utf-8');
-      saved = JSON.parse(raw);
-    } else {
-      return;
-    }
+      saved = JSON.parse(fs.readFileSync(SESSIONS_PATH, 'utf-8'));
+    } else { return; }
     if (!Array.isArray(saved) || saved.length === 0) return;
-
-    // Get list of live tmux sessions (if tmux is available)
     const liveTmux = tmuxAvailable ? new Set(tmuxListSessions()) : new Set<string>();
-
     console.log(`[session] Restoring ${saved.length} session(s) from disk...`);
     for (const s of saved) {
       const tmuxName = s.id.replace(/[.:]/g, '-');
       const tmuxAlive = liveTmux.has(tmuxName);
-
       if (tmuxAvailable && tmuxAlive) {
-        // tmux session survived server restart — just reattach (no need to re-run command)
         console.log(`[session] Reattaching to live tmux session: ${s.name} (${tmuxName})`);
         const sess = createSession(s.id, s.name, s.cwd);
-        // Don't set pendingCmd — the process is still running inside tmux
         sess.resized = false;
       } else {
-        // No tmux or tmux session is gone — recreate with command
         const cmd = cmdForSession(s);
         const sess = createSession(s.id, s.name, s.cwd, cmd);
         if (cmd) {
           console.log(`[session] Will run '${cmd}' in restored session '${s.name}' after first resize`);
-          sess.pendingCmd = cmd;
-          sess.resized = false;
+          sess.pendingCmd = cmd; sess.resized = false;
         }
       }
     }
-  } catch (e) {
-    console.warn('[session] Could not restore sessions:', e);
-  }
+  } catch (e) { console.warn('[session] Could not restore sessions:', e); }
 }
 
-// ─── WEBSOCKET ────────────────────────────────────────────────────
 // ─── DATA WEBSOCKET (per-session terminal I/O) ──────────────────
 wssData.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
   const sessionId = url.searchParams.get('sid') || '';
-
-  // Auth check
   if (isAuthEnabled()) {
     const token = url.searchParams.get('token') || '';
     if (!verifyToken(token)) { ws.close(4001, 'Unauthorized'); return; }
   }
-
   const session = sessions.get(sessionId);
   if (!session) { ws.close(4002, 'Session not found'); return; }
-
-  // Register this WS for this session's output
   if (!dataWsMap.has(sessionId)) dataWsMap.set(sessionId, new Set());
   dataWsMap.get(sessionId)!.add(ws);
   console.log(`[data-ws] Connected for ${sessionId.slice(-6)} (${dataWsMap.get(sessionId)!.size} clients)`);
-
-  // Send scrollback immediately so client sees current state
-  if (session.scrollback) {
-    ws.send(session.scrollback);
-  }
-
-  // Input from client → PTY
-  ws.on('message', (message: Buffer | string) => {
-    const s = sessions.get(sessionId);
-    if (s) s.pty.write(message.toString());
-  });
-
-  ws.on('close', () => {
-    const set = dataWsMap.get(sessionId);
-    if (set) {
-      set.delete(ws);
-      if (set.size === 0) dataWsMap.delete(sessionId);
-    }
-    console.log(`[data-ws] Disconnected for ${sessionId.slice(-6)}`);
-  });
-
-  ws.on('error', (err) => {
-    console.error(`[data-ws] Error for ${sessionId.slice(-6)}:`, err.message);
-  });
+  if (session.scrollback) ws.send(session.scrollback);
+  ws.on('message', (message: Buffer | string) => { const s = sessions.get(sessionId); if (s) s.pty.write(message.toString()); });
+  ws.on('close', () => { const set = dataWsMap.get(sessionId); if (set) { set.delete(ws); if (set.size === 0) dataWsMap.delete(sessionId); } console.log(`[data-ws] Disconnected for ${sessionId.slice(-6)}`); });
+  ws.on('error', (err) => { console.error(`[data-ws] Error for ${sessionId.slice(-6)}:`, err.message); });
 });
 
-// ─── CONTROL WEBSOCKET (session mgmt, settings, git, files) ─────
+// ─── CONTROL WEBSOCKET ───────────────────────────────────────────
 let clientCounter = 0;
 
 wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
-  // Authenticate WebSocket connections
   if (isAuthEnabled()) {
     const url = new URL(req.url || '', `http://${req.headers.host}`);
     const token = url.searchParams.get('token') || '';
-    if (!verifyToken(token)) {
-      ws.close(4001, 'Unauthorized');
-      return;
-    }
+    if (!verifyToken(token)) { ws.close(4001, 'Unauthorized'); return; }
   }
-
   const clientId = ++clientCounter;
   const clientTag = `[ws:client-${clientId}]`;
   console.log(`${clientTag} Client connected (total: ${wss.clients.size})`);
 
-  // Send initial data
-  const list = Array.from(sessions.values()).map(s => ({
-    id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd,
-  }));
+  const list = Array.from(sessions.values()).map(s => ({ id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd }));
   wsSend(ws, JSON.stringify({ type: 'session_list', sessions: list }));
   wsSend(ws, JSON.stringify({ type: 'settings', settings: currentSettings }));
-  console.log(`${clientTag} Sent initial data (${list.length} sessions)`);
 
   ws.on('message', (message: Buffer | string) => {
     const data = message.toString();
     let parsed: Record<string, unknown>;
     try { parsed = JSON.parse(data); } catch { return; }
 
-    // Heartbeat: respond to client pings immediately
-    if (parsed.type === 'ping') {
-      wsSend(ws, JSON.stringify({ type: 'pong', t: parsed.t }));
-      return;
-    }
-
-    // Log non-trivial messages (skip input/resize for noise reduction)
+    if (parsed.type === 'ping') { wsSend(ws, JSON.stringify({ type: 'pong', t: parsed.t })); return; }
     if (parsed.type !== 'input' && parsed.type !== 'resize') {
       console.log(`${clientTag} ← ${parsed.type}${parsed.sessionId ? ` [${(parsed.sessionId as string).slice(-6)}]` : ''}`);
     }
@@ -1476,20 +620,13 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const extraEnv = planId ? { SUPER_TERMINAL_PLAN_ID: planId } : undefined;
       const sess = createSession(id, name, parsed.cwd as string | undefined, undefined, extraEnv);
       wsSession.set(ws, id);
-      if (parsed.cmd) {
-        sess.cmd = parsed.cmd as string;
-        runCmdWhenReady(sess, sess.cmd);
-      }
-
+      if (parsed.cmd) { sess.cmd = parsed.cmd as string; runCmdWhenReady(sess, sess.cmd); }
       wsSend(ws, JSON.stringify({ type: 'session_created', sessionId: id, name }));
-      broadcastSessionList(); // calls persistSessions() — cmd is set above before this
+      broadcastSessionList();
 
     } else if (parsed.type === 'session_subscribe') {
-      // Subscribe to output without changing the active session
       const ids = parsed.sessionIds as string[];
-      if (Array.isArray(ids)) {
-        wsSubscriptions.set(ws, new Set(ids.filter(id => sessions.has(id))));
-      }
+      if (Array.isArray(ids)) wsSubscriptions.set(ws, new Set(ids.filter(id => sessions.has(id))));
 
     } else if (parsed.type === 'session_duplicate') {
       const sourceId = parsed.sourceSessionId as string;
@@ -1504,28 +641,17 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
     } else if (parsed.type === 'session_attach') {
       const id = parsed.sessionId as string;
-      if (!sessions.has(id)) {
-        wsSend(ws, JSON.stringify({ type: 'error', message: `Session ${id} not found` }));
-        return;
-      }
+      if (!sessions.has(id)) { wsSend(ws, JSON.stringify({ type: 'error', message: `Session ${id} not found` })); return; }
       wsSession.set(ws, id);
-      // Remove from subscriptions — active session gets output via wsSession
       wsSubscriptions.get(ws)?.delete(id);
       wsSend(ws, JSON.stringify({ type: 'session_attached', sessionId: id }));
-      // Replay current CWD/AI info immediately
       const sess = sessions.get(id)!;
       wsSend(ws, JSON.stringify({ type: 'session_info', sessionId: id, cwd: sess.cwd, ai: sess.ai }));
-      // Scrollback is now handled by per-session data WS on connect
-
-    // scrollback is now handled by per-session data WS on connect
 
     } else if (parsed.type === 'session_rename') {
       const id = parsed.sessionId as string;
       const session = sessions.get(id);
-      if (session) {
-        session.name = (parsed.name as string) || session.name;
-        broadcastSessionList();
-      }
+      if (session) { session.name = (parsed.name as string) || session.name; broadcastSessionList(); }
 
     } else if (parsed.type === 'session_close') {
       const id = parsed.sessionId as string;
@@ -1534,12 +660,8 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         if (session.cwdTimer) clearInterval(session.cwdTimer);
         session.pty.kill();
         if (session.tmuxName) tmuxKillSession(session.tmuxName);
-        // Clean up data WebSocket connections
         const dataClients = dataWsMap.get(id);
-        if (dataClients) {
-          dataClients.forEach(dws => dws.close(1000, 'Session closed'));
-          dataWsMap.delete(id);
-        }
+        if (dataClients) { dataClients.forEach(dws => dws.close(1000, 'Session closed')); dataWsMap.delete(id); }
         sessions.delete(id);
         broadcastSessionList();
       }
@@ -1551,13 +673,12 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       if (session) session.pty.write(parsed.data as string);
 
     } else if (parsed.type === 'send_when_ready') {
-      // Wait for AI prompt readiness, then send input using bracketed paste + Enter
       const id = parsed.sessionId as string;
       const text = parsed.data as string;
       if (!id || !text) return;
       const session = sessions.get(id);
       if (!session) return;
-      sendWhenAiReady(session, text, ws);
+      sendWhenAiReady(session, text, ws, wsSend);
 
     } else if (parsed.type === 'resize') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
@@ -1565,7 +686,6 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (session) {
         session.pty.resize(parsed.cols as number, parsed.rows as number);
-        // First resize after restore: now run the pending command at correct terminal size
         if (session.pendingCmd && !session.resized) {
           session.resized = true;
           const cmd = session.pendingCmd;
@@ -1576,419 +696,258 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       }
 
     } else if (parsed.type === 'git_graph') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const skip = typeof parsed.skip === 'number' ? parsed.skip : 0;
-      try {
-        const { commits, hasMore } = gitService.getGitLog(session.cwd, 50, skip);
-        wsSend(ws, JSON.stringify({ type: 'git_graph_data', sessionId: id, commits, hasMore, skip }));
-      } catch (e) {
-        wsSend(ws, JSON.stringify({ type: 'git_graph_data', sessionId: id, commits: [], hasMore: false, skip, error: String(e) }));
-      }
+      try { const { commits, hasMore } = gitService.getGitLog(session.cwd, 50, skip); wsSend(ws, JSON.stringify({ type: 'git_graph_data', sessionId: id, commits, hasMore, skip })); }
+      catch (e) { wsSend(ws, JSON.stringify({ type: 'git_graph_data', sessionId: id, commits: [], hasMore: false, skip, error: String(e) })); }
 
     } else if (parsed.type === 'git_graph_search') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const query = typeof parsed.query === 'string' ? parsed.query : '';
-      try {
-        const commits = gitService.searchGitLog(session.cwd, query);
-        wsSend(ws, JSON.stringify({ type: 'git_graph_search_data', sessionId: id, commits, query }));
-      } catch (e) {
-        wsSend(ws, JSON.stringify({ type: 'git_graph_search_data', sessionId: id, commits: [], query, error: String(e) }));
-      }
+      try { const commits = gitService.searchGitLog(session.cwd, query); wsSend(ws, JSON.stringify({ type: 'git_graph_search_data', sessionId: id, commits, query })); }
+      catch (e) { wsSend(ws, JSON.stringify({ type: 'git_graph_search_data', sessionId: id, commits: [], query, error: String(e) })); }
 
     } else if (parsed.type === 'git_file_list') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const hash = parsed.hash as string;
-      if (!hash || !/^[0-9a-f]{4,40}$/i.test(hash)) {
-        wsSend(ws, JSON.stringify({ type: 'git_file_list_data', hash, files: [], error: 'Invalid hash' }));
-        return;
-      }
-      try {
-        const files = gitService.getFileList(session.cwd, hash);
-        wsSend(ws, JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files }));
-      } catch (e) {
-        wsSend(ws, JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files: [], error: String(e) }));
-      }
+      if (!hash || !/^[0-9a-f]{4,40}$/i.test(hash)) { wsSend(ws, JSON.stringify({ type: 'git_file_list_data', hash, files: [], error: 'Invalid hash' })); return; }
+      try { const files = gitService.getFileList(session.cwd, hash); wsSend(ws, JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files })); }
+      catch (e) { wsSend(ws, JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files: [], error: String(e) })); }
 
     } else if (parsed.type === 'git_branch') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
-      try {
-        const branch = gitService.getCurrentBranch(session.cwd);
-        wsSend(ws, JSON.stringify({ type: 'git_branch_data', sessionId: id, branch }));
-      } catch {
-        wsSend(ws, JSON.stringify({ type: 'git_branch_data', sessionId: id, branch: null }));
-      }
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
+      try { const branch = gitService.getCurrentBranch(session.cwd); wsSend(ws, JSON.stringify({ type: 'git_branch_data', sessionId: id, branch })); }
+      catch { wsSend(ws, JSON.stringify({ type: 'git_branch_data', sessionId: id, branch: null })); }
 
     } else if (parsed.type === 'git_branch_list') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
-      try {
-        const branches = gitService.getBranchList(session.cwd);
-        wsSend(ws, JSON.stringify({ type: 'git_branch_list_data', sessionId: id, branches }));
-      } catch (e) {
-        wsSend(ws, JSON.stringify({ type: 'git_branch_list_data', sessionId: id, branches: [], error: String(e) }));
-      }
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
+      try { const branches = gitService.getBranchList(session.cwd); wsSend(ws, JSON.stringify({ type: 'git_branch_list_data', sessionId: id, branches })); }
+      catch (e) { wsSend(ws, JSON.stringify({ type: 'git_branch_list_data', sessionId: id, branches: [], error: String(e) })); }
 
     } else if (parsed.type === 'git_remote_url') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const url = gitService.getRemoteUrl(session.cwd);
       wsSend(ws, JSON.stringify({ type: 'git_remote_url_data', sessionId: id, url }));
 
     } else if (parsed.type === 'git_checkout') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const branch = parsed.branch as string;
-      if (!branch || !/^[a-zA-Z0-9][a-zA-Z0-9/_.\\-]*$/.test(branch)) {
-        wsSend(ws, JSON.stringify({ type: 'git_checkout_ack', sessionId: id, error: 'Invalid branch name' }));
-        return;
-      }
-      // For remote branches like origin/feature, create a local tracking branch
+      if (!branch || !/^[a-zA-Z0-9][a-zA-Z0-9/_.\\-]*$/.test(branch)) { wsSend(ws, JSON.stringify({ type: 'git_checkout_ack', sessionId: id, error: 'Invalid branch name' })); return; }
       let cmd: string;
-      if (branch.startsWith('origin/')) {
-        const localName = branch.slice(7);
-        cmd = `git checkout -b ${localName} --track ${branch}`;
-      } else {
-        cmd = `git checkout ${branch}`;
-      }
+      if (branch.startsWith('origin/')) { const localName = branch.slice(7); cmd = `git checkout -b ${localName} --track ${branch}`; }
+      else { cmd = `git checkout ${branch}`; }
       session.pty.write(cmd + '\r');
       wsSend(ws, JSON.stringify({ type: 'git_checkout_ack', sessionId: id, branch }));
 
     } else if (parsed.type === 'git_pull') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       session.pty.write('git pull\r');
       wsSend(ws, JSON.stringify({ type: 'git_pull_ack', sessionId: id }));
 
     } else if (parsed.type === 'file_tree') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const targetDir = (parsed.dir as string) || session.cwd;
       try {
         const tree = gitService.getFileTree(targetDir);
-        // Include git status for explorer badges
         const gitStatusMap: Record<string, string> = {};
-        if (gitService.isGitRepo(targetDir)) {
-          const files = gitService.getGitStatus(targetDir);
-          for (const f of files) { gitStatusMap[f.path] = f.status; }
-        }
+        if (gitService.isGitRepo(targetDir)) { const files = gitService.getGitStatus(targetDir); for (const f of files) { gitStatusMap[f.path] = f.status; } }
         wsSend(ws, JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree, gitStatus: gitStatusMap }));
-      } catch (e) {
-        wsSend(ws, JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree: [], error: String(e) }));
-      }
+      } catch (e) { wsSend(ws, JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree: [], error: String(e) })); }
 
     } else if (parsed.type === 'git_status') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       try {
         const isRepo = gitService.isGitRepo(session.cwd);
-        if (!isRepo) {
-          wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], isRepo: false }));
-          return;
-        }
+        if (!isRepo) { wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], isRepo: false })); return; }
         const files = gitService.getGitStatus(session.cwd);
         const branch = gitService.getCurrentBranch(session.cwd);
         const root = gitService.getGitRoot(session.cwd);
         const upstream = gitService.getUpstreamStatus(session.cwd);
         const worktrees = gitService.getWorktreeList(session.cwd);
-        // Detect if current session is in a worktree (not main)
         const normalizedCwd = session.cwd.replace(/\/+$/, '');
         const mainWt = worktrees.find(w => w.isMain);
         const isInWorktree = mainWt ? normalizedCwd !== mainWt.path.replace(/\/+$/, '') : false;
         let mainBranchFileCount: number | undefined;
-        if (isInWorktree && mainWt) {
-          try {
-            const mainFiles = gitService.getGitStatus(mainWt.path);
-            mainBranchFileCount = mainFiles.length;
-          } catch {}
-        }
+        if (isInWorktree && mainWt) { try { const mainFiles = gitService.getGitStatus(mainWt.path); mainBranchFileCount = mainFiles.length; } catch {} }
         wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true, upstream, worktrees, isInWorktree, mainBranchFileCount }));
-      } catch (e) {
-        wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], error: String(e), isRepo: false }));
-      }
+      } catch (e) { wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], error: String(e), isRepo: false })); }
 
     } else if (parsed.type === 'git_diff') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const filePath = parsed.filePath as string | undefined;
       const staged = parsed.staged as boolean || false;
       const diff = gitService.getGitDiff(session.cwd, filePath, staged);
       wsSend(ws, JSON.stringify({ type: 'git_diff_data', sessionId: id, filePath, staged, diff }));
 
     } else if (parsed.type === 'git_stage') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const filePath = parsed.filePath as string;
       const all = parsed.all as boolean || false;
       const ok = all ? gitService.gitStageAll(session.cwd) : gitService.gitStageFile(session.cwd, filePath);
       wsSend(ws, JSON.stringify({ type: 'git_stage_ack', sessionId: id, ok }));
-      // Auto-refresh status after staging
       if (ok) {
-        const files = gitService.getGitStatus(session.cwd);
-        const branch = gitService.getCurrentBranch(session.cwd);
-        const root = gitService.getGitRoot(session.cwd);
+        const files = gitService.getGitStatus(session.cwd); const branch = gitService.getCurrentBranch(session.cwd); const root = gitService.getGitRoot(session.cwd);
         wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
       }
 
     } else if (parsed.type === 'git_unstage') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const filePath = parsed.filePath as string;
       const all = parsed.all as boolean || false;
       const ok = all ? gitService.gitUnstageAll(session.cwd) : gitService.gitUnstageFile(session.cwd, filePath);
       wsSend(ws, JSON.stringify({ type: 'git_unstage_ack', sessionId: id, ok }));
       if (ok) {
-        const files = gitService.getGitStatus(session.cwd);
-        const branch = gitService.getCurrentBranch(session.cwd);
-        const root = gitService.getGitRoot(session.cwd);
+        const files = gitService.getGitStatus(session.cwd); const branch = gitService.getCurrentBranch(session.cwd); const root = gitService.getGitRoot(session.cwd);
         wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
       }
 
     } else if (parsed.type === 'git_commit') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const message = parsed.message as string;
       const result = gitService.gitCommit(session.cwd, message);
       wsSend(ws, JSON.stringify({ type: 'git_commit_ack', sessionId: id, ...result }));
       if (result.ok) {
-        // Auto-refresh status after commit
-        const files = gitService.getGitStatus(session.cwd);
-        const branch = gitService.getCurrentBranch(session.cwd);
-        const root = gitService.getGitRoot(session.cwd);
+        const files = gitService.getGitStatus(session.cwd); const branch = gitService.getCurrentBranch(session.cwd); const root = gitService.getGitRoot(session.cwd);
         wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
-        // Commit & Push
-        if (parsed.push) {
-          const pushResult = gitService.gitPush(session.cwd);
-          wsSend(ws, JSON.stringify({ type: 'git_push_ack', sessionId: id, ...pushResult }));
-        }
+        if (parsed.push) { const pushResult = gitService.gitPush(session.cwd); wsSend(ws, JSON.stringify({ type: 'git_push_ack', sessionId: id, ...pushResult })); }
       }
 
     } else if (parsed.type === 'file_create') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const result = gitService.createFile(session.cwd, parsed.filePath as string, parsed.isDir as boolean);
       wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'create', ...result }));
 
     } else if (parsed.type === 'file_rename') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const result = gitService.renameFile(session.cwd, parsed.oldPath as string, parsed.newPath as string);
       wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'rename', ...result }));
 
     } else if (parsed.type === 'file_delete') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const result = gitService.deleteFile(session.cwd, parsed.filePath as string);
       wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'delete', ...result }));
 
     } else if (parsed.type === 'file_duplicate') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const result = gitService.duplicateFile(session.cwd, parsed.filePath as string);
       wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'duplicate', ...result }));
 
     } else if (parsed.type === 'file_reveal') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
-      const filePath = parsed.filePath as string;
-      if (!filePath) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
+      const filePath = parsed.filePath as string; if (!filePath) return;
       const fullPath = path.resolve(session.cwd, filePath);
       const resolvedCwd = path.resolve(session.cwd);
       if (!fullPath.startsWith(resolvedCwd + path.sep) && fullPath !== resolvedCwd) return;
-      execFile('open', ['-R', fullPath], (err) => {
-        if (err) {
-          wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'reveal', ok: false, error: err.message }));
-        }
-      });
+      execFile('open', ['-R', fullPath], (err) => { if (err) wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'reveal', ok: false, error: err.message })); });
 
     } else if (parsed.type === 'file_read') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const filePath = parsed.filePath as string;
       const result = gitService.readFileContent(session.cwd, filePath);
       wsSend(ws, JSON.stringify({ type: 'file_read_data', sessionId: id, filePath, ...result }));
 
     } else if (parsed.type === 'file_search') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const query = parsed.query as string;
-      const results = gitService.searchInFiles(session.cwd, query, {
-        caseSensitive: parsed.caseSensitive as boolean,
-        useRegex: parsed.useRegex as boolean,
-        include: parsed.include as string,
-      });
+      const results = gitService.searchInFiles(session.cwd, query, { caseSensitive: parsed.caseSensitive as boolean, useRegex: parsed.useRegex as boolean, include: parsed.include as string });
       wsSend(ws, JSON.stringify({ type: 'file_search_data', sessionId: id, results }));
 
     } else if (parsed.type === 'file_replace') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
-      const result = gitService.replaceInFile(session.cwd, parsed.filePath as string, parsed.query as string, parsed.replacement as string, {
-        caseSensitive: parsed.caseSensitive as boolean,
-        useRegex: parsed.useRegex as boolean,
-      });
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
+      const result = gitService.replaceInFile(session.cwd, parsed.filePath as string, parsed.query as string, parsed.replacement as string, { caseSensitive: parsed.caseSensitive as boolean, useRegex: parsed.useRegex as boolean });
       wsSend(ws, JSON.stringify({ type: 'file_replace_ack', sessionId: id, ...result }));
 
     } else if (parsed.type === 'file_replace_all') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
-      const result = gitService.replaceInAllFiles(session.cwd, parsed.query as string, parsed.replacement as string, {
-        caseSensitive: parsed.caseSensitive as boolean,
-        useRegex: parsed.useRegex as boolean,
-        include: parsed.include as string,
-      });
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
+      const result = gitService.replaceInAllFiles(session.cwd, parsed.query as string, parsed.replacement as string, { caseSensitive: parsed.caseSensitive as boolean, useRegex: parsed.useRegex as boolean, include: parsed.include as string });
       wsSend(ws, JSON.stringify({ type: 'file_replace_ack', sessionId: id, ...result }));
 
     } else if (parsed.type === 'git_generate_message') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const message = gitService.generateCommitMessage(session.cwd);
       wsSend(ws, JSON.stringify({ type: 'git_generate_message_data', sessionId: id, message }));
 
     } else if (parsed.type === 'git_discard') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const filePath = parsed.filePath as string;
       const ok = gitService.gitDiscard(session.cwd, filePath);
       if (ok) {
-        const files = gitService.getGitStatus(session.cwd);
-        const branch = gitService.getCurrentBranch(session.cwd);
-        const root = gitService.getGitRoot(session.cwd);
+        const files = gitService.getGitStatus(session.cwd); const branch = gitService.getCurrentBranch(session.cwd); const root = gitService.getGitRoot(session.cwd);
         wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
       }
 
     } else if (parsed.type === 'git_push') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const result = gitService.gitPush(session.cwd);
       wsSend(ws, JSON.stringify({ type: 'git_push_ack', sessionId: id, ...result }));
 
     } else if (parsed.type === 'git_worktree_list') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
-      try {
-        const worktrees = gitService.getWorktreeList(session.cwd);
-        wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
-      } catch (e) {
-        wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees: [], error: String(e) }));
-      }
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
+      try { const worktrees = gitService.getWorktreeList(session.cwd); wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd })); }
+      catch (e) { wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees: [], error: String(e) })); }
 
     } else if (parsed.type === 'git_worktree_add') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const wtPath = parsed.path as string;
       const branch = parsed.branch as string | undefined;
       const createBranch = parsed.createBranch as boolean | undefined;
-      // Resolve relative path from git root, not session.cwd (which may be a worktree)
       const gitRoot = gitService.getGitRoot(session.cwd);
       const addCwd = gitRoot || session.cwd;
       const wtResult = gitService.addWorktree(addCwd, wtPath, branch, createBranch);
       wsSend(ws, JSON.stringify({ type: 'git_worktree_add_ack', sessionId: id, ...wtResult }));
-      if (wtResult.ok) {
-        const worktrees = gitService.getWorktreeList(session.cwd);
-        wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
-      }
+      if (wtResult.ok) { const worktrees = gitService.getWorktreeList(session.cwd); wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd })); }
 
     } else if (parsed.type === 'git_worktree_remove') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const wtPath = parsed.path as string;
       const force = parsed.force as boolean || false;
       const wtResult = gitService.removeWorktree(session.cwd, wtPath, force);
       wsSend(ws, JSON.stringify({ type: 'git_worktree_remove_ack', sessionId: id, path: wtPath, ...wtResult }));
-      if (wtResult.ok) {
-        const worktrees = gitService.getWorktreeList(session.cwd);
-        wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
-      }
+      if (wtResult.ok) { const worktrees = gitService.getWorktreeList(session.cwd); wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd })); }
 
     } else if (parsed.type === 'git_worktree_switch') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const wtPath = parsed.path as string;
-      const fs = require('fs');
-      if (!fs.existsSync(wtPath)) {
-        wsSend(ws, JSON.stringify({ type: 'git_worktree_switch_ack', sessionId: id, ok: false, error: 'Path does not exist' }));
-        return;
-      }
+      if (!fs.existsSync(wtPath)) { wsSend(ws, JSON.stringify({ type: 'git_worktree_switch_ack', sessionId: id, ok: false, error: 'Path does not exist' })); return; }
       session.cwd = wtPath;
-      if (session.pty) {
-        // Use single-quotes for safe shell escaping
-        const escaped = wtPath.replace(/'/g, "'\\''");
-        session.pty.write(`cd '${escaped}'\r`);
-      }
+      if (session.pty) { const escaped = wtPath.replace(/'/g, "'\\''"); session.pty.write(`cd '${escaped}'\r`); }
       wsSend(ws, JSON.stringify({ type: 'git_worktree_switch_ack', sessionId: id, ok: true, path: wtPath }));
-      // Broadcast session_info so tabs/statusbar/sidebar update
       const infoMsg = JSON.stringify({ type: 'session_info', sessionId: id, cwd: wtPath, ai: session.ai });
       wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(infoMsg); });
       try {
         const isRepo = gitService.isGitRepo(session.cwd);
         if (isRepo) {
-          const files = gitService.getGitStatus(session.cwd);
-          const branch = gitService.getCurrentBranch(session.cwd);
-          const root = gitService.getGitRoot(session.cwd);
-          const upstream = gitService.getUpstreamStatus(session.cwd);
+          const files = gitService.getGitStatus(session.cwd); const branch = gitService.getCurrentBranch(session.cwd); const root = gitService.getGitRoot(session.cwd); const upstream = gitService.getUpstreamStatus(session.cwd);
           wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true, upstream }));
         }
       } catch {}
@@ -1996,18 +955,14 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
 
     } else if (parsed.type === 'claude_usage') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       const usage = getClaudeUsage(session.cwd);
       wsSend(ws, JSON.stringify({ type: 'claude_usage_data', sessionId: id, usage }));
 
     } else if (parsed.type === 'claude_prompts') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws);
-      if (!id) return;
-      const session = sessions.get(id);
-      if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
+      const session = sessions.get(id); if (!session) return;
       console.log(`[claude_prompts] cwd=${session.cwd} aiPid=${session.aiPid}`);
       const prompts = getClaudePrompts(session.cwd, session.aiPid);
       console.log(`[claude_prompts] found ${prompts.length} prompts`);
@@ -2017,31 +972,24 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
   ws.on('close', (code, reason) => {
     console.log(`${clientTag} Disconnected (code: ${code}, reason: ${reason || 'none'}) — remaining clients: ${wss.clients.size - 1}`);
-    wsSession.delete(ws);
-    wsSubscriptions.delete(ws);
+    wsSession.delete(ws); wsSubscriptions.delete(ws);
   });
-  ws.on('error', (err) => {
-    console.error(`${clientTag} Error: ${err.message}`);
-  });
+  ws.on('error', (err) => { console.error(`${clientTag} Error: ${err.message}`); });
 });
 
+// ─── SERVER STARTUP ──────────────────────────────────────────────
 async function startServer() {
   try {
     await userDb.initUserCount();
     await userDb.ensurePlanImagesBucket();
     console.log(`[auth] Email auth: ${userDb.getUserCount()} registered user(s), registration ${isRegistrationAllowed() ? 'allowed' : 'locked'}`);
-  } catch (err) {
-    console.error('[supabase] Failed to initialize user count:', err);
-  }
+  } catch (err) { console.error('[supabase] Failed to initialize user count:', err); }
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Super Terminal → http://localhost:${PORT}`);
-    // 로컬 네트워크 IP 표시
-    const nets = require('os').networkInterfaces();
+    const nets = os.networkInterfaces();
     for (const name of Object.keys(nets)) {
-      for (const net of nets[name]) {
-        if (net.family === 'IPv4' && !net.internal) {
-          console.log(`  Network   → http://${net.address}:${PORT}`);
-        }
+      for (const net of nets[name]!) {
+        if (net.family === 'IPv4' && !net.internal) console.log(`  Network   → http://${net.address}:${PORT}`);
       }
     }
     restoreSessions();
@@ -2049,6 +997,6 @@ async function startServer() {
 }
 startServer();
 
-// Graceful shutdown — close database
+// Graceful shutdown
 process.on('SIGTERM', () => { db.close(); process.exit(0); });
 process.on('SIGINT', () => { db.close(); process.exit(0); });
