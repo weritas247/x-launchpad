@@ -275,7 +275,6 @@ export function activateFileTab(filePath) {
     tabEl.classList.toggle('active', isActive);
     paneEl.classList.toggle('active', isActive);
   });
-
 }
 
 export function closeFileTab(filePath) {

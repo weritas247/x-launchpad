@@ -524,19 +524,12 @@ app.get('/', (_req, res) => {
 });
 
 // Global Express error handler — catches unhandled errors in route handlers
-app.use(
-  (
-    err: Error,
-    _req: express.Request,
-    res: express.Response,
-    _next: express.NextFunction
-  ) => {
-    console.error('[express] Unhandled error:', err.message, err.stack);
-    if (!res.headersSent) {
-      res.status(500).json({ ok: false, error: 'Internal server error' });
-    }
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[express] Unhandled error:', err.message, err.stack);
+  if (!res.headersSent) {
+    res.status(500).json({ ok: false, error: 'Internal server error' });
   }
-);
+});
 
 // ─── SESSION MANAGEMENT ──────────────────────────────────────────
 const SCROLLBACK_LIMIT = 128 * 1024;

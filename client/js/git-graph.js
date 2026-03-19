@@ -600,7 +600,8 @@ function coAuthorBadge(coAuthors) {
 }
 
 // ─── STAT BADGE ──────────────────────────────────────
-function _statBadge(add, del) { // eslint-disable-line no-unused-vars
+function _statBadge(add, del) {
+  // eslint-disable-line no-unused-vars
   if (!add && !del) return '';
   const parts = [];
   if (add) parts.push(`<span class="gg-stat-add">+${add}</span>`);
