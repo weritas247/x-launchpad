@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Terminal — Control Dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { align-items: flex-start; padding: 40px; }
+    .dashboard { max-width: 800px; width: 100%; margin: 0 auto; }
+    .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .dash-title { font-size: 18px; font-weight: bold; color: #f0f6fc; }
+    .badge { font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: bold; }
+    .badge.on { background: #238636; color: #fff; }
+    .badge.off { background: #da3633; color: #fff; }
+    .badge.starting { background: #d29922; color: #1e1e2e; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+    .stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+    .stat-label { font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+    .stat-value { font-size: 20px; font-weight: bold; color: #f0f6fc; }
+    .actions { display: flex; gap: 8px; margin-bottom: 24px; }
+    .btn { padding: 8px 20px; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; font-family: inherit; }
+    .btn-start { background: #238636; color: #fff; }
+    .btn-stop { background: #da3633; color: #fff; }
+    .btn-restart { background: #1f6feb; color: #fff; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .log-box {
+      background: #0d1117; border: 1px solid #30363d; border-radius: 8px;
+      padding: 12px; font-size: 12px; line-height: 1.6;
+      max-height: 400px; overflow-y: auto;
+    }
+    .log-line { color: #8b949e; white-space: pre-wrap; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <div class="dash-header">
+      <div class="dash-title">⚡ Super Terminal Control</div>
+      <span class="badge off" id="badge">OFF</span>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Uptime</div>
+        <div class="stat-value" id="s-uptime">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Sessions</div>
+        <div class="stat-value" id="s-sessions">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">CPU</div>
+        <div class="stat-value" id="s-cpu">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Memory</div>
+        <div class="stat-value" id="s-memory">—</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-start" id="btn-start">Start</button>
+      <button class="btn btn-stop" id="btn-stop" disabled>Stop</button>
+      <button class="btn btn-restart" id="btn-restart" disabled>Restart</button>
+    </div>
+
+    <h3 style="color:#f0f6fc;margin-bottom:8px;font-size:14px;">Logs</h3>
+    <div class="log-box" id="log-box"></div>
+  </div>
+
+  <script>
+    const badge = document.getElementById('badge');
+    const sUptime = document.getElementById('s-uptime');
+    const sSessions = document.getElementById('s-sessions');
+    const sCpu = document.getElementById('s-cpu');
+    const sMemory = document.getElementById('s-memory');
+    const btnStart = document.getElementById('btn-start');
+    const btnStop = document.getElementById('btn-stop');
+    const btnRestart = document.getElementById('btn-restart');
+    const logBox = document.getElementById('log-box');
+
+    function formatUptime(ms) {
+      if (!ms) return '—';
+      const s = Math.floor(ms / 1000);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      return h > 0 ? `${h}h ${m}m` : `${m}m ${s % 60}s`;
+    }
+    function formatBytes(b) {
+      if (!b) return '—';
+      return (b / 1024 / 1024).toFixed(0) + 'MB';
+    }
+
+    function addLog(line) {
+      const el = document.createElement('div');
+      el.className = 'log-line';
+      el.textContent = line;
+      logBox.appendChild(el);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function connectWS() {
+      const ws = new WebSocket(`ws://${location.host}/ws`);
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'status') {
+          const running = msg.running;
+          const starting = msg.starting;
+          badge.textContent = running ? 'ON' : starting ? 'STARTING' : 'OFF';
+          badge.className = `badge ${running ? 'on' : starting ? 'starting' : 'off'}`;
+          sUptime.textContent = formatUptime(msg.uptime);
+          sSessions.textContent = msg.sessions;
+          sCpu.textContent = msg.cpu ? msg.cpu + '%' : '—';
+          sMemory.textContent = formatBytes(msg.memory);
+          btnStart.disabled = running || starting;
+          btnStop.disabled = !running && !starting;
+          btnRestart.disabled = !running;
+        }
+        if (msg.type === 'log') addLog(msg.line);
+      };
+      ws.onclose = () => setTimeout(connectWS, 3000);
+      ws.onerror = () => ws.close();
+    }
+    connectWS();
+
+    fetch('/api/logs').then(r => r.json()).then(d => {
+      (d.logs || []).forEach(addLog);
+    });
+
+    async function apiCall(endpoint) {
+      try {
+        const res = await fetch(`/api/${endpoint}`, { method: 'POST' });
+        if (!res.ok) {
+          const d = await res.json();
+          addLog(`[error] ${d.error}`);
+        }
+      } catch (err) { addLog(`[error] ${err.message}`); }
+    }
+    btnStart.onclick = () => apiCall('start');
+    btnStop.onclick = () => apiCall('stop');
+    btnRestart.onclick = () => apiCall('restart');
+  </script>
+</body>
+</html>
