@@ -7126,3 +7126,84 @@ body::after {
   cursor: pointer;
   z-index: 1;
 }
+
+/* ─── Control Panel Floating Button ─── */
+.control-floating-btn {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #89b4fa, #cba6f7);
+  color: #1e1e2e;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 8000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.control-floating-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+}
+
+.control-panel {
+  position: fixed;
+  bottom: 78px;
+  left: 24px;
+  width: 260px;
+  background: var(--bg-panel, #181825);
+  border: 1px solid var(--border-lit, #313244);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 8000;
+  opacity: 0;
+  transform: translateY(10px) scale(0.95);
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.control-panel.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.cp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.cp-title { font-size: 13px; font-weight: bold; color: #f0f6fc; }
+.cp-badge {
+  font-size: 9px; padding: 2px 8px; border-radius: 10px; font-weight: bold;
+}
+.cp-badge.on { background: #238636; color: #fff; }
+.cp-badge.off { background: #da3633; color: #fff; }
+.cp-badge.starting { background: #d29922; color: #1e1e2e; }
+
+.cp-stats { margin-bottom: 10px; }
+.cp-row {
+  display: flex; justify-content: space-between;
+  font-size: 11px; margin-bottom: 4px;
+}
+.cp-row span:first-child { color: #8b949e; }
+.cp-row span:last-child { color: #c9d1d9; }
+
+.cp-actions { display: flex; gap: 6px; }
+.cp-btn {
+  flex: 1; text-align: center; padding: 6px;
+  border: none; border-radius: 6px;
+  font-size: 10px; font-weight: bold;
+  cursor: pointer; font-family: inherit;
+}
+.cp-btn-stop { background: #f38ba8; color: #1e1e2e; }
+.cp-btn-restart { background: #a6e3a1; color: #1e1e2e; }
+.cp-btn-logs { background: var(--border-lit, #313244); color: #cdd6f4; }
+.cp-btn:hover { opacity: 0.85; }

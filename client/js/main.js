@@ -102,6 +102,7 @@ import {
   onAiPromptSent,
   updateAiTasksBadge,
 } from './plan-panel.js';
+import { initControlPanel } from './control-panel.js';
 import './mobile.js'; // auto-initializes mobile UI
 
 S.currentTheme = THEMES[0];
@@ -457,6 +458,7 @@ initExplorer();
 initSourceControl();
 initSearch();
 initPlanPanel();
+initControlPanel();
 
 // Wire up file viewer's lazy dependency
 setActivateSessionFn(activateSession);

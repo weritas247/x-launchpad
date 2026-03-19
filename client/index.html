@@ -1414,6 +1414,26 @@
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+    <!-- Control Panel Floating Button -->
+    <button id="control-floating-btn" class="control-floating-btn" title="Control Panel">⚡</button>
+    <div id="control-panel" class="control-panel">
+      <div class="cp-header">
+        <span class="cp-title">⚡ Super Terminal</span>
+        <span class="cp-badge off" id="cp-badge">OFF</span>
+      </div>
+      <div class="cp-stats">
+        <div class="cp-row"><span>Uptime</span><span id="cp-uptime">—</span></div>
+        <div class="cp-row"><span>Sessions</span><span id="cp-sessions">0</span></div>
+        <div class="cp-row"><span>CPU</span><span id="cp-cpu">—</span></div>
+        <div class="cp-row"><span>Memory</span><span id="cp-memory">—</span></div>
+      </div>
+      <div class="cp-actions">
+        <button class="cp-btn cp-btn-stop" id="cp-btn-stop">Stop</button>
+        <button class="cp-btn cp-btn-restart" id="cp-btn-restart">Restart</button>
+        <button class="cp-btn cp-btn-logs" id="cp-btn-logs">Logs</button>
+      </div>
+    </div>
+
     <script type="module" src="js/scroll-float.js"></script>
     <script type="module" src="js/mobile.js"></script>
     <script type="module" src="js/main.js"></script>
