@@ -5,6 +5,7 @@ import { WebSocket } from 'ws';
 
 export interface PtySession {
   id: string;
+  scrollback: string;
   pty: {
     write: (data: string) => void;
     onData: (cb: (data: string) => void) => { dispose: () => void };
@@ -104,12 +105,22 @@ export function sendWhenAiReady(
 
   // AI prompt patterns: Claude ❯/>, Gemini >, Codex $, generic prompt chars
   const promptRe = /[❯›>$%#]\s*$/;
+  // Claude-specific: "bypass permissions on" or model info line followed by prompt
+  const claudeReadyRe = /bypass permissions on|Claude Code v[\d.]+/;
+
+  // Check existing scrollback first — prompt may have already appeared
+  const tail = sess.scrollback.slice(-2000);
+  const cleanTail = stripEscape(tail);
+  if (cleanTail.length > 20 && (promptRe.test(cleanTail) || claudeReadyRe.test(cleanTail))) {
+    finish();
+    return;
+  }
 
   const unsub = sess.pty.onData((chunk: string) => {
     if (sent) return;
     buf += chunk;
     const clean = stripEscape(buf);
-    if (clean.length > 20 && promptRe.test(clean)) {
+    if (clean.length > 20 && (promptRe.test(clean) || claudeReadyRe.test(clean))) {
       finish();
     }
     if (buf.length > 8000 && !sent) {
@@ -117,8 +128,8 @@ export function sendWhenAiReady(
     }
   });
 
-  // Fallback: send after 15 seconds regardless
+  // Fallback: send after 3 seconds regardless
   setTimeout(() => {
     if (!sent) finish();
-  }, 15000);
+  }, 3000);
 }

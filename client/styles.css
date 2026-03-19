@@ -2522,13 +2522,25 @@ body::after {
   box-shadow: 0 0 10px rgba(255, 51, 102, 0.1);
 }
 
-/* Statusbar plan item */
+/* Statusbar clickable items hover */
 .sb-plan {
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s;
 }
 .sb-plan:hover {
-  color: var(--text-bright);
+  color: var(--accent);
+}
+#sb-ai-tasks {
+  transition: color 0.15s;
+}
+#sb-ai-tasks:hover {
+  color: var(--accent);
+}
+#sb-claude-usage {
+  transition: color 0.15s;
+}
+#sb-claude-usage:hover {
+  color: var(--accent);
 }
 
 /* ═══════════════════════════════════════════════════
