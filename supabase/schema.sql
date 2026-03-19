@@ -49,3 +49,21 @@ create trigger plans_updated_at
   for each row execute function public.set_updated_at();
 
 alter table public.plans disable row level security;
+
+-- plans 테이블 확장
+alter table public.plans add column if not exists status text not null default 'todo';
+alter table public.plans add column if not exists ai_done boolean not null default false;
+
+-- ─── Plan Logs ──────────────────────────────────────────────────
+create table if not exists public.plan_logs (
+  id          bigserial       primary key,
+  plan_id     text            not null references public.plans(id) on delete cascade,
+  type        text            not null,
+  content     text            not null default '',
+  commit_hash text,
+  created_at  timestamptz     not null default now()
+);
+
+create index if not exists idx_plan_logs_plan_id on public.plan_logs(plan_id);
+
+alter table public.plan_logs disable row level security;
