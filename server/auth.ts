@@ -7,13 +7,14 @@ import { timingSafeEqual } from 'crypto';
 import express from 'express';
 import * as db from './db';
 import * as userDb from './supabase';
+import { env } from './env';
 
 // ─── Configuration ───────────────────────────────────────────────
-const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
+const AUTH_TOKEN = env.AUTH_TOKEN;
 const tokenAuthEnabled = AUTH_TOKEN.length > 0;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const JWT_EXPIRES_IN = env.JWT_EXPIRES_IN;
 export const BCRYPT_ROUNDS = 12;
-export const ALLOW_REGISTRATION = process.env.ALLOW_REGISTRATION === '1';
+export const ALLOW_REGISTRATION = env.ALLOW_REGISTRATION;
 
 if (tokenAuthEnabled) {
   console.log('[auth] Legacy token authentication enabled');
@@ -21,7 +22,7 @@ if (tokenAuthEnabled) {
 
 // ─── JWT Secret ──────────────────────────────────────────────────
 function getJwtSecret(): string {
-  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  if (env.JWT_SECRET) return env.JWT_SECRET;
   let secret = db.getSetting('jwt_secret');
   if (!secret) {
     secret = crypto.randomBytes(64).toString('hex');

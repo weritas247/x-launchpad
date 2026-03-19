@@ -6,11 +6,12 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { execSync } from 'child_process';
+import { env } from './env';
 
 export const TMUX_SOCKET = path.join(os.tmpdir(), 'super-terminal-tmux');
 
 let _tmuxAvailable = false;
-const _tmuxRequested = process.env.ENABLE_TMUX === '1';
+const _tmuxRequested = env.ENABLE_TMUX;
 
 if (_tmuxRequested) {
   try {
@@ -43,7 +44,7 @@ export function tmuxSessionExists(name: string): boolean {
 }
 
 export function tmuxCreateSession(name: string, cwd: string, shell: string): void {
-  const safeCwd = fs.existsSync(cwd) ? cwd : process.env.HOME || '/';
+  const safeCwd = fs.existsSync(cwd) ? cwd : env.HOME;
   tmuxExec(['new-session', '-d', '-s', name, '-c', safeCwd, shell]);
   // Hide all tmux chrome — our UI provides its own
   try {

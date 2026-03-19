@@ -3,6 +3,7 @@
  */
 import * as fs from 'fs';
 import * as db from './db';
+import { env } from './env';
 
 export const DEFAULT_SETTINGS = {
   appearance: {
@@ -36,8 +37,8 @@ export const DEFAULT_SETTINGS = {
     renderer: 'canvas',
   },
   shell: {
-    shellPath: process.env.SHELL || '/bin/bash',
-    startDirectory: process.env.HOME || '/',
+    shellPath: env.SHELL,
+    startDirectory: env.HOME,
     env: {} as Record<string, string>,
     sessionNameFormat: 'shell-{n}',
     autoReconnect: true,

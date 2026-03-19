@@ -72,6 +72,7 @@ import {
   type WsContext,
   type Session as WsSession,
 } from './ws-handlers';
+import { env } from './env';
 
 // ─── Server setup ────────────────────────────────────────────────
 /** Safe WebSocket send — no-ops if socket is not OPEN */
@@ -97,7 +98,7 @@ server.on('upgrade', (req, socket, head) => {
   }
 });
 
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = env.PORT;
 const SETTINGS_PATH = path.join(__dirname, '../../settings.json');
 const SESSIONS_PATH = path.join(__dirname, '../../sessions.json');
 
@@ -434,7 +435,7 @@ app.post(
     const targetDir =
       session.cwd && fs.existsSync(session.cwd)
         ? session.cwd
-        : currentSettings.shell.startDirectory || process.env.HOME || '/tmp';
+        : currentSettings.shell.startDirectory || env.HOME;
     const ext = path.extname(originalName).toLowerCase() || '.png';
     const allowedExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
     if (!allowedExts.includes(ext))
@@ -467,7 +468,7 @@ app.post('/api/reveal-in-finder', (req, res) => {
   const sessionId = req.body?.sessionId as string;
   if (!sessionId) return res.status(400).json({ ok: false });
   const session = sessions.get(sessionId);
-  const dir = session?.cwd || currentSettings.shell.startDirectory || process.env.HOME || '/tmp';
+  const dir = session?.cwd || currentSettings.shell.startDirectory || env.HOME;
   if (!fs.existsSync(dir)) return res.status(404).json({ ok: false });
   execFile('open', [dir], (err) => {
     if (err) return res.status(500).json({ ok: false, error: String(err) });
@@ -481,7 +482,7 @@ app.get('/api/download', (req, res) => {
   if (!sessionId || !filePath) return res.status(400).json({ ok: false, error: 'Missing params' });
   const session = sessions.get(sessionId);
   if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
-  const cwd = session.cwd || process.env.HOME || '/tmp';
+  const cwd = session.cwd || env.HOME;
   const fullPath = path.resolve(cwd, filePath);
   if (!fullPath.startsWith(path.resolve(cwd)))
     return res.status(403).json({ ok: false, error: 'Access denied' });
@@ -505,7 +506,7 @@ app.post(
       return res.status(400).json({ ok: false, error: 'Missing params' });
     const session = sessions.get(sessionId);
     if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
-    const cwd = session.cwd || process.env.HOME || '/tmp';
+    const cwd = session.cwd || env.HOME;
     const dir = targetDir ? path.resolve(cwd, targetDir) : cwd;
     if (!dir.startsWith(path.resolve(cwd)))
       return res.status(403).json({ ok: false, error: 'Access denied' });
@@ -566,8 +567,7 @@ function createSession(
   extraEnv?: Record<string, string>
 ): Session {
   const s = currentSettings.shell;
-  const shellPath =
-    s.shellPath || (os.platform() === 'win32' ? 'powershell.exe' : process.env.SHELL || 'bash');
+  const shellPath = s.shellPath || (os.platform() === 'win32' ? 'powershell.exe' : env.SHELL);
   const mergedEnv = {
     ...(process.env as Record<string, string>),
     ...s.env,
@@ -581,7 +581,7 @@ function createSession(
         : 'en_US.UTF-8',
     TERM: 'xterm-256color',
   };
-  const cwd0 = restoreCwd || s.startDirectory || process.env.HOME || '/';
+  const cwd0 = restoreCwd || s.startDirectory || env.HOME;
   const tmuxName = id.replace(/[.:]/g, '-');
   const useTmux = tmuxAvailable;
 
@@ -597,7 +597,7 @@ function createSession(
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
-      cwd: fs.existsSync(cwd0) ? cwd0 : process.env.HOME || '/',
+      cwd: fs.existsSync(cwd0) ? cwd0 : env.HOME,
       env: mergedEnv,
     });
   } else {
@@ -605,7 +605,7 @@ function createSession(
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
-      cwd: fs.existsSync(cwd0) ? cwd0 : process.env.HOME || '/',
+      cwd: fs.existsSync(cwd0) ? cwd0 : env.HOME,
       env: mergedEnv,
     });
   }

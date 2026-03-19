@@ -14,6 +14,7 @@ import { getClaudeUsage, getClaudePrompts } from './claude-service';
 import { runCmdWhenReady, sendWhenAiReady } from './pty-utils';
 import { tmuxKillSession } from './tmux';
 import { AppSettings } from './config';
+import { env } from './env';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -134,7 +135,7 @@ const handlers: Record<string, WsHandler> = {
     const source = ctx.sessions.get(sourceId);
     const id = `session-${Date.now()}`;
     const name = (parsed.name as string) || 'Shell';
-    const cwd = source?.cwd || ctx.currentSettings.shell.startDirectory || process.env.HOME || '/';
+    const cwd = source?.cwd || ctx.currentSettings.shell.startDirectory || env.HOME;
     ctx.createSession(id, name, cwd);
     ctx.wsSession.set(ctx.ws, id);
     ctx.wsSend(ctx.ws, JSON.stringify({ type: 'session_created', sessionId: id, name }));
