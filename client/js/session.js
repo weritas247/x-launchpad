@@ -6,7 +6,9 @@ import { deactivateAllFileTabs } from './file-viewer.js';
 
 // Lazy-loaded callbacks to avoid circular imports
 let _onSessionChangeSidePanels = null;
-export function setOnSessionChangeSidePanels(fn) { _onSessionChangeSidePanels = fn; }
+export function setOnSessionChangeSidePanels(fn) {
+  _onSessionChangeSidePanels = fn;
+}
 
 export function activateSession(id) {
   if (!terminalMap.has(id)) return;
@@ -74,5 +76,9 @@ export function updateStatusBar() {
   }
 }
 
-export function showEmptyState()  { emptyState.style.display = 'flex'; }
-export function hideEmptyState()  { emptyState.style.display = 'none'; }
+export function showEmptyState() {
+  emptyState.style.display = 'flex';
+}
+export function hideEmptyState() {
+  emptyState.style.display = 'none';
+}

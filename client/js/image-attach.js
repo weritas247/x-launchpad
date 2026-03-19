@@ -16,8 +16,10 @@ function handlePaste(e, sessionId) {
     }
   }
   if (files.length === 0) return;
-  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-  files.forEach(f => addAttachment(f, sessionId));
+  files.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+  );
+  files.forEach((f) => addAttachment(f, sessionId));
   e.preventDefault();
   e.stopPropagation();
 }
@@ -36,17 +38,22 @@ function handleDragLeave(e) {
 
 function handleDrop(e, sessionId) {
   e.currentTarget.classList.remove('image-drag-over');
-  if (e.dataTransfer?.types.includes('text/split-tab') ||
-      e.dataTransfer?.types.includes('text/tab-session')) return;
+  if (
+    e.dataTransfer?.types.includes('text/split-tab') ||
+    e.dataTransfer?.types.includes('text/tab-session')
+  )
+    return;
   if (!e.dataTransfer?.files.length) return;
 
   const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-  const files = Array.from(e.dataTransfer.files).filter(f => imageTypes.includes(f.type));
+  const files = Array.from(e.dataTransfer.files).filter((f) => imageTypes.includes(f.type));
   if (files.length === 0) return;
   e.preventDefault();
   e.stopPropagation();
-  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-  files.forEach(f => addAttachment(f, sessionId));
+  files.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+  );
+  files.forEach((f) => addAttachment(f, sessionId));
 }
 
 // ─── ATTACHMENT MANAGEMENT ───────────────────────────────────────
@@ -68,13 +75,16 @@ function removeAttachment(sessionId, idx) {
 
 function clearAll(sessionId) {
   const list = attachments.get(sessionId);
-  if (list) list.forEach(i => URL.revokeObjectURL(i.objectUrl));
+  if (list) list.forEach((i) => URL.revokeObjectURL(i.objectUrl));
   attachments.delete(sessionId);
   const entry = terminalMap.get(sessionId);
   if (entry) {
     entry.div.querySelector('.img-attach-bar')?.remove();
     adjustXtermForBar(entry, 0);
-    requestAnimationFrame(() => { entry.fitAddon.fit(); entry.term.scrollToBottom(); });
+    requestAnimationFrame(() => {
+      entry.fitAddon.fit();
+      entry.term.scrollToBottom();
+    });
   }
 }
 
@@ -131,7 +141,10 @@ function renderPreview(sessionId) {
   if (!list || list.length === 0) {
     if (hadBar) {
       adjustXtermForBar(entry, 0);
-      requestAnimationFrame(() => { entry.fitAddon.fit(); entry.term.scrollToBottom(); });
+      requestAnimationFrame(() => {
+        entry.fitAddon.fit();
+        entry.term.scrollToBottom();
+      });
     }
     return;
   }
@@ -150,12 +163,12 @@ function renderPreview(sessionId) {
     const closeBtn = document.createElement('button');
     closeBtn.className = 'img-attach-close';
     closeBtn.textContent = '✕';
-    closeBtn.addEventListener('click', e => {
+    closeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       removeAttachment(sessionId, idx);
     });
 
-    thumb.addEventListener('click', e => {
+    thumb.addEventListener('click', (e) => {
       if (e.target === closeBtn) return;
       showImagePreview(item.objectUrl);
     });
@@ -169,7 +182,7 @@ function renderPreview(sessionId) {
   const confirmBtn = document.createElement('button');
   confirmBtn.className = 'img-attach-confirm';
   confirmBtn.textContent = '↵ 첨부';
-  confirmBtn.addEventListener('click', e => {
+  confirmBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     confirmAttachments(sessionId);
   });
@@ -179,7 +192,7 @@ function renderPreview(sessionId) {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'img-attach-cancel';
   cancelBtn.textContent = '✕';
-  cancelBtn.addEventListener('click', e => {
+  cancelBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     clearAll(sessionId);
   });
@@ -219,24 +232,29 @@ function hideImagePreview() {
   const overlay = document.getElementById('img-preview-overlay');
   if (!overlay) return;
   overlay.classList.remove('active');
-  setTimeout(() => { overlay.style.display = 'none'; }, 200);
+  setTimeout(() => {
+    overlay.style.display = 'none';
+  }, 200);
 }
 
 // Wire up close handlers once DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   const overlay = document.getElementById('img-preview-overlay');
   const closeBtn = document.getElementById('img-preview-close');
-  if (overlay) overlay.addEventListener('click', e => { if (e.target === overlay) hideImagePreview(); });
+  if (overlay)
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) hideImagePreview();
+    });
   if (closeBtn) closeBtn.addEventListener('click', hideImagePreview);
-  document.addEventListener('keydown', e => {
+  document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && overlay?.classList.contains('active')) hideImagePreview();
   });
 });
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
 export function setupTerminalImageHandlers(div, sessionId) {
-  div.addEventListener('paste', e => handlePaste(e, sessionId), true);
-  div.addEventListener('dragover', e => handleDragOver(e));
-  div.addEventListener('dragleave', e => handleDragLeave(e));
-  div.addEventListener('drop', e => handleDrop(e, sessionId));
+  div.addEventListener('paste', (e) => handlePaste(e, sessionId), true);
+  div.addEventListener('dragover', (e) => handleDragOver(e));
+  div.addEventListener('dragleave', (e) => handleDragLeave(e));
+  div.addEventListener('drop', (e) => handleDrop(e, sessionId));
 }

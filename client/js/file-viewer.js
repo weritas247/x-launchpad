@@ -21,7 +21,13 @@ export function openFileTab(filePath, content, opts = {}) {
   if (fileTabs.has(filePath)) {
     // Already open — just activate and update content
     activateFileTab(filePath);
-    updateFileContent(filePath, content, { binary: isBinary, isImage, imageData, imageMime, error });
+    updateFileContent(filePath, content, {
+      binary: isBinary,
+      isImage,
+      imageData,
+      imageMime,
+      error,
+    });
     return;
   }
 
@@ -38,7 +44,10 @@ export function openFileTab(filePath, content, opts = {}) {
   tabEl.title = filePath;
 
   tabEl.addEventListener('click', (e) => {
-    if (e.target.closest('.tab-close-btn')) { closeFileTab(filePath); return; }
+    if (e.target.closest('.tab-close-btn')) {
+      closeFileTab(filePath);
+      return;
+    }
     activateFileTab(filePath);
   });
 
@@ -80,27 +89,73 @@ export function openFileTab(filePath, content, opts = {}) {
 function getHljsLang(filePath) {
   const ext = filePath.split('.').pop()?.toLowerCase();
   const langMap = {
-    js: 'javascript', mjs: 'javascript', cjs: 'javascript',
-    ts: 'typescript', mts: 'typescript', cts: 'typescript',
-    jsx: 'javascript', tsx: 'typescript',
-    py: 'python', rb: 'ruby', rs: 'rust', go: 'go',
-    java: 'java', kt: 'kotlin', scala: 'scala',
-    c: 'c', h: 'c', cpp: 'cpp', cc: 'cpp', cxx: 'cpp', hpp: 'cpp',
-    cs: 'csharp', swift: 'swift', m: 'objectivec',
-    html: 'xml', htm: 'xml', xml: 'xml', svg: 'xml',
-    css: 'css', scss: 'scss', less: 'less', sass: 'scss',
-    json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'ini',
-    md: 'markdown', markdown: 'markdown',
-    sh: 'bash', bash: 'bash', zsh: 'bash', fish: 'bash',
-    sql: 'sql', graphql: 'graphql', gql: 'graphql',
-    php: 'php', lua: 'lua', r: 'r', pl: 'perl',
-    dockerfile: 'dockerfile', makefile: 'makefile',
-    tf: 'hcl', hcl: 'hcl',
-    vue: 'xml', svelte: 'xml',
-    ini: 'ini', conf: 'ini', cfg: 'ini',
-    diff: 'diff', patch: 'diff',
-    zig: 'zig', nim: 'nim', ex: 'elixir', exs: 'elixir',
-    erl: 'erlang', hs: 'haskell', clj: 'clojure',
+    js: 'javascript',
+    mjs: 'javascript',
+    cjs: 'javascript',
+    ts: 'typescript',
+    mts: 'typescript',
+    cts: 'typescript',
+    jsx: 'javascript',
+    tsx: 'typescript',
+    py: 'python',
+    rb: 'ruby',
+    rs: 'rust',
+    go: 'go',
+    java: 'java',
+    kt: 'kotlin',
+    scala: 'scala',
+    c: 'c',
+    h: 'c',
+    cpp: 'cpp',
+    cc: 'cpp',
+    cxx: 'cpp',
+    hpp: 'cpp',
+    cs: 'csharp',
+    swift: 'swift',
+    m: 'objectivec',
+    html: 'xml',
+    htm: 'xml',
+    xml: 'xml',
+    svg: 'xml',
+    css: 'css',
+    scss: 'scss',
+    less: 'less',
+    sass: 'scss',
+    json: 'json',
+    yaml: 'yaml',
+    yml: 'yaml',
+    toml: 'ini',
+    md: 'markdown',
+    markdown: 'markdown',
+    sh: 'bash',
+    bash: 'bash',
+    zsh: 'bash',
+    fish: 'bash',
+    sql: 'sql',
+    graphql: 'graphql',
+    gql: 'graphql',
+    php: 'php',
+    lua: 'lua',
+    r: 'r',
+    pl: 'perl',
+    dockerfile: 'dockerfile',
+    makefile: 'makefile',
+    tf: 'hcl',
+    hcl: 'hcl',
+    vue: 'xml',
+    svelte: 'xml',
+    ini: 'ini',
+    conf: 'ini',
+    cfg: 'ini',
+    diff: 'diff',
+    patch: 'diff',
+    zig: 'zig',
+    nim: 'nim',
+    ex: 'elixir',
+    exs: 'elixir',
+    erl: 'erlang',
+    hs: 'haskell',
+    clj: 'clojure',
   };
   // Also check filename (e.g. Dockerfile, Makefile)
   const name = filePath.split('/').pop()?.toLowerCase() || '';
@@ -154,13 +209,19 @@ function updateFileContent(filePath, content, opts = {}) {
   }
 
   if (highlightedLines && highlightedLines.length === lines.length) {
-    contentEl.innerHTML = highlightedLines.map((html, i) =>
-      `<div class="fl"><span class="fl-ln" style="min-width:${gutterWidth}ch">${i + 1}</span><span class="fl-code">${html || ' '}</span></div>`
-    ).join('');
+    contentEl.innerHTML = highlightedLines
+      .map(
+        (html, i) =>
+          `<div class="fl"><span class="fl-ln" style="min-width:${gutterWidth}ch">${i + 1}</span><span class="fl-code">${html || ' '}</span></div>`
+      )
+      .join('');
   } else {
-    contentEl.innerHTML = lines.map((line, i) =>
-      `<div class="fl"><span class="fl-ln" style="min-width:${gutterWidth}ch">${i + 1}</span><span class="fl-code">${escHtml(line) || ' '}</span></div>`
-    ).join('');
+    contentEl.innerHTML = lines
+      .map(
+        (line, i) =>
+          `<div class="fl"><span class="fl-ln" style="min-width:${gutterWidth}ch">${i + 1}</span><span class="fl-code">${escHtml(line) || ' '}</span></div>`
+      )
+      .join('');
   }
 }
 
@@ -264,11 +325,27 @@ export function getActiveFilePath() {
 function getFileIcon(name) {
   const ext = name.split('.').pop()?.toLowerCase();
   const iconMap = {
-    js: '📜', ts: '📘', jsx: '⚛', tsx: '⚛',
-    json: '{}', md: '📝', css: '🎨', html: '🌐',
-    py: '🐍', rs: '🦀', go: '🐹', rb: '💎',
-    sh: '$_', yml: '⚙', yaml: '⚙', toml: '⚙',
-    png: '🖼', jpg: '🖼', gif: '🖼', svg: '🖼', webp: '🖼',
+    js: '📜',
+    ts: '📘',
+    jsx: '⚛',
+    tsx: '⚛',
+    json: '{}',
+    md: '📝',
+    css: '🎨',
+    html: '🌐',
+    py: '🐍',
+    rs: '🦀',
+    go: '🐹',
+    rb: '💎',
+    sh: '$_',
+    yml: '⚙',
+    yaml: '⚙',
+    toml: '⚙',
+    png: '🖼',
+    jpg: '🖼',
+    gif: '🖼',
+    svg: '🖼',
+    webp: '🖼',
     lock: '🔒',
   };
   return iconMap[ext] || '📄';

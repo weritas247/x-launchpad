@@ -10,22 +10,22 @@ const resizeHandle = document.getElementById('chat-editor-resize');
 
 // ─── Slash commands ─────────────────────────────────
 const SLASH_COMMANDS = [
-  { cmd: '/help',       desc: 'Show available commands' },
-  { cmd: '/clear',      desc: 'Clear terminal' },
-  { cmd: '/compact',    desc: 'Compact conversation' },
-  { cmd: '/model',      desc: 'Switch AI model' },
-  { cmd: '/cost',       desc: 'Show token usage' },
-  { cmd: '/status',     desc: 'Show session status' },
-  { cmd: '/init',       desc: 'Initialize project' },
-  { cmd: '/memory',     desc: 'Show memory' },
-  { cmd: '/review',     desc: 'Code review' },
-  { cmd: '/bug',        desc: 'Report bug' },
-  { cmd: '/plan',       desc: 'Show plan' },
-  { cmd: '/vim',        desc: 'Toggle vim mode' },
+  { cmd: '/help', desc: 'Show available commands' },
+  { cmd: '/clear', desc: 'Clear terminal' },
+  { cmd: '/compact', desc: 'Compact conversation' },
+  { cmd: '/model', desc: 'Switch AI model' },
+  { cmd: '/cost', desc: 'Show token usage' },
+  { cmd: '/status', desc: 'Show session status' },
+  { cmd: '/init', desc: 'Initialize project' },
+  { cmd: '/memory', desc: 'Show memory' },
+  { cmd: '/review', desc: 'Code review' },
+  { cmd: '/bug', desc: 'Report bug' },
+  { cmd: '/plan', desc: 'Show plan' },
+  { cmd: '/vim', desc: 'Toggle vim mode' },
   { cmd: '/permissions', desc: 'Manage permissions' },
-  { cmd: '/mcp',        desc: 'MCP servers' },
-  { cmd: '/doctor',     desc: 'Diagnose issues' },
-  { cmd: '/login',      desc: 'Login to service' },
+  { cmd: '/mcp', desc: 'MCP servers' },
+  { cmd: '/doctor', desc: 'Diagnose issues' },
+  { cmd: '/login', desc: 'Login to service' },
   { cmd: '/terminal-setup', desc: 'Terminal setup' },
 ];
 
@@ -42,7 +42,9 @@ try {
 } catch {}
 
 function saveHistory() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(-MAX_HISTORY))); } catch {}
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(-MAX_HISTORY)));
+  } catch {}
 }
 
 function addToHistory(text) {
@@ -59,7 +61,9 @@ function addToHistory(text) {
 // ─── Draft auto-save ────────────────────────────────
 const DRAFT_KEY = 'chat-editor-draft';
 function saveDraft() {
-  try { localStorage.setItem(DRAFT_KEY, chatInput.value); } catch {}
+  try {
+    localStorage.setItem(DRAFT_KEY, chatInput.value);
+  } catch {}
 }
 function loadDraft() {
   try {
@@ -74,8 +78,13 @@ let slashFiltered = [];
 
 function showSlashMenu(query) {
   const q = query.toLowerCase();
-  slashFiltered = SLASH_COMMANDS.filter(c => c.cmd.includes(q) || c.desc.toLowerCase().includes(q));
-  if (slashFiltered.length === 0) { hideSlashMenu(); return; }
+  slashFiltered = SLASH_COMMANDS.filter(
+    (c) => c.cmd.includes(q) || c.desc.toLowerCase().includes(q)
+  );
+  if (slashFiltered.length === 0) {
+    hideSlashMenu();
+    return;
+  }
 
   slashMenu.style.display = 'block';
   slashActive = 0;
@@ -89,14 +98,17 @@ function hideSlashMenu() {
 }
 
 function renderSlashMenu() {
-  slashMenu.innerHTML = slashFiltered.map((c, i) =>
-    `<div class="slash-item${i === slashActive ? ' active' : ''}" data-idx="${i}">
+  slashMenu.innerHTML = slashFiltered
+    .map(
+      (c, i) =>
+        `<div class="slash-item${i === slashActive ? ' active' : ''}" data-idx="${i}">
       <span class="slash-cmd">${c.cmd}</span>
       <span class="slash-desc">${c.desc}</span>
     </div>`
-  ).join('');
+    )
+    .join('');
 
-  slashMenu.querySelectorAll('.slash-item').forEach(el => {
+  slashMenu.querySelectorAll('.slash-item').forEach((el) => {
     el.addEventListener('click', () => {
       const idx = parseInt(el.dataset.idx);
       applySlashCommand(slashFiltered[idx]);
@@ -155,7 +167,7 @@ function initResize() {
     const delta = startY - e.clientY;
     const newH = Math.max(40, Math.min(300, startH + delta));
     editor.style.height = newH + 'px';
-    chatInput.style.maxHeight = (newH - 20) + 'px';
+    chatInput.style.maxHeight = newH - 20 + 'px';
   }
 
   function onUp() {

@@ -9,11 +9,15 @@ const CURSOR_SHOW = '\x1b[?25h';
 // Regex to strip cursor visibility sequences from PTY data
 const CURSOR_VIS_RE = /\x1b\[\?25[lh]/g;
 
-const buffers = new Map();   // sessionId → { term, cursorHidden, restoreTimer }
-const bypassed = new Set();  // sessionIds that skip cursor management (e.g. session restore)
+const buffers = new Map(); // sessionId → { term, cursorHidden, restoreTimer }
+const bypassed = new Set(); // sessionIds that skip cursor management (e.g. session restore)
 
-export function bypassStream(sessionId) { bypassed.add(sessionId); }
-export function unbypassStream(sessionId) { bypassed.delete(sessionId); }
+export function bypassStream(sessionId) {
+  bypassed.add(sessionId);
+}
+export function unbypassStream(sessionId) {
+  bypassed.delete(sessionId);
+}
 
 function scheduleCursorRestore(sessionId) {
   const buf = buffers.get(sessionId);
@@ -27,7 +31,10 @@ function scheduleCursorRestore(sessionId) {
 }
 
 export function streamWrite(sessionId, term, data) {
-  if (bypassed.has(sessionId)) { term.write(data); return; }
+  if (bypassed.has(sessionId)) {
+    term.write(data);
+    return;
+  }
   let buf = buffers.get(sessionId);
   if (!buf) {
     buf = { term, cursorHidden: false, restoreTimer: null };
@@ -36,7 +43,10 @@ export function streamWrite(sessionId, term, data) {
   buf.term = term;
 
   // Cancel pending cursor restore — new data is arriving
-  if (buf.restoreTimer) { clearTimeout(buf.restoreTimer); buf.restoreTimer = null; }
+  if (buf.restoreTimer) {
+    clearTimeout(buf.restoreTimer);
+    buf.restoreTimer = null;
+  }
 
   // Strip cursor show/hide from incoming data — we manage cursor visibility ourselves
   const cleaned = data.replace(CURSOR_VIS_RE, '');
@@ -58,7 +68,10 @@ export function streamWrite(sessionId, term, data) {
 export function flushStream(sessionId) {
   const buf = buffers.get(sessionId);
   if (!buf) return;
-  if (buf.restoreTimer) { clearTimeout(buf.restoreTimer); buf.restoreTimer = null; }
+  if (buf.restoreTimer) {
+    clearTimeout(buf.restoreTimer);
+    buf.restoreTimer = null;
+  }
   if (buf.cursorHidden) {
     buf.cursorHidden = false;
     buf.term.write(CURSOR_SHOW);

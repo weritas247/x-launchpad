@@ -23,7 +23,7 @@ export function handleClaudeUsageData(msg) {
   }
   showUsage();
   const totalIn = u.inputTokens + u.cacheReadTokens + u.cacheCreateTokens;
-  const pct = Math.min(u.totalCost / 200 * 100, 100).toFixed(1);
+  const pct = Math.min((u.totalCost / 200) * 100, 100).toFixed(1);
   sbClaudeTokens.textContent = `${pct}% · ↑${formatTokens(totalIn)} ↓${formatTokens(u.outputTokens)}`;
   sbClaudeUsage.title = `Claude Code Usage (Max $200 plan)\nUsage: ${pct}%\nModel: ${u.model || '?'}\nInput: ${u.inputTokens.toLocaleString()}\nOutput: ${u.outputTokens.toLocaleString()}\nCache Read: ${u.cacheReadTokens.toLocaleString()}\nCache Create: ${u.cacheCreateTokens.toLocaleString()}\nAPI Cost: $${u.totalCost.toFixed(2)}`;
 }
@@ -55,7 +55,10 @@ export function startUsagePolling() {
 }
 
 export function stopUsagePolling() {
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
 }
 
 export function onSessionChangeUsage() {

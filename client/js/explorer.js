@@ -16,12 +16,17 @@ let ctxTargetType = ''; // 'file' | 'directory'
 export function initExplorer() {
   // Explorer context menu
   const ctxMenu = document.getElementById('explorer-ctx-menu');
-  document.addEventListener('click', () => { if (ctxMenu) ctxMenu.style.display = 'none'; });
+  document.addEventListener('click', () => {
+    if (ctxMenu) ctxMenu.style.display = 'none';
+  });
 
   document.getElementById('ectx-new-file')?.addEventListener('click', () => {
     const name = prompt('New file name:');
     if (!name || !S.activeSessionId) return;
-    const dir = ctxTargetType === 'directory' ? ctxTargetPath : ctxTargetPath.split('/').slice(0, -1).join('/');
+    const dir =
+      ctxTargetType === 'directory'
+        ? ctxTargetPath
+        : ctxTargetPath.split('/').slice(0, -1).join('/');
     const filePath = dir ? `${dir}/${name}` : name;
     wsSend({ type: 'file_create', sessionId: S.activeSessionId, filePath, isDir: false });
   });
@@ -29,7 +34,10 @@ export function initExplorer() {
   document.getElementById('ectx-new-folder')?.addEventListener('click', () => {
     const name = prompt('New folder name:');
     if (!name || !S.activeSessionId) return;
-    const dir = ctxTargetType === 'directory' ? ctxTargetPath : ctxTargetPath.split('/').slice(0, -1).join('/');
+    const dir =
+      ctxTargetType === 'directory'
+        ? ctxTargetPath
+        : ctxTargetPath.split('/').slice(0, -1).join('/');
     const filePath = dir ? `${dir}/${name}` : name;
     wsSend({ type: 'file_create', sessionId: S.activeSessionId, filePath, isDir: true });
   });
@@ -45,7 +53,7 @@ export function initExplorer() {
 
   document.getElementById('ectx-delete')?.addEventListener('click', async () => {
     const name = ctxTargetPath.split('/').pop();
-    if (!await confirmModal(`Delete "${name}"?`, 'Delete') || !S.activeSessionId) return;
+    if (!(await confirmModal(`Delete "${name}"?`, 'Delete')) || !S.activeSessionId) return;
     wsSend({ type: 'file_delete', sessionId: S.activeSessionId, filePath: ctxTargetPath });
   });
 
@@ -180,13 +188,14 @@ function renderTreeLevel(parent, entries, depth) {
   for (const entry of entries) {
     const item = document.createElement('div');
     item.className = 'explorer-item' + (entry.type === 'directory' ? ' is-dir' : '');
-    item.style.paddingLeft = (12 + depth * 16) + 'px';
+    item.style.paddingLeft = 12 + depth * 16 + 'px';
     item.dataset.path = entry.path;
 
     if (entry.type === 'directory') {
       const isExpanded = expandedDirs.has(entry.path);
       const dirHasChanges = hasDirChanges(entry.path);
-      item.innerHTML = `<span class="explorer-arrow">${isExpanded ? '▾' : '▸'}</span>` +
+      item.innerHTML =
+        `<span class="explorer-arrow">${isExpanded ? '▾' : '▸'}</span>` +
         `<span class="explorer-icon">📁</span>` +
         `<span class="explorer-name">${escHtml(entry.name)}</span>` +
         (dirHasChanges ? `<span class="explorer-git-dot"></span>` : '');
@@ -207,8 +216,11 @@ function renderTreeLevel(parent, entries, depth) {
     } else {
       const icon = getFileIcon(entry.name);
       const status = gitStatusMap[entry.path];
-      const statusBadge = status ? `<span class="explorer-git-badge explorer-git-${getGitClass(status)}">${getGitLabel(status)}</span>` : '';
-      item.innerHTML = `<span class="explorer-arrow" style="visibility:hidden">▸</span>` +
+      const statusBadge = status
+        ? `<span class="explorer-git-badge explorer-git-${getGitClass(status)}">${getGitLabel(status)}</span>`
+        : '';
+      item.innerHTML =
+        `<span class="explorer-arrow" style="visibility:hidden">▸</span>` +
         `<span class="explorer-icon">${icon}</span>` +
         `<span class="explorer-name${status ? ' explorer-git-' + getGitClass(status) + '-name' : ''}">${escHtml(entry.name)}</span>` +
         statusBadge;
@@ -225,29 +237,52 @@ function renderTreeLevel(parent, entries, depth) {
 function getFileIcon(name) {
   const ext = name.split('.').pop()?.toLowerCase();
   const iconMap = {
-    js: '📜', ts: '📘', jsx: '⚛', tsx: '⚛',
-    json: '{}', md: '📝', css: '🎨', html: '🌐',
-    py: '🐍', rs: '🦀', go: '🐹', rb: '💎',
-    sh: '$_', yml: '⚙', yaml: '⚙', toml: '⚙',
-    png: '🖼', jpg: '🖼', gif: '🖼', svg: '🖼', webp: '🖼',
+    js: '📜',
+    ts: '📘',
+    jsx: '⚛',
+    tsx: '⚛',
+    json: '{}',
+    md: '📝',
+    css: '🎨',
+    html: '🌐',
+    py: '🐍',
+    rs: '🦀',
+    go: '🐹',
+    rb: '💎',
+    sh: '$_',
+    yml: '⚙',
+    yaml: '⚙',
+    toml: '⚙',
+    png: '🖼',
+    jpg: '🖼',
+    gif: '🖼',
+    svg: '🖼',
+    webp: '🖼',
     lock: '🔒',
   };
   return iconMap[ext] || '📄';
 }
 
 function getGitClass(status) {
-  const map = { 'M': 'modified', 'A': 'added', 'D': 'deleted', 'R': 'renamed', 'U': 'untracked', '?': 'untracked' };
+  const map = {
+    M: 'modified',
+    A: 'added',
+    D: 'deleted',
+    R: 'renamed',
+    U: 'untracked',
+    '?': 'untracked',
+  };
   return map[status] || 'modified';
 }
 
 function getGitLabel(status) {
-  const map = { 'M': 'M', 'A': 'A', 'D': 'D', 'R': 'R', 'U': 'U', '?': 'U' };
+  const map = { M: 'M', A: 'A', D: 'D', R: 'R', U: 'U', '?': 'U' };
   return map[status] || status;
 }
 
 function hasDirChanges(dirPath) {
   const prefix = dirPath + '/';
-  return Object.keys(gitStatusMap).some(p => p === dirPath || p.startsWith(prefix));
+  return Object.keys(gitStatusMap).some((p) => p === dirPath || p.startsWith(prefix));
 }
 
 export function handleFileOpAck(msg) {
@@ -255,7 +290,7 @@ export function handleFileOpAck(msg) {
     requestFileTree();
     if (msg.op === 'delete') {
       // Also refresh source control after file delete
-      import('./source-control.js').then(m => m.requestGitStatus());
+      import('./source-control.js').then((m) => m.requestGitStatus());
     }
     showToast(`File ${msg.op} successful`, 'success');
   } else {

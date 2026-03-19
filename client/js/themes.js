@@ -16,14 +16,16 @@ export function applyTheme(t) {
       root.style.setProperty(prop, val);
     }
   }
-  terminalMap.forEach(({ term }) => { term.options.theme = t.term; });
+  terminalMap.forEach(({ term }) => {
+    term.options.theme = t.term;
+  });
   updateSwatches();
 }
 
 export function initThemeSwatches() {
   const swatchContainer = document.getElementById('theme-swatches');
   if (!swatchContainer) return;
-  THEMES.forEach(t => {
+  THEMES.forEach((t) => {
     const sw = document.createElement('div');
     sw.className = 'theme-swatch' + (t.id === 'cyber' ? ' active' : '');
     sw.title = t.label;
@@ -31,7 +33,7 @@ export function initThemeSwatches() {
     sw.addEventListener('click', () => {
       if (S.pendingSettings) {
         S.pendingSettings.appearance.theme = t.id;
-        document.querySelectorAll('.theme-grid .theme-card').forEach(el => {
+        document.querySelectorAll('.theme-grid .theme-card').forEach((el) => {
           el.classList.toggle('active', el.dataset.themeId === t.id);
         });
       }

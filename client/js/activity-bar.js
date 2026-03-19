@@ -5,20 +5,22 @@ import { requestGitStatus } from './source-control.js';
 const ICON_ORDER_KEY = 'super-terminal-activity-order';
 
 let activePanel = 'search';
-const splits = [];          // [{ id, primary, secondary, ratio, btnEl }]
-let activeSplitId = null;  // currently shown split's id (null = single panel view)
+const splits = []; // [{ id, primary, secondary, ratio, btnEl }]
+let activeSplitId = null; // currently shown split's id (null = single panel view)
 let splitIdCounter = 0;
 let dragSrcBtn = null;
 
 /** Find which split (if any) contains a given panel */
 function findSplitByPanel(panel) {
-  return splits.find(s => s.primary === panel || s.secondary === panel);
+  return splits.find((s) => s.primary === panel || s.secondary === panel);
 }
 
 function saveIconOrder() {
   const bar = document.getElementById('activity-bar');
-  const order = [...bar.querySelectorAll('.activity-btn[data-panel]')].map(b => b.dataset.panel);
-  try { localStorage.setItem(ICON_ORDER_KEY, JSON.stringify(order)); } catch {}
+  const order = [...bar.querySelectorAll('.activity-btn[data-panel]')].map((b) => b.dataset.panel);
+  try {
+    localStorage.setItem(ICON_ORDER_KEY, JSON.stringify(order));
+  } catch {}
 }
 
 function restoreIconOrder() {
@@ -27,13 +29,15 @@ function restoreIconOrder() {
     if (!Array.isArray(saved) || saved.length === 0) return;
     const bar = document.getElementById('activity-bar');
     const btnMap = {};
-    bar.querySelectorAll('.activity-btn[data-panel]').forEach(b => { btnMap[b.dataset.panel] = b; });
+    bar.querySelectorAll('.activity-btn[data-panel]').forEach((b) => {
+      btnMap[b.dataset.panel] = b;
+    });
     // Reorder: append in saved order, skip unknown
     for (const panel of saved) {
       if (btnMap[panel]) bar.appendChild(btnMap[panel]);
     }
     // Append any remaining buttons not in saved order
-    Object.keys(btnMap).forEach(p => {
+    Object.keys(btnMap).forEach((p) => {
       if (!saved.includes(p)) bar.appendChild(btnMap[p]);
     });
   } catch {}
@@ -48,24 +52,24 @@ export function initActivityBar() {
     const firstPanel = firstBtn.dataset.panel;
     activePanel = firstPanel;
     // Update active states
-    document.querySelectorAll('.activity-btn').forEach(b => {
+    document.querySelectorAll('.activity-btn').forEach((b) => {
       b.classList.toggle('active', b.dataset.panel === firstPanel);
     });
-    document.querySelectorAll('.sidebar-panel').forEach(p => {
+    document.querySelectorAll('.sidebar-panel').forEach((p) => {
       p.classList.toggle('active', p.id === `panel-${firstPanel}`);
     });
     triggerPanelLoad(firstPanel);
   }
 
   const buttons = document.querySelectorAll('.activity-btn');
-  buttons.forEach(btn => {
+  buttons.forEach((btn) => {
     btn.addEventListener('click', () => {
       const panel = btn.dataset.panel;
 
       // Split button click
       const splitId = btn.dataset.splitId;
       if (splitId) {
-        const split = splits.find(s => s.id === splitId);
+        const split = splits.find((s) => s.id === splitId);
         if (!split) return;
         if (activeSplitId === splitId) {
           toggleSidebar();
@@ -100,7 +104,9 @@ export function initActivityBar() {
     btn.addEventListener('dragend', () => {
       btn.classList.remove('dragging');
       dragSrcBtn = null;
-      document.querySelectorAll('.activity-btn').forEach(b => b.classList.remove('drag-over-top', 'drag-over-bottom'));
+      document
+        .querySelectorAll('.activity-btn')
+        .forEach((b) => b.classList.remove('drag-over-top', 'drag-over-bottom'));
       clearSidebarDropZones();
     });
 
@@ -167,7 +173,7 @@ export function initActivityBar() {
     // Case 1: Header drag → swap within active split
     const headerPanel = e.dataTransfer.getData('text/sidebar-panel');
     if (headerPanel && activeSplitId) {
-      const split = splits.find(s => s.id === activeSplitId);
+      const split = splits.find((s) => s.id === activeSplitId);
       if (!split) return;
       const draggedIsPrimary = headerPanel === split.primary;
       if ((draggedIsPrimary && !isTop) || (!draggedIsPrimary && isTop)) {
@@ -222,8 +228,11 @@ export function initActivityBar() {
     if (e.dataTransfer.dropEffect !== 'none') return;
     if (!activeSplitId) return;
     const sidebarRect = sidebar.getBoundingClientRect();
-    const droppedOutside = e.clientX < sidebarRect.left || e.clientX > sidebarRect.right ||
-                           e.clientY < sidebarRect.top || e.clientY > sidebarRect.bottom;
+    const droppedOutside =
+      e.clientX < sidebarRect.left ||
+      e.clientX > sidebarRect.right ||
+      e.clientY < sidebarRect.top ||
+      e.clientY > sidebarRect.bottom;
     if (droppedOutside) {
       destroySplit(activeSplitId);
     }
@@ -235,7 +244,7 @@ export function initActivityBar() {
 // ─── Split Management ───
 
 function createSplit(primary, secondary) {
-  const id = 'split-' + (++splitIdCounter);
+  const id = 'split-' + ++splitIdCounter;
   const split = { id, primary, secondary, ratio: 0.5, btnEl: null };
   splits.push(split);
 
@@ -247,7 +256,7 @@ function createSplit(primary, secondary) {
 }
 
 function showSplitView(splitId) {
-  const split = splits.find(s => s.id === splitId);
+  const split = splits.find((s) => s.id === splitId);
   if (!split) return;
 
   // Hide any currently shown split first
@@ -261,7 +270,7 @@ function showSplitView(splitId) {
   activePanel = split.primary;
 
   // Update activity bar: this split's button active, all others not
-  document.querySelectorAll('.activity-btn').forEach(btn => {
+  document.querySelectorAll('.activity-btn').forEach((btn) => {
     if (btn.dataset.splitId === splitId) {
       btn.classList.add('active');
     } else {
@@ -270,7 +279,7 @@ function showSplitView(splitId) {
   });
 
   // Show both panels in split layout
-  document.querySelectorAll('.sidebar-panel').forEach(p => {
+  document.querySelectorAll('.sidebar-panel').forEach((p) => {
     const id = p.id.replace('panel-', '');
     if (id === split.primary) {
       p.classList.add('active');
@@ -305,7 +314,7 @@ function showSplitView(splitId) {
 function hideSplitView() {
   if (!activeSplitId) return;
   const sidebar = document.getElementById('sidebar');
-  const split = splits.find(s => s.id === activeSplitId);
+  const split = splits.find((s) => s.id === activeSplitId);
 
   // Save current ratio
   if (split) {
@@ -314,13 +323,13 @@ function hideSplitView() {
   }
 
   // Clean up split DOM
-  sidebar.querySelectorAll('.sidebar-header[draggable]').forEach(h => {
+  sidebar.querySelectorAll('.sidebar-header[draggable]').forEach((h) => {
     h.removeAttribute('draggable');
   });
   sidebar.classList.remove('sidebar-split');
   sidebar.style.removeProperty('--sidebar-split-ratio');
 
-  document.querySelectorAll('.sidebar-panel').forEach(p => {
+  document.querySelectorAll('.sidebar-panel').forEach((p) => {
     p.classList.remove('sidebar-panel-secondary', 'active');
   });
 
@@ -337,7 +346,7 @@ function hideSplitView() {
 }
 
 function destroySplit(splitId) {
-  const idx = splits.findIndex(s => s.id === splitId);
+  const idx = splits.findIndex((s) => s.id === splitId);
   if (idx === -1) return;
   const split = splits[idx];
 
@@ -370,7 +379,7 @@ export function closeSidebarSplit() {
 }
 
 function swapActiveSplit() {
-  const split = splits.find(s => s.id === activeSplitId);
+  const split = splits.find((s) => s.id === activeSplitId);
   if (!split) return;
   const temp = split.primary;
   split.primary = split.secondary;
@@ -378,7 +387,7 @@ function swapActiveSplit() {
   activePanel = split.primary;
 
   if (activeSplitId) {
-    document.querySelectorAll('.sidebar-panel').forEach(p => {
+    document.querySelectorAll('.sidebar-panel').forEach((p) => {
       const id = p.id.replace('panel-', '');
       if (id === split.primary) {
         p.classList.add('active');
@@ -487,14 +496,15 @@ function ensureSplitCloseBtn(splitId) {
 
 function setupSplitHeaderDrag() {
   const sidebar = document.getElementById('sidebar');
-  sidebar.querySelectorAll('.sidebar-panel.active .sidebar-header').forEach(header => {
+  sidebar.querySelectorAll('.sidebar-panel.active .sidebar-header').forEach((header) => {
     header.setAttribute('draggable', 'true');
   });
 }
 
 function initSidebarSplitResize() {
   const sidebar = document.getElementById('sidebar');
-  let startY = 0, startRatio = 0.5;
+  let startY = 0,
+    startRatio = 0.5;
 
   sidebar.addEventListener('mousedown', (e) => {
     if (!e.target.classList.contains('sidebar-split-resize')) return;
@@ -546,7 +556,7 @@ export function switchPanel(panel) {
   activePanel = panel;
 
   // Update active button
-  document.querySelectorAll('.activity-btn').forEach(btn => {
+  document.querySelectorAll('.activity-btn').forEach((btn) => {
     if (btn.dataset.splitId) {
       btn.classList.remove('active');
     } else {
@@ -555,7 +565,7 @@ export function switchPanel(panel) {
   });
 
   // Update visible panel
-  document.querySelectorAll('.sidebar-panel').forEach(p => {
+  document.querySelectorAll('.sidebar-panel').forEach((p) => {
     p.classList.toggle('active', p.id === `panel-${panel}`);
   });
 
@@ -576,12 +586,14 @@ export { toggleSidebar as toggleSidebarExport };
 export function initSidebarResize() {
   const handle = document.getElementById('sidebar-resize');
   if (!handle) return;
-  let startX = 0, startW = 0;
+  let startX = 0,
+    startW = 0;
 
   handle.addEventListener('mousedown', (e) => {
     e.preventDefault();
     startX = e.clientX;
-    startW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w')) || 240;
+    startW =
+      parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w')) || 240;
     handle.classList.add('dragging');
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
@@ -609,9 +621,12 @@ export function setActivityBadge(panel, count, opts) {
   if (!btn) return;
 
   // Remove existing badges
-  btn.querySelectorAll('.activity-badge, .activity-badge-group').forEach(el => el.remove());
+  btn.querySelectorAll('.activity-badge, .activity-badge-group').forEach((el) => el.remove());
 
-  const total = (opts && opts.mainCount !== null && opts.mainCount !== undefined) ? count + opts.mainCount : count;
+  const total =
+    opts && opts.mainCount !== null && opts.mainCount !== undefined
+      ? count + opts.mainCount
+      : count;
   if (total <= 0) return;
 
   // Dual badge: worktree + main branch

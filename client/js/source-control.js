@@ -21,8 +21,8 @@ let worktreeCollapsed = true; // worktree section collapsed by default
 
 // ─── Multi-select state ──────────────────────────────
 const selectedItems = new Set(); // Set of "staged:path" or "unstaged:path"
-let lastClickedKey = null;     // for shift-click range select
-let allFileKeys = [];          // ordered list of keys for range select
+let lastClickedKey = null; // for shift-click range select
+let allFileKeys = []; // ordered list of keys for range select
 let dragSelecting = false;
 let dragStartY = 0;
 let dragCurrentY = 0;
@@ -63,9 +63,13 @@ export function initSourceControl() {
   };
 
   if (commitBtn) commitBtn.addEventListener('click', () => doCommit(false));
-  if (commitInput) commitInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); doCommit(false); }
-  });
+  if (commitInput)
+    commitInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        doCommit(false);
+      }
+    });
 
   // Generate commit message
   const generateBtn = document.getElementById('sc-generate-btn');
@@ -129,7 +133,10 @@ export function initSourceControl() {
       if (!value) return;
       // Sanitize: only allow alphanumeric, hyphens, underscores, dots
       const safeName = value.replace(/[^a-zA-Z0-9._-]/g, '-');
-      if (!safeName) { showToast('Invalid branch/worktree name', 'error'); return; }
+      if (!safeName) {
+        showToast('Invalid branch/worktree name', 'error');
+        return;
+      }
       const isNewBranch = newBranchCb?.checked || false;
       const path = `.claude/worktrees/${safeName}`;
       wsSend({
@@ -137,7 +144,7 @@ export function initSourceControl() {
         sessionId: S.activeSessionId,
         path,
         branch: isNewBranch ? safeName : value,
-        createBranch: isNewBranch
+        createBranch: isNewBranch,
       });
       pathInput.value = '';
       if (newBranchCb) newBranchCb.checked = false;
@@ -148,8 +155,13 @@ export function initSourceControl() {
   const wtPathInput = document.getElementById('sc-worktree-path');
   if (wtPathInput) {
     wtPathInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); wtCreateBtn?.click(); }
-      if (e.key === 'Escape') { document.getElementById('sc-worktree-add-form').style.display = 'none'; }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        wtCreateBtn?.click();
+      }
+      if (e.key === 'Escape') {
+        document.getElementById('sc-worktree-add-form').style.display = 'none';
+      }
     });
   }
 
@@ -168,7 +180,9 @@ export function handleGitCommitAck(msg) {
   } else {
     showToast('Commit failed: ' + (msg.error || 'unknown error'), 'error', 5000);
     if (commitInput) commitInput.style.borderColor = 'var(--danger)';
-    setTimeout(() => { if (commitInput) commitInput.style.borderColor = ''; }, 2000);
+    setTimeout(() => {
+      if (commitInput) commitInput.style.borderColor = '';
+    }, 2000);
   }
 }
 
@@ -183,7 +197,10 @@ export function handleGitPushAck(msg) {
 export function handleGitGenerateMessage(msg) {
   const commitInput = document.getElementById('sc-commit-input');
   const generateBtn = document.getElementById('sc-generate-btn');
-  if (generateBtn) { generateBtn.textContent = 'Generate ✦'; generateBtn.disabled = false; }
+  if (generateBtn) {
+    generateBtn.textContent = 'Generate ✦';
+    generateBtn.disabled = false;
+  }
   if (commitInput && msg.message) {
     commitInput.value = msg.message;
     commitInput.focus();
@@ -208,9 +225,17 @@ export function handleWorktreeRemoveAck(msg) {
   if (msg.ok) {
     showToast('Worktree removed', 'success');
   } else if (msg.error && msg.error.includes('modified or untracked')) {
-    confirmModal('이 워크트리에 저장되지 않은 변경사항이 있습니다.\n강제로 삭제하시겠습니까?', '강제 삭제').then(yes => {
+    confirmModal(
+      '이 워크트리에 저장되지 않은 변경사항이 있습니다.\n강제로 삭제하시겠습니까?',
+      '강제 삭제'
+    ).then((yes) => {
       if (yes) {
-        wsSend({ type: 'git_worktree_remove', sessionId: S.activeSessionId, path: msg.path, force: true });
+        wsSend({
+          type: 'git_worktree_remove',
+          sessionId: S.activeSessionId,
+          path: msg.path,
+          force: true,
+        });
       }
     });
   } else {
@@ -243,13 +268,18 @@ export function handleGitStatusData(msg) {
     // In worktree session: server provides mainBranchFileCount
     setActivityBadge('source-control', gitStatusFiles.length, {
       isInWorktree: true,
-      mainCount: msg.mainBranchFileCount !== null && msg.mainBranchFileCount !== undefined ? msg.mainBranchFileCount : null,
+      mainCount:
+        msg.mainBranchFileCount !== null && msg.mainBranchFileCount !== undefined
+          ? msg.mainBranchFileCount
+          : null,
     });
   } else {
     // On main branch: split worktree-tracking files from real changes client-side
-    const isWtFile = (f) => f.path && (f.path.startsWith('.claude/worktrees/') || f.path.startsWith('.claude/worktrees\\'));
-    const mainFiles = gitStatusFiles.filter(f => !isWtFile(f));
-    const wtFiles = gitStatusFiles.filter(f => isWtFile(f));
+    const isWtFile = (f) =>
+      f.path &&
+      (f.path.startsWith('.claude/worktrees/') || f.path.startsWith('.claude/worktrees\\'));
+    const mainFiles = gitStatusFiles.filter((f) => !isWtFile(f));
+    const wtFiles = gitStatusFiles.filter((f) => isWtFile(f));
     if (wtFiles.length > 0) {
       setActivityBadge('source-control', wtFiles.length, {
         isInWorktree: true,
@@ -281,8 +311,12 @@ function openDiffOverlay(overlay) {
     document.removeEventListener('keydown', onEsc);
     _diffCloseHandler = null;
   };
-  const onOverlayClick = (e) => { if (e.target === overlay) closeDiff(); };
-  const onEsc = (e) => { if (e.key === 'Escape') closeDiff(); };
+  const onOverlayClick = (e) => {
+    if (e.target === overlay) closeDiff();
+  };
+  const onEsc = (e) => {
+    if (e.key === 'Escape') closeDiff();
+  };
 
   closeBtn.addEventListener('click', closeDiff);
   overlay.addEventListener('click', onOverlayClick);
@@ -301,7 +335,8 @@ export function handleGitDiffData(msg) {
   if (titleFile) titleFile.textContent = msg.filePath || '—';
   if (titleBadge) {
     titleBadge.textContent = msg.staged ? 'STAGED' : 'UNSTAGED';
-    titleBadge.className = 'diff-title-badge ' + (msg.staged ? 'diff-badge-staged' : 'diff-badge-unstaged');
+    titleBadge.className =
+      'diff-title-badge ' + (msg.staged ? 'diff-badge-staged' : 'diff-badge-unstaged');
   }
   if (diffLoading) diffLoading.style.display = 'none';
   if (diffContent) {
@@ -318,29 +353,37 @@ export function handleGitDiffData(msg) {
 
 function renderDiffHtml(diff) {
   const lines = diff.split('\n');
-  let oldLine = 0, newLine = 0;
-  return lines.map(line => {
-    const escaped = escHtml(line);
-    // Parse hunk header for line numbers
-    const hunkMatch = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-    if (hunkMatch) {
-      oldLine = parseInt(hunkMatch[1]);
-      newLine = parseInt(hunkMatch[2]);
-      return `<div class="diff-hunk">${escaped}</div>`;
-    }
-    if (line.startsWith('+') && !line.startsWith('+++')) {
-      const ln = newLine++;
-      return `<div class="diff-add"><span class="diff-ln diff-ln-old"></span><span class="diff-ln">${ln}</span>${escaped}</div>`;
-    } else if (line.startsWith('-') && !line.startsWith('---')) {
-      const ln = oldLine++;
-      return `<div class="diff-del"><span class="diff-ln">${ln}</span><span class="diff-ln diff-ln-new"></span>${escaped}</div>`;
-    } else if (line.startsWith('diff ') || line.startsWith('index ') || line.startsWith('---') || line.startsWith('+++')) {
-      return `<div class="diff-ctx diff-meta">${escaped}</div>`;
-    }
-    const oln = oldLine++;
-    const nln = newLine++;
-    return `<div class="diff-ctx"><span class="diff-ln">${oln}</span><span class="diff-ln">${nln}</span>${escaped}</div>`;
-  }).join('');
+  let oldLine = 0,
+    newLine = 0;
+  return lines
+    .map((line) => {
+      const escaped = escHtml(line);
+      // Parse hunk header for line numbers
+      const hunkMatch = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (hunkMatch) {
+        oldLine = parseInt(hunkMatch[1]);
+        newLine = parseInt(hunkMatch[2]);
+        return `<div class="diff-hunk">${escaped}</div>`;
+      }
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        const ln = newLine++;
+        return `<div class="diff-add"><span class="diff-ln diff-ln-old"></span><span class="diff-ln">${ln}</span>${escaped}</div>`;
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        const ln = oldLine++;
+        return `<div class="diff-del"><span class="diff-ln">${ln}</span><span class="diff-ln diff-ln-new"></span>${escaped}</div>`;
+      } else if (
+        line.startsWith('diff ') ||
+        line.startsWith('index ') ||
+        line.startsWith('---') ||
+        line.startsWith('+++')
+      ) {
+        return `<div class="diff-ctx diff-meta">${escaped}</div>`;
+      }
+      const oln = oldLine++;
+      const nln = newLine++;
+      return `<div class="diff-ctx"><span class="diff-ln">${oln}</span><span class="diff-ln">${nln}</span>${escaped}</div>`;
+    })
+    .join('');
 }
 
 function renderSourceControl() {
@@ -363,36 +406,45 @@ function renderSourceControl() {
   // Update commit input placeholder with branch name
   const commitInput = document.getElementById('sc-commit-input');
   if (commitInput) {
-    commitInput.placeholder = gitBranch ? `Message (Enter to commit on "${gitBranch}")` : 'Message (Enter to commit)';
+    commitInput.placeholder = gitBranch
+      ? `Message (Enter to commit on "${gitBranch}")`
+      : 'Message (Enter to commit)';
   }
 
   if (!isGitRepo) {
     container.innerHTML = '';
-    if (emptyEl) { emptyEl.style.display = ''; emptyEl.textContent = 'Not a git repository'; }
+    if (emptyEl) {
+      emptyEl.style.display = '';
+      emptyEl.textContent = 'Not a git repository';
+    }
     return;
   }
 
   if (gitStatusFiles.length === 0) {
     container.innerHTML = '';
-    if (emptyEl) { emptyEl.style.display = ''; emptyEl.textContent = 'No changes detected'; }
+    if (emptyEl) {
+      emptyEl.style.display = '';
+      emptyEl.textContent = 'No changes detected';
+    }
     return;
   }
 
   if (emptyEl) emptyEl.style.display = 'none';
 
-  const staged = gitStatusFiles.filter(f => f.staged);
-  const allUnstaged = gitStatusFiles.filter(f => !f.staged);
+  const staged = gitStatusFiles.filter((f) => f.staged);
+  const allUnstaged = gitStatusFiles.filter((f) => !f.staged);
 
   // Separate worktree files from regular changes
-  const isWorktreeFile = (f) => f.path.startsWith('.claude/worktrees/') || f.path.startsWith('.claude/worktrees\\');
-  const changes = allUnstaged.filter(f => !isWorktreeFile(f));
-  const worktreeFiles = allUnstaged.filter(f => isWorktreeFile(f));
+  const isWorktreeFile = (f) =>
+    f.path.startsWith('.claude/worktrees/') || f.path.startsWith('.claude/worktrees\\');
+  const changes = allUnstaged.filter((f) => !isWorktreeFile(f));
+  const worktreeFiles = allUnstaged.filter((f) => isWorktreeFile(f));
 
   // Build ordered key list for range select
   allFileKeys = [
-    ...staged.map(f => makeKey(f, true)),
-    ...changes.map(f => makeKey(f, false)),
-    ...worktreeFiles.map(f => makeKey(f, false))
+    ...staged.map((f) => makeKey(f, true)),
+    ...changes.map((f) => makeKey(f, false)),
+    ...worktreeFiles.map((f) => makeKey(f, false)),
   ];
 
   // Clean up selection: remove keys that no longer exist
@@ -572,9 +624,10 @@ function renderTreeView(parent, files, isStaged) {
         // Directory
         const dirItem = document.createElement('div');
         dirItem.className = 'sc-tree-dir';
-        dirItem.style.paddingLeft = (12 + depth * 14) + 'px';
+        dirItem.style.paddingLeft = 12 + depth * 14 + 'px';
         const isExpanded = expandedTreeDirs.has(fullPath);
-        dirItem.innerHTML = `<span class="sc-tree-arrow">${isExpanded ? '▾' : '▸'}</span>` +
+        dirItem.innerHTML =
+          `<span class="sc-tree-arrow">${isExpanded ? '▾' : '▸'}</span>` +
           `<span class="sc-tree-dir-name">${escHtml(name)}</span>`;
         dirItem.addEventListener('click', () => {
           if (expandedTreeDirs.has(fullPath)) expandedTreeDirs.delete(fullPath);
@@ -601,15 +654,16 @@ function createFileItem(file, isStaged, treeDepth) {
   const item = document.createElement('div');
   item.className = 'sc-file-item';
   if (treeDepth !== undefined) {
-    item.style.paddingLeft = (12 + treeDepth * 14) + 'px';
+    item.style.paddingLeft = 12 + treeDepth * 14 + 'px';
   }
 
   const statusClass = getStatusClass(file.status);
   const statusLabel = getStatusLabel(file.status);
   const fileName = file.path.split('/').pop();
-  const dirPath = (treeDepth === undefined && file.path.includes('/'))
-    ? file.path.slice(0, file.path.lastIndexOf('/'))
-    : '';
+  const dirPath =
+    treeDepth === undefined && file.path.includes('/')
+      ? file.path.slice(0, file.path.lastIndexOf('/'))
+      : '';
 
   // File info
   const nameSpan = document.createElement('span');
@@ -698,12 +752,20 @@ function createFileItem(file, isStaged, treeDepth) {
 }
 
 function getStatusClass(status) {
-  const map = { 'M': 'sc-modified', 'A': 'sc-added', 'D': 'sc-deleted', 'R': 'sc-renamed', 'C': 'sc-copied', 'U': 'sc-untracked', '?': 'sc-untracked' };
+  const map = {
+    M: 'sc-modified',
+    A: 'sc-added',
+    D: 'sc-deleted',
+    R: 'sc-renamed',
+    C: 'sc-copied',
+    U: 'sc-untracked',
+    '?': 'sc-untracked',
+  };
   return map[status] || 'sc-modified';
 }
 
 function getStatusLabel(status) {
-  const map = { 'M': 'M', 'A': 'A', 'D': 'D', 'R': 'R', 'C': 'C', 'U': 'U', '?': 'U' };
+  const map = { M: 'M', A: 'A', D: 'D', R: 'R', C: 'C', U: 'U', '?': 'U' };
   return map[status] || status;
 }
 
@@ -719,12 +781,12 @@ function makeKey(file, isStaged) {
 function parseKey(key) {
   const staged = key.startsWith('staged:');
   const path = key.replace(/^(staged|unstaged):/, '');
-  const file = gitStatusFiles.find(f => f.path === path && f.staged === staged);
+  const file = gitStatusFiles.find((f) => f.path === path && f.staged === staged);
   return { path, staged, file };
 }
 
 function getSelectedFileInfos() {
-  return [...selectedItems].map(parseKey).filter(x => x.file);
+  return [...selectedItems].map(parseKey).filter((x) => x.file);
 }
 
 function clearSelection() {
@@ -736,7 +798,7 @@ function clearSelection() {
 function updateSelectionVisuals() {
   const container = document.getElementById('sc-file-list');
   if (!container) return;
-  container.querySelectorAll('.sc-file-item').forEach(el => {
+  container.querySelectorAll('.sc-file-item').forEach((el) => {
     const key = el.dataset.fileKey;
     if (key && selectedItems.has(key)) {
       el.classList.add('sc-selected');
@@ -763,7 +825,7 @@ function handleFileItemClick(e, _file, _isStaged, key) {
     // Range select
     const range = getKeysInRange(lastClickedKey, key);
     if (!isMeta) selectedItems.clear();
-    range.forEach(k => selectedItems.add(k));
+    range.forEach((k) => selectedItems.add(k));
   } else if (isMeta) {
     // Toggle individual
     if (selectedItems.has(key)) selectedItems.delete(key);
@@ -810,7 +872,8 @@ function initDragSelect() {
   container.addEventListener('mousedown', (e) => {
     // Only left button, ignore buttons/actions
     if (e.button !== 0) return;
-    if (e.target.closest('.sc-file-action, .sc-action-btn, .sc-section-header, .sc-tree-dir')) return;
+    if (e.target.closest('.sc-file-action, .sc-action-btn, .sc-section-header, .sc-tree-dir'))
+      return;
 
     dragStartedInside = true;
     dragContainer = container;
@@ -844,14 +907,15 @@ function initDragSelect() {
     lasso.style.display = 'block';
     lasso.style.top = top + 'px';
     lasso.style.left = left + 'px';
-    lasso.style.width = (right - left) + 'px';
-    lasso.style.height = (bottom - top) + 'px';
+    lasso.style.width = right - left + 'px';
+    lasso.style.height = bottom - top + 'px';
 
     // Check which items are in the lasso rect
     const items = dragContainer.querySelectorAll('.sc-file-item');
-    items.forEach(el => {
+    items.forEach((el) => {
       const rect = el.getBoundingClientRect();
-      const overlaps = rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right;
+      const overlaps =
+        rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right;
       const key = el.dataset.fileKey;
       if (!key) return;
       if (overlaps) {
@@ -878,9 +942,11 @@ function showScContextMenu(x, y) {
   if (!menu || !ctxTarget) return;
 
   const sel = getSelectedFileInfos();
-  const hasUnstaged = sel.some(s => !s.staged);
-  const hasStaged = sel.some(s => s.staged);
-  const hasDiscardable = sel.some(s => !s.staged && s.file && s.file.status !== 'U' && s.file.status !== '?');
+  const hasUnstaged = sel.some((s) => !s.staged);
+  const hasStaged = sel.some((s) => s.staged);
+  const hasDiscardable = sel.some(
+    (s) => !s.staged && s.file && s.file.status !== 'U' && s.file.status !== '?'
+  );
   const multiCount = sel.length;
 
   // Show/hide items based on context
@@ -900,7 +966,8 @@ function showScContextMenu(x, y) {
   }
   if (discardItem) {
     discardItem.style.display = hasDiscardable ? '' : 'none';
-    discardItem.textContent = multiCount > 1 ? `↩ Discard Changes (${multiCount})` : '↩ Discard Changes';
+    discardItem.textContent =
+      multiCount > 1 ? `↩ Discard Changes (${multiCount})` : '↩ Discard Changes';
   }
   if (diffItem) {
     diffItem.style.display = multiCount <= 1 ? '' : 'none';
@@ -931,13 +998,21 @@ function initScContextMenu() {
     if (titleFile) titleFile.textContent = ctxTarget.path;
     if (diffContent) diffContent.innerHTML = '';
     if (diffLoading) diffLoading.style.display = '';
-    if (overlay) { overlay.classList.add('open'); openDiffOverlay(overlay); }
-    wsSend({ type: 'git_diff', sessionId: S.activeSessionId, filePath: ctxTarget.path, staged: ctxTarget.staged });
+    if (overlay) {
+      overlay.classList.add('open');
+      openDiffOverlay(overlay);
+    }
+    wsSend({
+      type: 'git_diff',
+      sessionId: S.activeSessionId,
+      filePath: ctxTarget.path,
+      staged: ctxTarget.staged,
+    });
   });
 
   document.getElementById('sctx-stage')?.addEventListener('click', () => {
     if (!S.activeSessionId) return;
-    const sel = getSelectedFileInfos().filter(s => !s.staged);
+    const sel = getSelectedFileInfos().filter((s) => !s.staged);
     if (sel.length === 0 && ctxTarget) {
       wsSend({ type: 'git_stage', sessionId: S.activeSessionId, filePath: ctxTarget.path });
     } else {
@@ -950,7 +1025,7 @@ function initScContextMenu() {
 
   document.getElementById('sctx-unstage')?.addEventListener('click', () => {
     if (!S.activeSessionId) return;
-    const sel = getSelectedFileInfos().filter(s => s.staged);
+    const sel = getSelectedFileInfos().filter((s) => s.staged);
     if (sel.length === 0 && ctxTarget) {
       wsSend({ type: 'git_unstage', sessionId: S.activeSessionId, filePath: ctxTarget.path });
     } else {
@@ -963,7 +1038,9 @@ function initScContextMenu() {
 
   document.getElementById('sctx-discard')?.addEventListener('click', () => {
     if (!S.activeSessionId) return;
-    const sel = getSelectedFileInfos().filter(s => !s.staged && s.file && s.file.status !== 'U' && s.file.status !== '?');
+    const sel = getSelectedFileInfos().filter(
+      (s) => !s.staged && s.file && s.file.status !== 'U' && s.file.status !== '?'
+    );
     if (sel.length === 0 && ctxTarget) {
       wsSend({ type: 'git_discard', sessionId: S.activeSessionId, filePath: ctxTarget.path });
     } else {
@@ -977,12 +1054,13 @@ function initScContextMenu() {
   document.getElementById('sctx-delete')?.addEventListener('click', async () => {
     if (!S.activeSessionId) return;
     const sel = getSelectedFileInfos();
-    const paths = sel.length > 0 ? sel.map(s => s.path) : (ctxTarget ? [ctxTarget.path] : []);
+    const paths = sel.length > 0 ? sel.map((s) => s.path) : ctxTarget ? [ctxTarget.path] : [];
     if (paths.length === 0) return;
-    const msg = paths.length === 1
-      ? `Delete "${paths[0]}"?`
-      : `Delete ${paths.length} files?\n${paths.join('\n')}`;
-    if (!await confirmModal(msg, 'Delete')) return;
+    const msg =
+      paths.length === 1
+        ? `Delete "${paths[0]}"?`
+        : `Delete ${paths.length} files?\n${paths.join('\n')}`;
+    if (!(await confirmModal(msg, 'Delete'))) return;
     for (const p of paths) {
       wsSend({ type: 'file_delete', sessionId: S.activeSessionId, filePath: p });
     }
