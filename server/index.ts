@@ -5,7 +5,10 @@ dotenv.config({ path: '.env.dev' });
 process.on('unhandledRejection', (reason) => {
   const code = (reason as any)?.code;
   if (code === 'PGRST205' || code === 'PGRST116') {
-    console.warn('[supabase] Background query failed (table may not exist yet):', (reason as any)?.message);
+    console.warn(
+      '[supabase] Background query failed (table may not exist yet):',
+      (reason as any)?.message
+    );
     return;
   }
   console.error('[UnhandledRejection]', reason);
@@ -28,12 +31,36 @@ import * as userDb from './supabase';
 import * as bcrypt from 'bcryptjs';
 
 // ─── Extracted modules ───────────────────────────────────────────
-import { DEFAULT_SETTINGS, AppSettings, loadSettings, saveSettings as saveSettingsToStore } from './config';
-import { tmuxAvailable, TMUX_SOCKET, tmuxSessionExists, tmuxCreateSession, tmuxKillSession, tmuxGetCwd, tmuxGetPanePid, tmuxListSessions } from './tmux';
 import {
-  isAuthEnabled, isSetupRequired, isRegistrationAllowed, getAuthMode,
-  verifyToken, getTokenPayload, issueJwt, extractToken, authMiddleware,
-  checkRateLimit, recordAuthFailure, tokenAuthEnabled, BCRYPT_ROUNDS,
+  DEFAULT_SETTINGS,
+  AppSettings,
+  loadSettings,
+  saveSettings as saveSettingsToStore,
+} from './config';
+import {
+  tmuxAvailable,
+  TMUX_SOCKET,
+  tmuxSessionExists,
+  tmuxCreateSession,
+  tmuxKillSession,
+  tmuxGetCwd,
+  tmuxGetPanePid,
+  tmuxListSessions,
+} from './tmux';
+import {
+  isAuthEnabled,
+  isSetupRequired,
+  isRegistrationAllowed,
+  getAuthMode,
+  verifyToken,
+  getTokenPayload,
+  issueJwt,
+  extractToken,
+  authMiddleware,
+  checkRateLimit,
+  recordAuthFailure,
+  tokenAuthEnabled,
+  BCRYPT_ROUNDS,
 } from './auth';
 import { getClaudeUsage, getClaudePrompts } from './claude-service';
 import { runCmdWhenReady, sendWhenAiReady } from './pty-utils';
@@ -52,9 +79,13 @@ const wssData = new WebSocketServer({ noServer: true });
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
   if (url.pathname === '/pty') {
-    wssData.handleUpgrade(req, socket, head, (ws) => { wssData.emit('connection', ws, req); });
+    wssData.handleUpgrade(req, socket, head, (ws) => {
+      wssData.emit('connection', ws, req);
+    });
   } else {
-    wss.handleUpgrade(req, socket, head, (ws) => { wss.emit('connection', ws, req); });
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit('connection', ws, req);
+    });
   }
 });
 
@@ -90,21 +121,36 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'Email and password required' });
   }
   const user = await userDb.getUserByEmail(email);
-  if (!user) { recordAuthFailure(ip); return res.status(401).json({ ok: false, error: 'Invalid credentials' }); }
+  if (!user) {
+    recordAuthFailure(ip);
+    return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+  }
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) { recordAuthFailure(ip); return res.status(401).json({ ok: false, error: 'Invalid credentials' }); }
+  if (!valid) {
+    recordAuthFailure(ip);
+    return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+  }
   const jwtToken = issueJwt(user);
-  res.json({ ok: true, token: jwtToken, user: { id: user.id, email: user.email, name: user.name } });
+  res.json({
+    ok: true,
+    token: jwtToken,
+    user: { id: user.id, email: user.email, name: user.name },
+  });
 });
 
 app.post('/api/auth/register', async (req, res) => {
   const ip = req.ip || 'unknown';
-  if (!checkRateLimit(ip)) return res.status(429).json({ ok: false, error: 'Too many attempts. Try again later.' });
-  if (!isRegistrationAllowed()) return res.status(403).json({ ok: false, error: 'Registration is not allowed' });
+  if (!checkRateLimit(ip))
+    return res.status(429).json({ ok: false, error: 'Too many attempts. Try again later.' });
+  if (!isRegistrationAllowed())
+    return res.status(403).json({ ok: false, error: 'Registration is not allowed' });
   const { email, password, name } = req.body || {};
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ ok: false, error: 'Valid email is required' });
-  if (!password || password.length < 8) return res.status(400).json({ ok: false, error: 'Password must be at least 8 characters' });
-  if (password.length > 128) return res.status(400).json({ ok: false, error: 'Password must be at most 128 characters' });
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return res.status(400).json({ ok: false, error: 'Valid email is required' });
+  if (!password || password.length < 8)
+    return res.status(400).json({ ok: false, error: 'Password must be at least 8 characters' });
+  if (password.length > 128)
+    return res.status(400).json({ ok: false, error: 'Password must be at most 128 characters' });
   try {
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const userId = await userDb.createUser(email, hash, name || '');
@@ -112,7 +158,11 @@ app.post('/api/auth/register', async (req, res) => {
     if (!user) throw new Error('User creation failed');
     const jwtToken = issueJwt(user);
     console.log(`[auth] New user registered: ${email} (id: ${userId})`);
-    res.json({ ok: true, token: jwtToken, user: { id: user.id, email: user.email, name: user.name } });
+    res.json({
+      ok: true,
+      token: jwtToken,
+      user: { id: user.id, email: user.email, name: user.name },
+    });
   } catch (err: any) {
     console.error('[auth] Registration error:', err?.message || err?.code || err);
     recordAuthFailure(ip);
@@ -122,10 +172,24 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.get('/api/auth/check', async (req, res) => {
   const authOn = isAuthEnabled();
-  if (!authOn) return res.json({ ok: true, authEnabled: false, authMode: 'none', registrationAllowed: isRegistrationAllowed(), setupRequired: false });
+  if (!authOn)
+    return res.json({
+      ok: true,
+      authEnabled: false,
+      authMode: 'none',
+      registrationAllowed: isRegistrationAllowed(),
+      setupRequired: false,
+    });
   const token = extractToken(req);
   const valid = token ? verifyToken(token) : false;
-  const result: any = { ok: valid, authEnabled: true, authMode: getAuthMode(), registrationAllowed: isRegistrationAllowed(), setupRequired: isSetupRequired(), tokenAuthEnabled };
+  const result: any = {
+    ok: valid,
+    authEnabled: true,
+    authMode: getAuthMode(),
+    registrationAllowed: isRegistrationAllowed(),
+    setupRequired: isSetupRequired(),
+    tokenAuthEnabled,
+  };
   if (valid && token) {
     const payload = getTokenPayload(token);
     if (payload) {
@@ -136,132 +200,238 @@ app.get('/api/auth/check', async (req, res) => {
   res.json(result);
 });
 
-app.get('/login', (_req, res) => { res.sendFile(path.join(__dirname, '../../client/login.html')); });
+app.get('/login', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../../client/login.html'));
+});
 
 // Settings endpoints
-app.get('/api/settings', (_req, res) => { res.json(currentSettings); });
+app.get('/api/settings', (_req, res) => {
+  res.json(currentSettings);
+});
 app.post('/api/settings', (req, res) => {
   try {
     currentSettings = req.body as AppSettings;
     saveSettings(currentSettings);
     res.json({ ok: true });
-  } catch (e) { res.status(400).json({ ok: false, error: String(e) }); }
+  } catch (e) {
+    res.status(400).json({ ok: false, error: String(e) });
+  }
 });
-app.get('/api/settings/default', (_req, res) => { res.json(DEFAULT_SETTINGS); });
+app.get('/api/settings/default', (_req, res) => {
+  res.json(DEFAULT_SETTINGS);
+});
 
 // ─── PLANS API ───────────────────────────────────────────────────
 app.get('/api/plans', async (req, res) => {
-  const token = extractToken(req); const payload = getTokenPayload(token);
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  try { const plans = await userDb.getPlans(payload.userId); res.json({ ok: true, plans }); }
-  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
+  try {
+    const plans = await userDb.getPlans(payload.userId);
+    res.json({ ok: true, plans });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
 });
 
 app.post('/api/plans', async (req, res) => {
-  const token = extractToken(req); const payload = getTokenPayload(token);
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
   const { id, title, content, category, status } = req.body || {};
   if (!id) return res.status(400).json({ ok: false, error: 'Missing id' });
   try {
-    const plan = await userDb.createPlan(payload.userId, { id, title: title || '', content: content || '', category: category || 'other', status: status || 'todo' });
+    const plan = await userDb.createPlan(payload.userId, {
+      id,
+      title: title || '',
+      content: content || '',
+      category: category || 'other',
+      status: status || 'todo',
+    });
     res.json({ ok: true, plan });
-  } catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
 });
 
 app.put('/api/plans/:id', async (req, res) => {
-  const token = extractToken(req); const payload = getTokenPayload(token);
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
   const { title, content, category, status } = req.body || {};
-  try { const plan = await userDb.updatePlan(payload.userId, req.params.id, { title, content, category, status }); res.json({ ok: true, plan }); }
-  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
+  try {
+    const plan = await userDb.updatePlan(payload.userId, req.params.id, {
+      title,
+      content,
+      category,
+      status,
+    });
+    res.json({ ok: true, plan });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
 });
 
 app.delete('/api/plans/:id', async (req, res) => {
-  const token = extractToken(req); const payload = getTokenPayload(token);
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  try { await userDb.deletePlan(payload.userId, req.params.id); res.json({ ok: true }); }
-  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
+  try {
+    await userDb.deletePlan(payload.userId, req.params.id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
 });
 
 app.patch('/api/plans/:id/status', async (req, res) => {
-  const token = extractToken(req); const payload = getTokenPayload(token);
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
   const { status } = req.body || {};
   const validStatuses = ['todo', 'doing', 'done', 'on_hold', 'cancelled'];
-  if (!status || !validStatuses.includes(status)) return res.status(400).json({ ok: false, error: 'Invalid status' });
-  try { const plan = await userDb.updatePlanStatus(payload.userId, req.params.id, status); res.json({ ok: true, plan }); }
-  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
+  if (!status || !validStatuses.includes(status))
+    return res.status(400).json({ ok: false, error: 'Invalid status' });
+  try {
+    const plan = await userDb.updatePlanStatus(payload.userId, req.params.id, status);
+    res.json({ ok: true, plan });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
 });
 
 app.get('/api/plans/:id/logs', async (req, res) => {
-  const token = extractToken(req); const payload = getTokenPayload(token);
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  try { const logs = await userDb.getPlanLogs(payload.userId, req.params.id); res.json({ ok: true, logs }); }
-  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
+  try {
+    const logs = await userDb.getPlanLogs(payload.userId, req.params.id);
+    res.json({ ok: true, logs });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
 });
 
 app.post('/api/plans/log', async (req, res) => {
-  const token = extractToken(req); const payload = getTokenPayload(token);
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
   const { plan_id, type, content, commit_hash } = req.body || {};
-  if (!type || !['commit', 'summary'].includes(type)) return res.status(400).json({ ok: false, error: 'Invalid type' });
+  if (!type || !['commit', 'summary'].includes(type))
+    return res.status(400).json({ ok: false, error: 'Invalid type' });
   try {
-    const result = await userDb.appendPlanLog(payload.userId, { plan_id, type, content: content || '', commit_hash });
+    const result = await userDb.appendPlanLog(payload.userId, {
+      plan_id,
+      type,
+      content: content || '',
+      commit_hash,
+    });
     if (type === 'summary' && result.plan) {
-      const msg = JSON.stringify({ type: 'plan_ai_done', planId: result.plan.id, planTitle: result.plan.title, planStatus: result.plan.status });
-      wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg); });
+      const msg = JSON.stringify({
+        type: 'plan_ai_done',
+        planId: result.plan.id,
+        planTitle: result.plan.title,
+        planStatus: result.plan.status,
+      });
+      wss.clients.forEach((c) => {
+        if (c.readyState === WebSocket.OPEN) c.send(msg);
+      });
     }
     res.json({ ok: true, plan: result.plan, log: result.log });
-  } catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
 });
 
 // ─── PLAN IMAGES (Supabase Storage) ──────────────────────────────
-app.post('/api/plans/:id/images', express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], limit: '10mb' }), async (req, res) => {
-  const token = extractToken(req); const payload = getTokenPayload(token);
-  if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  const planId = req.params.id;
-  const filename = (req.query.filename as string) || `img-${Date.now()}.png`;
-  try { const result = await userDb.uploadPlanImage(payload.userId, planId, filename, req.body, req.headers['content-type'] || 'image/png'); res.json({ ok: true, ...result }); }
-  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
-});
+app.post(
+  '/api/plans/:id/images',
+  express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], limit: '10mb' }),
+  async (req, res) => {
+    const token = extractToken(req);
+    const payload = getTokenPayload(token);
+    if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    const planId = req.params.id;
+    const filename = (req.query.filename as string) || `img-${Date.now()}.png`;
+    try {
+      const result = await userDb.uploadPlanImage(
+        payload.userId,
+        planId,
+        filename,
+        req.body,
+        req.headers['content-type'] || 'image/png'
+      );
+      res.json({ ok: true, ...result });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String(e) });
+    }
+  }
+);
 
 app.get('/api/plans/:id/images', async (req, res) => {
-  const token = extractToken(req); const payload = getTokenPayload(token);
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  try { const images = await userDb.listPlanImages(payload.userId, req.params.id); res.json({ ok: true, images }); }
-  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
+  try {
+    const images = await userDb.listPlanImages(payload.userId, req.params.id);
+    res.json({ ok: true, images });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
 });
 
 app.delete('/api/plans/:id/images/:filename', async (req, res) => {
-  const token = extractToken(req); const payload = getTokenPayload(token);
+  const token = extractToken(req);
+  const payload = getTokenPayload(token);
   if (!payload) return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  try { await userDb.deletePlanImage(payload.userId, req.params.id, req.params.filename); res.json({ ok: true }); }
-  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
+  try {
+    await userDb.deletePlanImage(payload.userId, req.params.id, req.params.filename);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
 });
 
 // ─── IMAGE UPLOAD ────────────────────────────────────────────────
-app.post('/api/upload-image', express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], limit: '20mb' }), (req, res) => {
-  const sessionId = req.query.sessionId as string;
-  const originalName = req.query.filename as string;
-  if (!sessionId || !originalName) return res.status(400).json({ ok: false, error: 'Missing sessionId or filename' });
-  const session = sessions.get(sessionId);
-  if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
-  const targetDir = (session.cwd && fs.existsSync(session.cwd)) ? session.cwd : (currentSettings.shell.startDirectory || process.env.HOME || '/tmp');
-  const ext = path.extname(originalName).toLowerCase() || '.png';
-  const allowedExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
-  if (!allowedExts.includes(ext)) return res.status(400).json({ ok: false, error: 'Unsupported image format' });
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 23);
-  const safeName = `pasted-image-${timestamp}${ext}`;
-  const fullPath = path.join(targetDir, safeName);
-  try { fs.writeFileSync(fullPath, req.body); res.json({ ok: true, filename: safeName, fullPath }); }
-  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
-});
+app.post(
+  '/api/upload-image',
+  express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], limit: '20mb' }),
+  (req, res) => {
+    const sessionId = req.query.sessionId as string;
+    const originalName = req.query.filename as string;
+    if (!sessionId || !originalName)
+      return res.status(400).json({ ok: false, error: 'Missing sessionId or filename' });
+    const session = sessions.get(sessionId);
+    if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
+    const targetDir =
+      session.cwd && fs.existsSync(session.cwd)
+        ? session.cwd
+        : currentSettings.shell.startDirectory || process.env.HOME || '/tmp';
+    const ext = path.extname(originalName).toLowerCase() || '.png';
+    const allowedExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+    if (!allowedExts.includes(ext))
+      return res.status(400).json({ ok: false, error: 'Unsupported image format' });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 23);
+    const safeName = `pasted-image-${timestamp}${ext}`;
+    const fullPath = path.join(targetDir, safeName);
+    try {
+      fs.writeFileSync(fullPath, req.body);
+      res.json({ ok: true, filename: safeName, fullPath });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String(e) });
+    }
+  }
+);
 
 app.post('/api/delete-image', (req, res) => {
   const filePath = req.body?.filePath as string;
   if (!filePath || !filePath.includes('pasted-image-')) return res.status(400).json({ ok: false });
-  try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); res.json({ ok: true }); }
-  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
 });
 
 // ─── FILE OPERATIONS ─────────────────────────────────────────────
@@ -285,31 +455,47 @@ app.get('/api/download', (req, res) => {
   if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
   const cwd = session.cwd || process.env.HOME || '/tmp';
   const fullPath = path.resolve(cwd, filePath);
-  if (!fullPath.startsWith(path.resolve(cwd))) return res.status(403).json({ ok: false, error: 'Access denied' });
+  if (!fullPath.startsWith(path.resolve(cwd)))
+    return res.status(403).json({ ok: false, error: 'Access denied' });
   if (!fs.existsSync(fullPath)) return res.status(404).json({ ok: false, error: 'File not found' });
   const stat = fs.statSync(fullPath);
-  if (stat.isDirectory()) return res.status(400).json({ ok: false, error: 'Cannot download directory' });
-  if (stat.size > 50 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'File too large (>50MB)' });
+  if (stat.isDirectory())
+    return res.status(400).json({ ok: false, error: 'Cannot download directory' });
+  if (stat.size > 50 * 1024 * 1024)
+    return res.status(413).json({ ok: false, error: 'File too large (>50MB)' });
   res.download(fullPath);
 });
 
-app.post('/api/upload', express.raw({ type: 'application/octet-stream', limit: '50mb' }), (req, res) => {
-  const sessionId = req.query.sessionId as string;
-  const fileName = req.query.filename as string;
-  const targetDir = req.query.dir as string | undefined;
-  if (!sessionId || !fileName) return res.status(400).json({ ok: false, error: 'Missing params' });
-  const session = sessions.get(sessionId);
-  if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
-  const cwd = session.cwd || process.env.HOME || '/tmp';
-  const dir = targetDir ? path.resolve(cwd, targetDir) : cwd;
-  if (!dir.startsWith(path.resolve(cwd))) return res.status(403).json({ ok: false, error: 'Access denied' });
-  const safeName = path.basename(fileName);
-  const fullPath = path.join(dir, safeName);
-  try { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(fullPath, req.body); res.json({ ok: true, filename: safeName, fullPath }); }
-  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
-});
+app.post(
+  '/api/upload',
+  express.raw({ type: 'application/octet-stream', limit: '50mb' }),
+  (req, res) => {
+    const sessionId = req.query.sessionId as string;
+    const fileName = req.query.filename as string;
+    const targetDir = req.query.dir as string | undefined;
+    if (!sessionId || !fileName)
+      return res.status(400).json({ ok: false, error: 'Missing params' });
+    const session = sessions.get(sessionId);
+    if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
+    const cwd = session.cwd || process.env.HOME || '/tmp';
+    const dir = targetDir ? path.resolve(cwd, targetDir) : cwd;
+    if (!dir.startsWith(path.resolve(cwd)))
+      return res.status(403).json({ ok: false, error: 'Access denied' });
+    const safeName = path.basename(fileName);
+    const fullPath = path.join(dir, safeName);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(fullPath, req.body);
+      res.json({ ok: true, filename: safeName, fullPath });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String(e) });
+    }
+  }
+);
 
-app.get('/', (_req, res) => { res.sendFile(path.join(__dirname, '../../client/index.html')); });
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../../client/index.html'));
+});
 
 // ─── SESSION MANAGEMENT ──────────────────────────────────────────
 const SCROLLBACK_LIMIT = 128 * 1024;
@@ -336,16 +522,27 @@ const wsSession = new Map<WebSocket, string>();
 const wsSubscriptions = new Map<WebSocket, Set<string>>();
 const dataWsMap = new Map<string, Set<WebSocket>>();
 
-function createSession(id: string, name: string, restoreCwd?: string, restoreCmd?: string, extraEnv?: Record<string, string>): Session {
+function createSession(
+  id: string,
+  name: string,
+  restoreCwd?: string,
+  restoreCmd?: string,
+  extraEnv?: Record<string, string>
+): Session {
   const s = currentSettings.shell;
-  const shellPath = s.shellPath || (os.platform() === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash'));
+  const shellPath =
+    s.shellPath || (os.platform() === 'win32' ? 'powershell.exe' : process.env.SHELL || 'bash');
   const mergedEnv = {
     ...(process.env as Record<string, string>),
     ...s.env,
     ...(extraEnv || {}),
-    LANG: (process.env.LANG && process.env.LANG.includes('UTF')) ? process.env.LANG : 'en_US.UTF-8',
-    LC_ALL: (process.env.LC_ALL && process.env.LC_ALL.includes('UTF')) ? process.env.LC_ALL : 'en_US.UTF-8',
-    LC_CTYPE: (process.env.LC_CTYPE && process.env.LC_CTYPE.includes('UTF')) ? process.env.LC_CTYPE : 'en_US.UTF-8',
+    LANG: process.env.LANG && process.env.LANG.includes('UTF') ? process.env.LANG : 'en_US.UTF-8',
+    LC_ALL:
+      process.env.LC_ALL && process.env.LC_ALL.includes('UTF') ? process.env.LC_ALL : 'en_US.UTF-8',
+    LC_CTYPE:
+      process.env.LC_CTYPE && process.env.LC_CTYPE.includes('UTF')
+        ? process.env.LC_CTYPE
+        : 'en_US.UTF-8',
     TERM: 'xterm-256color',
   };
   const cwd0 = restoreCwd || s.startDirectory || process.env.HOME || '/';
@@ -361,19 +558,34 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
       console.log(`[tmux] Reattaching to existing session: ${tmuxName}`);
     }
     ptyProcess = pty.spawn('tmux', ['-S', TMUX_SOCKET, 'attach-session', '-t', tmuxName], {
-      name: 'xterm-256color', cols: 80, rows: 24,
-      cwd: fs.existsSync(cwd0) ? cwd0 : (process.env.HOME || '/'),
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: fs.existsSync(cwd0) ? cwd0 : process.env.HOME || '/',
       env: mergedEnv,
     });
   } else {
     ptyProcess = pty.spawn(shellPath, ['-i'], {
-      name: 'xterm-256color', cols: 80, rows: 24,
-      cwd: fs.existsSync(cwd0) ? cwd0 : (process.env.HOME || '/'),
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: fs.existsSync(cwd0) ? cwd0 : process.env.HOME || '/',
       env: mergedEnv,
     });
   }
 
-  const session: Session = { id, name, pty: ptyProcess, createdAt: Date.now(), cwd: cwd0, ai: null, aiPid: null, cmd: restoreCmd, scrollback: '', tmuxName: useTmux ? tmuxName : undefined };
+  const session: Session = {
+    id,
+    name,
+    pty: ptyProcess,
+    createdAt: Date.now(),
+    cwd: cwd0,
+    ai: null,
+    aiPid: null,
+    cmd: restoreCmd,
+    scrollback: '',
+    tmuxName: useTmux ? tmuxName : undefined,
+  };
   sessions.set(id, session);
 
   // PTY output batching
@@ -392,7 +604,7 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     outputBuf = '';
     const clients = dataWsMap.get(id);
     if (!clients || clients.size === 0) return;
-    clients.forEach(ws => {
+    clients.forEach((ws) => {
       if (ws.readyState !== WebSocket.OPEN) return;
       if ((ws as any).bufferedAmount > 1024 * 1024) return;
       ws.send(data);
@@ -406,7 +618,10 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     if (!filtered) return;
     outputBuf += filtered;
     if (outputBuf.length > 64 * 1024) {
-      if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+      if (flushTimer) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+      }
       flushOutput();
       return;
     }
@@ -416,12 +631,20 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
   ptyProcess.onExit(({ exitCode }) => {
     console.log(`[session] ${id} exited: ${exitCode}`);
     if (session.cwdTimer) clearInterval(session.cwdTimer);
-    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    if (flushTimer) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
     ptyDataSub.dispose();
     const dataClients = dataWsMap.get(id);
-    if (dataClients) { dataClients.forEach(ws => ws.close(1000, 'Session ended')); dataWsMap.delete(id); }
+    if (dataClients) {
+      dataClients.forEach((ws) => ws.close(1000, 'Session ended'));
+      dataWsMap.delete(id);
+    }
     if (session.tmuxName && tmuxSessionExists(session.tmuxName)) {
-      console.log(`[tmux] PTY detached but tmux session '${session.tmuxName}' still alive — keeping`);
+      console.log(
+        `[tmux] PTY detached but tmux session '${session.tmuxName}' still alive — keeping`
+      );
       return;
     }
     sessions.delete(id);
@@ -438,71 +661,103 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
     const now = Date.now();
     if (now - lastPollTime < interval) return;
     lastPollTime = now;
-    void (async () => { try {
-      let newCwd = cwd0;
-      let shellPid = ptyProcess.pid;
-      if (session.tmuxName) {
-        const tmuxCwd = tmuxGetCwd(session.tmuxName);
-        if (tmuxCwd) newCwd = tmuxCwd;
-        const panePid = tmuxGetPanePid(session.tmuxName);
-        if (panePid) shellPid = panePid;
-      } else {
-        try {
-          const { stdout } = await execFileAsync('lsof', ['-p', String(shellPid), '-a', '-d', 'cwd', '-Fn'], { encoding: 'utf-8', timeout: 500 });
-          const match = stdout.match(/\nn(.+)/);
-          if (match) newCwd = match[1].trim();
-        } catch {}
-      }
-      let newAi: string | null = null;
-      let newAiPid: number | null = null;
+    void (async () => {
       try {
-        const { stdout: psOut } = await execFileAsync('ps', ['-eo', 'pid,ppid,args'], { encoding: 'utf-8', timeout: 800 });
-        const rows = psOut.trim().split('\n').slice(1);
-        const parentOf = new Map<number, number>();
-        const cmdOf = new Map<number, string>();
-        for (const row of rows) {
-          const m = row.trim().match(/^(\d+)\s+(\d+)\s+(.*)/);
-          if (m) { parentOf.set(parseInt(m[1]), parseInt(m[2])); cmdOf.set(parseInt(m[1]), m[3]); }
+        let newCwd = cwd0;
+        let shellPid = ptyProcess.pid;
+        if (session.tmuxName) {
+          const tmuxCwd = tmuxGetCwd(session.tmuxName);
+          if (tmuxCwd) newCwd = tmuxCwd;
+          const panePid = tmuxGetPanePid(session.tmuxName);
+          if (panePid) shellPid = panePid;
+        } else {
+          try {
+            const { stdout } = await execFileAsync(
+              'lsof',
+              ['-p', String(shellPid), '-a', '-d', 'cwd', '-Fn'],
+              { encoding: 'utf-8', timeout: 500 }
+            );
+            const match = stdout.match(/\nn(.+)/);
+            if (match) newCwd = match[1].trim();
+          } catch {}
         }
-        const rootPid = shellPid;
-        const descendants = new Set<number>([rootPid]);
-        for (const [p, pp] of parentOf) {
-          let cur = pp;
-          const visited = new Set<number>();
-          while (cur !== 0 && !visited.has(cur)) {
-            visited.add(cur);
-            if (cur === rootPid) { descendants.add(p); break; }
-            cur = parentOf.get(cur) ?? 0;
+        let newAi: string | null = null;
+        let newAiPid: number | null = null;
+        try {
+          const { stdout: psOut } = await execFileAsync('ps', ['-eo', 'pid,ppid,args'], {
+            encoding: 'utf-8',
+            timeout: 800,
+          });
+          const rows = psOut.trim().split('\n').slice(1);
+          const parentOf = new Map<number, number>();
+          const cmdOf = new Map<number, string>();
+          for (const row of rows) {
+            const m = row.trim().match(/^(\d+)\s+(\d+)\s+(.*)/);
+            if (m) {
+              parentOf.set(parseInt(m[1]), parseInt(m[2]));
+              cmdOf.set(parseInt(m[1]), m[3]);
+            }
           }
+          const rootPid = shellPid;
+          const descendants = new Set<number>([rootPid]);
+          for (const [p, pp] of parentOf) {
+            let cur = pp;
+            const visited = new Set<number>();
+            while (cur !== 0 && !visited.has(cur)) {
+              visited.add(cur);
+              if (cur === rootPid) {
+                descendants.add(p);
+                break;
+              }
+              cur = parentOf.get(cur) ?? 0;
+            }
+          }
+          const aiCandidates: { pid: number; ai: string }[] = [];
+          for (const dp of descendants) {
+            const cmd = (cmdOf.get(dp) || '').toLowerCase();
+            if (/claude/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'claude' });
+            else if (/chatgpt/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'chatgpt' });
+            else if (/\/gemini(\s|$)/.test(cmd) || /bin\/gemini/.test(cmd))
+              aiCandidates.push({ pid: dp, ai: 'gemini' });
+            else if (/copilot/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'copilot' });
+            else if (/aider/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'aider' });
+            else if (/cursor/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'cursor' });
+            else if (/opencode/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'opencode' });
+            else if (/codex/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'codex' });
+          }
+          if (aiCandidates.length > 0) {
+            const claudeCandidates = aiCandidates.filter((c) => c.ai === 'claude');
+            if (claudeCandidates.length > 0) {
+              newAi = 'claude';
+              const sessDir = path.join(CLAUDE_DIR, 'sessions');
+              const matched = claudeCandidates.find((c) =>
+                fs.existsSync(path.join(sessDir, `${c.pid}.json`))
+              );
+              newAiPid = matched ? matched.pid : claudeCandidates[0].pid;
+            } else {
+              newAi = aiCandidates[0].ai;
+              newAiPid = aiCandidates[0].pid;
+            }
+          }
+        } catch {}
+        if (newCwd !== session.cwd || newAi !== session.ai || newAiPid !== session.aiPid) {
+          session.cwd = newCwd;
+          session.ai = newAi;
+          session.aiPid = newAiPid;
+          const msg = JSON.stringify({
+            type: 'session_info',
+            sessionId: id,
+            cwd: newCwd,
+            ai: newAi,
+          });
+          wss.clients.forEach((c) => {
+            if (c.readyState === WebSocket.OPEN) c.send(msg);
+          });
         }
-        const aiCandidates: { pid: number; ai: string }[] = [];
-        for (const dp of descendants) {
-          const cmd = (cmdOf.get(dp) || '').toLowerCase();
-          if (/claude/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'claude' });
-          else if (/chatgpt/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'chatgpt' });
-          else if (/\/gemini(\s|$)/.test(cmd) || /bin\/gemini/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'gemini' });
-          else if (/copilot/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'copilot' });
-          else if (/aider/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'aider' });
-          else if (/cursor/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'cursor' });
-          else if (/opencode/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'opencode' });
-          else if (/codex/.test(cmd)) aiCandidates.push({ pid: dp, ai: 'codex' });
-        }
-        if (aiCandidates.length > 0) {
-          const claudeCandidates = aiCandidates.filter(c => c.ai === 'claude');
-          if (claudeCandidates.length > 0) {
-            newAi = 'claude';
-            const sessDir = path.join(CLAUDE_DIR, 'sessions');
-            const matched = claudeCandidates.find(c => fs.existsSync(path.join(sessDir, `${c.pid}.json`)));
-            newAiPid = matched ? matched.pid : claudeCandidates[0].pid;
-          } else { newAi = aiCandidates[0].ai; newAiPid = aiCandidates[0].pid; }
-        }
-      } catch {}
-      if (newCwd !== session.cwd || newAi !== session.ai || newAiPid !== session.aiPid) {
-        session.cwd = newCwd; session.ai = newAi; session.aiPid = newAiPid;
-        const msg = JSON.stringify({ type: 'session_info', sessionId: id, cwd: newCwd, ai: newAi });
-        wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg); });
+      } catch (e) {
+        console.error(`[cwd-poll] Error for ${id}:`, e);
       }
-    } catch (e) { console.error(`[cwd-poll] Error for ${id}:`, e); } })();
+    })();
   }, 2000);
 
   console.log(`[session] Created: ${id} (${name})`);
@@ -510,24 +765,43 @@ function createSession(id: string, name: string, restoreCwd?: string, restoreCmd
 }
 
 function persistSessions() {
-  const data = Array.from(sessions.values()).map(s => ({ id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd, cmd: s.cmd }));
-  try { db.saveSessions(data); } catch {}
-  try { fs.writeFileSync(SESSIONS_PATH, JSON.stringify(data, null, 2), 'utf-8'); } catch {}
+  const data = Array.from(sessions.values()).map((s) => ({
+    id: s.id,
+    name: s.name,
+    createdAt: s.createdAt,
+    cwd: s.cwd,
+    cmd: s.cmd,
+  }));
+  try {
+    db.saveSessions(data);
+  } catch {}
+  try {
+    fs.writeFileSync(SESSIONS_PATH, JSON.stringify(data, null, 2), 'utf-8');
+  } catch {}
 }
 
 function broadcastSessionList(exclude?: WebSocket) {
   persistSessions();
-  const list = Array.from(sessions.values()).map(s => ({ id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd }));
+  const list = Array.from(sessions.values()).map((s) => ({
+    id: s.id,
+    name: s.name,
+    createdAt: s.createdAt,
+    cwd: s.cwd,
+  }));
   const msg = JSON.stringify({ type: 'session_list', sessions: list });
-  wss.clients.forEach(client => {
+  wss.clients.forEach((client) => {
     if (client !== exclude && client.readyState === WebSocket.OPEN) client.send(msg);
   });
 }
 
 // ─── RESTORE SESSIONS ON STARTUP ─────────────────────────────────
 const NAME_TO_CMD: Record<string, string> = {
-  claude: 'claude --dangerously-skip-permissions', gemini: 'gemini', codex: 'codex',
-  opencode: 'opencode', aider: 'aider', copilot: 'copilot',
+  claude: 'claude --dangerously-skip-permissions',
+  gemini: 'gemini',
+  codex: 'codex',
+  opencode: 'opencode',
+  aider: 'aider',
+  copilot: 'copilot',
 };
 
 function cmdForSession(s: { name: string; cmd?: string }): string | undefined {
@@ -540,10 +814,18 @@ function restoreSessions() {
     let saved: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string }>;
     const dbSessions = db.listSessions();
     if (dbSessions.length > 0) {
-      saved = dbSessions.map(r => ({ id: r.id, name: r.name, createdAt: r.created_at, cwd: r.cwd, cmd: r.cmd || undefined }));
+      saved = dbSessions.map((r) => ({
+        id: r.id,
+        name: r.name,
+        createdAt: r.created_at,
+        cwd: r.cwd,
+        cmd: r.cmd || undefined,
+      }));
     } else if (fs.existsSync(SESSIONS_PATH)) {
       saved = JSON.parse(fs.readFileSync(SESSIONS_PATH, 'utf-8'));
-    } else { return; }
+    } else {
+      return;
+    }
     if (!Array.isArray(saved) || saved.length === 0) return;
     const liveTmux = tmuxAvailable ? new Set(tmuxListSessions()) : new Set<string>();
     console.log(`[session] Restoring ${saved.length} session(s) from disk...`);
@@ -558,12 +840,17 @@ function restoreSessions() {
         const cmd = cmdForSession(s);
         const sess = createSession(s.id, s.name, s.cwd, cmd);
         if (cmd) {
-          console.log(`[session] Will run '${cmd}' in restored session '${s.name}' after first resize`);
-          sess.pendingCmd = cmd; sess.resized = false;
+          console.log(
+            `[session] Will run '${cmd}' in restored session '${s.name}' after first resize`
+          );
+          sess.pendingCmd = cmd;
+          sess.resized = false;
         }
       }
     }
-  } catch (e) { console.warn('[session] Could not restore sessions:', e); }
+  } catch (e) {
+    console.warn('[session] Could not restore sessions:', e);
+  }
 }
 
 // ─── DATA WEBSOCKET (per-session terminal I/O) ──────────────────
@@ -572,17 +859,37 @@ wssData.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   const sessionId = url.searchParams.get('sid') || '';
   if (isAuthEnabled()) {
     const token = url.searchParams.get('token') || '';
-    if (!verifyToken(token)) { ws.close(4001, 'Unauthorized'); return; }
+    if (!verifyToken(token)) {
+      ws.close(4001, 'Unauthorized');
+      return;
+    }
   }
   const session = sessions.get(sessionId);
-  if (!session) { ws.close(4002, 'Session not found'); return; }
+  if (!session) {
+    ws.close(4002, 'Session not found');
+    return;
+  }
   if (!dataWsMap.has(sessionId)) dataWsMap.set(sessionId, new Set());
   dataWsMap.get(sessionId)!.add(ws);
-  console.log(`[data-ws] Connected for ${sessionId.slice(-6)} (${dataWsMap.get(sessionId)!.size} clients)`);
+  console.log(
+    `[data-ws] Connected for ${sessionId.slice(-6)} (${dataWsMap.get(sessionId)!.size} clients)`
+  );
   if (session.scrollback) ws.send(session.scrollback);
-  ws.on('message', (message: Buffer | string) => { const s = sessions.get(sessionId); if (s) s.pty.write(message.toString()); });
-  ws.on('close', () => { const set = dataWsMap.get(sessionId); if (set) { set.delete(ws); if (set.size === 0) dataWsMap.delete(sessionId); } console.log(`[data-ws] Disconnected for ${sessionId.slice(-6)}`); });
-  ws.on('error', (err) => { console.error(`[data-ws] Error for ${sessionId.slice(-6)}:`, err.message); });
+  ws.on('message', (message: Buffer | string) => {
+    const s = sessions.get(sessionId);
+    if (s) s.pty.write(message.toString());
+  });
+  ws.on('close', () => {
+    const set = dataWsMap.get(sessionId);
+    if (set) {
+      set.delete(ws);
+      if (set.size === 0) dataWsMap.delete(sessionId);
+    }
+    console.log(`[data-ws] Disconnected for ${sessionId.slice(-6)}`);
+  });
+  ws.on('error', (err) => {
+    console.error(`[data-ws] Error for ${sessionId.slice(-6)}:`, err.message);
+  });
 });
 
 // ─── CONTROL WEBSOCKET ───────────────────────────────────────────
@@ -592,24 +899,41 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   if (isAuthEnabled()) {
     const url = new URL(req.url || '', `http://${req.headers.host}`);
     const token = url.searchParams.get('token') || '';
-    if (!verifyToken(token)) { ws.close(4001, 'Unauthorized'); return; }
+    if (!verifyToken(token)) {
+      ws.close(4001, 'Unauthorized');
+      return;
+    }
   }
   const clientId = ++clientCounter;
   const clientTag = `[ws:client-${clientId}]`;
   console.log(`${clientTag} Client connected (total: ${wss.clients.size})`);
 
-  const list = Array.from(sessions.values()).map(s => ({ id: s.id, name: s.name, createdAt: s.createdAt, cwd: s.cwd }));
+  const list = Array.from(sessions.values()).map((s) => ({
+    id: s.id,
+    name: s.name,
+    createdAt: s.createdAt,
+    cwd: s.cwd,
+  }));
   wsSend(ws, JSON.stringify({ type: 'session_list', sessions: list }));
   wsSend(ws, JSON.stringify({ type: 'settings', settings: currentSettings }));
 
   ws.on('message', (message: Buffer | string) => {
     const data = message.toString();
     let parsed: Record<string, unknown>;
-    try { parsed = JSON.parse(data); } catch { return; }
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      return;
+    }
 
-    if (parsed.type === 'ping') { wsSend(ws, JSON.stringify({ type: 'pong', t: parsed.t })); return; }
+    if (parsed.type === 'ping') {
+      wsSend(ws, JSON.stringify({ type: 'pong', t: parsed.t }));
+      return;
+    }
     if (parsed.type !== 'input' && parsed.type !== 'resize') {
-      console.log(`${clientTag} ← ${parsed.type}${parsed.sessionId ? ` [${(parsed.sessionId as string).slice(-6)}]` : ''}`);
+      console.log(
+        `${clientTag} ← ${parsed.type}${parsed.sessionId ? ` [${(parsed.sessionId as string).slice(-6)}]` : ''}`
+      );
     }
 
     if (parsed.type === 'session_create') {
@@ -620,14 +944,16 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const extraEnv = planId ? { SUPER_TERMINAL_PLAN_ID: planId } : undefined;
       const sess = createSession(id, name, parsed.cwd as string | undefined, undefined, extraEnv);
       wsSession.set(ws, id);
-      if (parsed.cmd) { sess.cmd = parsed.cmd as string; runCmdWhenReady(sess, sess.cmd); }
+      if (parsed.cmd) {
+        sess.cmd = parsed.cmd as string;
+        runCmdWhenReady(sess, sess.cmd);
+      }
       wsSend(ws, JSON.stringify({ type: 'session_created', sessionId: id, name }));
       broadcastSessionList();
-
     } else if (parsed.type === 'session_subscribe') {
       const ids = parsed.sessionIds as string[];
-      if (Array.isArray(ids)) wsSubscriptions.set(ws, new Set(ids.filter(id => sessions.has(id))));
-
+      if (Array.isArray(ids))
+        wsSubscriptions.set(ws, new Set(ids.filter((id) => sessions.has(id))));
     } else if (parsed.type === 'session_duplicate') {
       const sourceId = parsed.sourceSessionId as string;
       const source = sessions.get(sourceId);
@@ -638,21 +964,27 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       wsSession.set(ws, id);
       wsSend(ws, JSON.stringify({ type: 'session_created', sessionId: id, name }));
       broadcastSessionList();
-
     } else if (parsed.type === 'session_attach') {
       const id = parsed.sessionId as string;
-      if (!sessions.has(id)) { wsSend(ws, JSON.stringify({ type: 'error', message: `Session ${id} not found` })); return; }
+      if (!sessions.has(id)) {
+        wsSend(ws, JSON.stringify({ type: 'error', message: `Session ${id} not found` }));
+        return;
+      }
       wsSession.set(ws, id);
       wsSubscriptions.get(ws)?.delete(id);
       wsSend(ws, JSON.stringify({ type: 'session_attached', sessionId: id }));
       const sess = sessions.get(id)!;
-      wsSend(ws, JSON.stringify({ type: 'session_info', sessionId: id, cwd: sess.cwd, ai: sess.ai }));
-
+      wsSend(
+        ws,
+        JSON.stringify({ type: 'session_info', sessionId: id, cwd: sess.cwd, ai: sess.ai })
+      );
     } else if (parsed.type === 'session_rename') {
       const id = parsed.sessionId as string;
       const session = sessions.get(id);
-      if (session) { session.name = (parsed.name as string) || session.name; broadcastSessionList(); }
-
+      if (session) {
+        session.name = (parsed.name as string) || session.name;
+        broadcastSessionList();
+      }
     } else if (parsed.type === 'session_close') {
       const id = parsed.sessionId as string;
       const session = sessions.get(id);
@@ -661,17 +993,18 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         session.pty.kill();
         if (session.tmuxName) tmuxKillSession(session.tmuxName);
         const dataClients = dataWsMap.get(id);
-        if (dataClients) { dataClients.forEach(dws => dws.close(1000, 'Session closed')); dataWsMap.delete(id); }
+        if (dataClients) {
+          dataClients.forEach((dws) => dws.close(1000, 'Session closed'));
+          dataWsMap.delete(id);
+        }
         sessions.delete(id);
         broadcastSessionList();
       }
-
     } else if (parsed.type === 'input') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
       if (!id) return;
       const session = sessions.get(id);
       if (session) session.pty.write(parsed.data as string);
-
     } else if (parsed.type === 'send_when_ready') {
       const id = parsed.sessionId as string;
       const text = parsed.data as string;
@@ -679,7 +1012,6 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const session = sessions.get(id);
       if (!session) return;
       sendWhenAiReady(session, text, ws, wsSend);
-
     } else if (parsed.type === 'resize') {
       const id = (parsed.sessionId as string) || wsSession.get(ws);
       if (!id) return;
@@ -690,232 +1022,519 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
           session.resized = true;
           const cmd = session.pendingCmd;
           session.pendingCmd = undefined;
-          console.log(`[session] Running '${cmd}' in '${session.name}' after resize to ${parsed.cols}x${parsed.rows}`);
+          console.log(
+            `[session] Running '${cmd}' in '${session.name}' after resize to ${parsed.cols}x${parsed.rows}`
+          );
           runCmdWhenReady(session, cmd);
         }
       }
-
     } else if (parsed.type === 'git_graph') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const skip = typeof parsed.skip === 'number' ? parsed.skip : 0;
-      try { const { commits, hasMore } = gitService.getGitLog(session.cwd, 50, skip); wsSend(ws, JSON.stringify({ type: 'git_graph_data', sessionId: id, commits, hasMore, skip })); }
-      catch (e) { wsSend(ws, JSON.stringify({ type: 'git_graph_data', sessionId: id, commits: [], hasMore: false, skip, error: String(e) })); }
-
+      try {
+        const { commits, hasMore } = gitService.getGitLog(session.cwd, 50, skip);
+        wsSend(
+          ws,
+          JSON.stringify({ type: 'git_graph_data', sessionId: id, commits, hasMore, skip })
+        );
+      } catch (e) {
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_graph_data',
+            sessionId: id,
+            commits: [],
+            hasMore: false,
+            skip,
+            error: String(e),
+          })
+        );
+      }
     } else if (parsed.type === 'git_graph_search') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const query = typeof parsed.query === 'string' ? parsed.query : '';
-      try { const commits = gitService.searchGitLog(session.cwd, query); wsSend(ws, JSON.stringify({ type: 'git_graph_search_data', sessionId: id, commits, query })); }
-      catch (e) { wsSend(ws, JSON.stringify({ type: 'git_graph_search_data', sessionId: id, commits: [], query, error: String(e) })); }
-
+      try {
+        const commits = gitService.searchGitLog(session.cwd, query);
+        wsSend(
+          ws,
+          JSON.stringify({ type: 'git_graph_search_data', sessionId: id, commits, query })
+        );
+      } catch (e) {
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_graph_search_data',
+            sessionId: id,
+            commits: [],
+            query,
+            error: String(e),
+          })
+        );
+      }
     } else if (parsed.type === 'git_file_list') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const hash = parsed.hash as string;
-      if (!hash || !/^[0-9a-f]{4,40}$/i.test(hash)) { wsSend(ws, JSON.stringify({ type: 'git_file_list_data', hash, files: [], error: 'Invalid hash' })); return; }
-      try { const files = gitService.getFileList(session.cwd, hash); wsSend(ws, JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files })); }
-      catch (e) { wsSend(ws, JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files: [], error: String(e) })); }
-
+      if (!hash || !/^[0-9a-f]{4,40}$/i.test(hash)) {
+        wsSend(
+          ws,
+          JSON.stringify({ type: 'git_file_list_data', hash, files: [], error: 'Invalid hash' })
+        );
+        return;
+      }
+      try {
+        const files = gitService.getFileList(session.cwd, hash);
+        wsSend(ws, JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files }));
+      } catch (e) {
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_file_list_data',
+            sessionId: id,
+            hash,
+            files: [],
+            error: String(e),
+          })
+        );
+      }
     } else if (parsed.type === 'git_branch') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
-      try { const branch = gitService.getCurrentBranch(session.cwd); wsSend(ws, JSON.stringify({ type: 'git_branch_data', sessionId: id, branch })); }
-      catch { wsSend(ws, JSON.stringify({ type: 'git_branch_data', sessionId: id, branch: null })); }
-
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      try {
+        const branch = gitService.getCurrentBranch(session.cwd);
+        wsSend(ws, JSON.stringify({ type: 'git_branch_data', sessionId: id, branch }));
+      } catch {
+        wsSend(ws, JSON.stringify({ type: 'git_branch_data', sessionId: id, branch: null }));
+      }
     } else if (parsed.type === 'git_branch_list') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
-      try { const branches = gitService.getBranchList(session.cwd); wsSend(ws, JSON.stringify({ type: 'git_branch_list_data', sessionId: id, branches })); }
-      catch (e) { wsSend(ws, JSON.stringify({ type: 'git_branch_list_data', sessionId: id, branches: [], error: String(e) })); }
-
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      try {
+        const branches = gitService.getBranchList(session.cwd);
+        wsSend(ws, JSON.stringify({ type: 'git_branch_list_data', sessionId: id, branches }));
+      } catch (e) {
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_branch_list_data',
+            sessionId: id,
+            branches: [],
+            error: String(e),
+          })
+        );
+      }
     } else if (parsed.type === 'git_remote_url') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const url = gitService.getRemoteUrl(session.cwd);
       wsSend(ws, JSON.stringify({ type: 'git_remote_url_data', sessionId: id, url }));
-
     } else if (parsed.type === 'git_checkout') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const branch = parsed.branch as string;
-      if (!branch || !/^[a-zA-Z0-9][a-zA-Z0-9/_.\\-]*$/.test(branch)) { wsSend(ws, JSON.stringify({ type: 'git_checkout_ack', sessionId: id, error: 'Invalid branch name' })); return; }
+      if (!branch || !/^[a-zA-Z0-9][a-zA-Z0-9/_.\\-]*$/.test(branch)) {
+        wsSend(
+          ws,
+          JSON.stringify({ type: 'git_checkout_ack', sessionId: id, error: 'Invalid branch name' })
+        );
+        return;
+      }
       let cmd: string;
-      if (branch.startsWith('origin/')) { const localName = branch.slice(7); cmd = `git checkout -b ${localName} --track ${branch}`; }
-      else { cmd = `git checkout ${branch}`; }
+      if (branch.startsWith('origin/')) {
+        const localName = branch.slice(7);
+        cmd = `git checkout -b ${localName} --track ${branch}`;
+      } else {
+        cmd = `git checkout ${branch}`;
+      }
       session.pty.write(cmd + '\r');
       wsSend(ws, JSON.stringify({ type: 'git_checkout_ack', sessionId: id, branch }));
-
     } else if (parsed.type === 'git_pull') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       session.pty.write('git pull\r');
       wsSend(ws, JSON.stringify({ type: 'git_pull_ack', sessionId: id }));
-
     } else if (parsed.type === 'file_tree') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const targetDir = (parsed.dir as string) || session.cwd;
       try {
         const tree = gitService.getFileTree(targetDir);
         const gitStatusMap: Record<string, string> = {};
-        if (gitService.isGitRepo(targetDir)) { const files = gitService.getGitStatus(targetDir); for (const f of files) { gitStatusMap[f.path] = f.status; } }
-        wsSend(ws, JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree, gitStatus: gitStatusMap }));
-      } catch (e) { wsSend(ws, JSON.stringify({ type: 'file_tree_data', sessionId: id, dir: targetDir, tree: [], error: String(e) })); }
-
+        if (gitService.isGitRepo(targetDir)) {
+          const files = gitService.getGitStatus(targetDir);
+          for (const f of files) {
+            gitStatusMap[f.path] = f.status;
+          }
+        }
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'file_tree_data',
+            sessionId: id,
+            dir: targetDir,
+            tree,
+            gitStatus: gitStatusMap,
+          })
+        );
+      } catch (e) {
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'file_tree_data',
+            sessionId: id,
+            dir: targetDir,
+            tree: [],
+            error: String(e),
+          })
+        );
+      }
     } else if (parsed.type === 'git_status') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       try {
         const isRepo = gitService.isGitRepo(session.cwd);
-        if (!isRepo) { wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], isRepo: false })); return; }
+        if (!isRepo) {
+          wsSend(
+            ws,
+            JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], isRepo: false })
+          );
+          return;
+        }
         const files = gitService.getGitStatus(session.cwd);
         const branch = gitService.getCurrentBranch(session.cwd);
         const root = gitService.getGitRoot(session.cwd);
         const upstream = gitService.getUpstreamStatus(session.cwd);
         const worktrees = gitService.getWorktreeList(session.cwd);
         const normalizedCwd = session.cwd.replace(/\/+$/, '');
-        const mainWt = worktrees.find(w => w.isMain);
+        const mainWt = worktrees.find((w) => w.isMain);
         const isInWorktree = mainWt ? normalizedCwd !== mainWt.path.replace(/\/+$/, '') : false;
         let mainBranchFileCount: number | undefined;
-        if (isInWorktree && mainWt) { try { const mainFiles = gitService.getGitStatus(mainWt.path); mainBranchFileCount = mainFiles.length; } catch {} }
-        wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true, upstream, worktrees, isInWorktree, mainBranchFileCount }));
-      } catch (e) { wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files: [], error: String(e), isRepo: false })); }
-
+        if (isInWorktree && mainWt) {
+          try {
+            const mainFiles = gitService.getGitStatus(mainWt.path);
+            mainBranchFileCount = mainFiles.length;
+          } catch {}
+        }
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_status_data',
+            sessionId: id,
+            files,
+            branch,
+            root,
+            isRepo: true,
+            upstream,
+            worktrees,
+            isInWorktree,
+            mainBranchFileCount,
+          })
+        );
+      } catch (e) {
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_status_data',
+            sessionId: id,
+            files: [],
+            error: String(e),
+            isRepo: false,
+          })
+        );
+      }
     } else if (parsed.type === 'git_diff') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const filePath = parsed.filePath as string | undefined;
-      const staged = parsed.staged as boolean || false;
+      const staged = (parsed.staged as boolean) || false;
       const diff = gitService.getGitDiff(session.cwd, filePath, staged);
       wsSend(ws, JSON.stringify({ type: 'git_diff_data', sessionId: id, filePath, staged, diff }));
-
     } else if (parsed.type === 'git_stage') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const filePath = parsed.filePath as string;
-      const all = parsed.all as boolean || false;
-      const ok = all ? gitService.gitStageAll(session.cwd) : gitService.gitStageFile(session.cwd, filePath);
+      const all = (parsed.all as boolean) || false;
+      const ok = all
+        ? gitService.gitStageAll(session.cwd)
+        : gitService.gitStageFile(session.cwd, filePath);
       wsSend(ws, JSON.stringify({ type: 'git_stage_ack', sessionId: id, ok }));
       if (ok) {
-        const files = gitService.getGitStatus(session.cwd); const branch = gitService.getCurrentBranch(session.cwd); const root = gitService.getGitRoot(session.cwd);
-        wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+        const files = gitService.getGitStatus(session.cwd);
+        const branch = gitService.getCurrentBranch(session.cwd);
+        const root = gitService.getGitRoot(session.cwd);
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_status_data',
+            sessionId: id,
+            files,
+            branch,
+            root,
+            isRepo: true,
+          })
+        );
       }
-
     } else if (parsed.type === 'git_unstage') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const filePath = parsed.filePath as string;
-      const all = parsed.all as boolean || false;
-      const ok = all ? gitService.gitUnstageAll(session.cwd) : gitService.gitUnstageFile(session.cwd, filePath);
+      const all = (parsed.all as boolean) || false;
+      const ok = all
+        ? gitService.gitUnstageAll(session.cwd)
+        : gitService.gitUnstageFile(session.cwd, filePath);
       wsSend(ws, JSON.stringify({ type: 'git_unstage_ack', sessionId: id, ok }));
       if (ok) {
-        const files = gitService.getGitStatus(session.cwd); const branch = gitService.getCurrentBranch(session.cwd); const root = gitService.getGitRoot(session.cwd);
-        wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+        const files = gitService.getGitStatus(session.cwd);
+        const branch = gitService.getCurrentBranch(session.cwd);
+        const root = gitService.getGitRoot(session.cwd);
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_status_data',
+            sessionId: id,
+            files,
+            branch,
+            root,
+            isRepo: true,
+          })
+        );
       }
-
     } else if (parsed.type === 'git_commit') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const message = parsed.message as string;
       const result = gitService.gitCommit(session.cwd, message);
       wsSend(ws, JSON.stringify({ type: 'git_commit_ack', sessionId: id, ...result }));
       if (result.ok) {
-        const files = gitService.getGitStatus(session.cwd); const branch = gitService.getCurrentBranch(session.cwd); const root = gitService.getGitRoot(session.cwd);
-        wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
-        if (parsed.push) { const pushResult = gitService.gitPush(session.cwd); wsSend(ws, JSON.stringify({ type: 'git_push_ack', sessionId: id, ...pushResult })); }
+        const files = gitService.getGitStatus(session.cwd);
+        const branch = gitService.getCurrentBranch(session.cwd);
+        const root = gitService.getGitRoot(session.cwd);
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_status_data',
+            sessionId: id,
+            files,
+            branch,
+            root,
+            isRepo: true,
+          })
+        );
+        if (parsed.push) {
+          const pushResult = gitService.gitPush(session.cwd);
+          wsSend(ws, JSON.stringify({ type: 'git_push_ack', sessionId: id, ...pushResult }));
+        }
       }
-
     } else if (parsed.type === 'file_create') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
-      const result = gitService.createFile(session.cwd, parsed.filePath as string, parsed.isDir as boolean);
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const result = gitService.createFile(
+        session.cwd,
+        parsed.filePath as string,
+        parsed.isDir as boolean
+      );
       wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'create', ...result }));
-
     } else if (parsed.type === 'file_rename') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
-      const result = gitService.renameFile(session.cwd, parsed.oldPath as string, parsed.newPath as string);
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const result = gitService.renameFile(
+        session.cwd,
+        parsed.oldPath as string,
+        parsed.newPath as string
+      );
       wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'rename', ...result }));
-
     } else if (parsed.type === 'file_delete') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const result = gitService.deleteFile(session.cwd, parsed.filePath as string);
       wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'delete', ...result }));
-
     } else if (parsed.type === 'file_duplicate') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const result = gitService.duplicateFile(session.cwd, parsed.filePath as string);
-      wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'duplicate', ...result }));
-
+      wsSend(
+        ws,
+        JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'duplicate', ...result })
+      );
     } else if (parsed.type === 'file_reveal') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
-      const filePath = parsed.filePath as string; if (!filePath) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const filePath = parsed.filePath as string;
+      if (!filePath) return;
       const fullPath = path.resolve(session.cwd, filePath);
       const resolvedCwd = path.resolve(session.cwd);
       if (!fullPath.startsWith(resolvedCwd + path.sep) && fullPath !== resolvedCwd) return;
-      execFile('open', ['-R', fullPath], (err) => { if (err) wsSend(ws, JSON.stringify({ type: 'file_op_ack', sessionId: id, op: 'reveal', ok: false, error: err.message })); });
-
+      execFile('open', ['-R', fullPath], (err) => {
+        if (err)
+          wsSend(
+            ws,
+            JSON.stringify({
+              type: 'file_op_ack',
+              sessionId: id,
+              op: 'reveal',
+              ok: false,
+              error: err.message,
+            })
+          );
+      });
     } else if (parsed.type === 'file_read') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const filePath = parsed.filePath as string;
       const result = gitService.readFileContent(session.cwd, filePath);
       wsSend(ws, JSON.stringify({ type: 'file_read_data', sessionId: id, filePath, ...result }));
-
     } else if (parsed.type === 'file_search') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const query = parsed.query as string;
-      const results = gitService.searchInFiles(session.cwd, query, { caseSensitive: parsed.caseSensitive as boolean, useRegex: parsed.useRegex as boolean, include: parsed.include as string });
+      const results = gitService.searchInFiles(session.cwd, query, {
+        caseSensitive: parsed.caseSensitive as boolean,
+        useRegex: parsed.useRegex as boolean,
+        include: parsed.include as string,
+      });
       wsSend(ws, JSON.stringify({ type: 'file_search_data', sessionId: id, results }));
-
     } else if (parsed.type === 'file_replace') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
-      const result = gitService.replaceInFile(session.cwd, parsed.filePath as string, parsed.query as string, parsed.replacement as string, { caseSensitive: parsed.caseSensitive as boolean, useRegex: parsed.useRegex as boolean });
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const result = gitService.replaceInFile(
+        session.cwd,
+        parsed.filePath as string,
+        parsed.query as string,
+        parsed.replacement as string,
+        { caseSensitive: parsed.caseSensitive as boolean, useRegex: parsed.useRegex as boolean }
+      );
       wsSend(ws, JSON.stringify({ type: 'file_replace_ack', sessionId: id, ...result }));
-
     } else if (parsed.type === 'file_replace_all') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
-      const result = gitService.replaceInAllFiles(session.cwd, parsed.query as string, parsed.replacement as string, { caseSensitive: parsed.caseSensitive as boolean, useRegex: parsed.useRegex as boolean, include: parsed.include as string });
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      const result = gitService.replaceInAllFiles(
+        session.cwd,
+        parsed.query as string,
+        parsed.replacement as string,
+        {
+          caseSensitive: parsed.caseSensitive as boolean,
+          useRegex: parsed.useRegex as boolean,
+          include: parsed.include as string,
+        }
+      );
       wsSend(ws, JSON.stringify({ type: 'file_replace_ack', sessionId: id, ...result }));
-
     } else if (parsed.type === 'git_generate_message') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const message = gitService.generateCommitMessage(session.cwd);
       wsSend(ws, JSON.stringify({ type: 'git_generate_message_data', sessionId: id, message }));
-
     } else if (parsed.type === 'git_discard') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const filePath = parsed.filePath as string;
       const ok = gitService.gitDiscard(session.cwd, filePath);
       if (ok) {
-        const files = gitService.getGitStatus(session.cwd); const branch = gitService.getCurrentBranch(session.cwd); const root = gitService.getGitRoot(session.cwd);
-        wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true }));
+        const files = gitService.getGitStatus(session.cwd);
+        const branch = gitService.getCurrentBranch(session.cwd);
+        const root = gitService.getGitRoot(session.cwd);
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_status_data',
+            sessionId: id,
+            files,
+            branch,
+            root,
+            isRepo: true,
+          })
+        );
       }
-
     } else if (parsed.type === 'git_push') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const result = gitService.gitPush(session.cwd);
       wsSend(ws, JSON.stringify({ type: 'git_push_ack', sessionId: id, ...result }));
-
     } else if (parsed.type === 'git_worktree_list') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
-      try { const worktrees = gitService.getWorktreeList(session.cwd); wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd })); }
-      catch (e) { wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees: [], error: String(e) })); }
-
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      try {
+        const worktrees = gitService.getWorktreeList(session.cwd);
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_worktree_list_data',
+            sessionId: id,
+            worktrees,
+            currentPath: session.cwd,
+          })
+        );
+      } catch (e) {
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_worktree_list_data',
+            sessionId: id,
+            worktrees: [],
+            error: String(e),
+          })
+        );
+      }
     } else if (parsed.type === 'git_worktree_add') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const wtPath = parsed.path as string;
       const branch = parsed.branch as string | undefined;
       const createBranch = parsed.createBranch as boolean | undefined;
@@ -923,46 +1542,126 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       const addCwd = gitRoot || session.cwd;
       const wtResult = gitService.addWorktree(addCwd, wtPath, branch, createBranch);
       wsSend(ws, JSON.stringify({ type: 'git_worktree_add_ack', sessionId: id, ...wtResult }));
-      if (wtResult.ok) { const worktrees = gitService.getWorktreeList(session.cwd); wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd })); }
-
+      if (wtResult.ok) {
+        const worktrees = gitService.getWorktreeList(session.cwd);
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_worktree_list_data',
+            sessionId: id,
+            worktrees,
+            currentPath: session.cwd,
+          })
+        );
+      }
     } else if (parsed.type === 'git_worktree_remove') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const wtPath = parsed.path as string;
-      const force = parsed.force as boolean || false;
+      const force = (parsed.force as boolean) || false;
       const wtResult = gitService.removeWorktree(session.cwd, wtPath, force);
-      wsSend(ws, JSON.stringify({ type: 'git_worktree_remove_ack', sessionId: id, path: wtPath, ...wtResult }));
-      if (wtResult.ok) { const worktrees = gitService.getWorktreeList(session.cwd); wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd })); }
-
+      wsSend(
+        ws,
+        JSON.stringify({
+          type: 'git_worktree_remove_ack',
+          sessionId: id,
+          path: wtPath,
+          ...wtResult,
+        })
+      );
+      if (wtResult.ok) {
+        const worktrees = gitService.getWorktreeList(session.cwd);
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_worktree_list_data',
+            sessionId: id,
+            worktrees,
+            currentPath: session.cwd,
+          })
+        );
+      }
     } else if (parsed.type === 'git_worktree_switch') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const wtPath = parsed.path as string;
-      if (!fs.existsSync(wtPath)) { wsSend(ws, JSON.stringify({ type: 'git_worktree_switch_ack', sessionId: id, ok: false, error: 'Path does not exist' })); return; }
+      if (!fs.existsSync(wtPath)) {
+        wsSend(
+          ws,
+          JSON.stringify({
+            type: 'git_worktree_switch_ack',
+            sessionId: id,
+            ok: false,
+            error: 'Path does not exist',
+          })
+        );
+        return;
+      }
       session.cwd = wtPath;
-      if (session.pty) { const escaped = wtPath.replace(/'/g, "'\\''"); session.pty.write(`cd '${escaped}'\r`); }
-      wsSend(ws, JSON.stringify({ type: 'git_worktree_switch_ack', sessionId: id, ok: true, path: wtPath }));
-      const infoMsg = JSON.stringify({ type: 'session_info', sessionId: id, cwd: wtPath, ai: session.ai });
-      wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(infoMsg); });
+      if (session.pty) {
+        const escaped = wtPath.replace(/'/g, "'\\''");
+        session.pty.write(`cd '${escaped}'\r`);
+      }
+      wsSend(
+        ws,
+        JSON.stringify({ type: 'git_worktree_switch_ack', sessionId: id, ok: true, path: wtPath })
+      );
+      const infoMsg = JSON.stringify({
+        type: 'session_info',
+        sessionId: id,
+        cwd: wtPath,
+        ai: session.ai,
+      });
+      wss.clients.forEach((c) => {
+        if (c.readyState === WebSocket.OPEN) c.send(infoMsg);
+      });
       try {
         const isRepo = gitService.isGitRepo(session.cwd);
         if (isRepo) {
-          const files = gitService.getGitStatus(session.cwd); const branch = gitService.getCurrentBranch(session.cwd); const root = gitService.getGitRoot(session.cwd); const upstream = gitService.getUpstreamStatus(session.cwd);
-          wsSend(ws, JSON.stringify({ type: 'git_status_data', sessionId: id, files, branch, root, isRepo: true, upstream }));
+          const files = gitService.getGitStatus(session.cwd);
+          const branch = gitService.getCurrentBranch(session.cwd);
+          const root = gitService.getGitRoot(session.cwd);
+          const upstream = gitService.getUpstreamStatus(session.cwd);
+          wsSend(
+            ws,
+            JSON.stringify({
+              type: 'git_status_data',
+              sessionId: id,
+              files,
+              branch,
+              root,
+              isRepo: true,
+              upstream,
+            })
+          );
         }
       } catch {}
       const worktrees = gitService.getWorktreeList(session.cwd);
-      wsSend(ws, JSON.stringify({ type: 'git_worktree_list_data', sessionId: id, worktrees, currentPath: session.cwd }));
-
+      wsSend(
+        ws,
+        JSON.stringify({
+          type: 'git_worktree_list_data',
+          sessionId: id,
+          worktrees,
+          currentPath: session.cwd,
+        })
+      );
     } else if (parsed.type === 'claude_usage') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       const usage = getClaudeUsage(session.cwd);
       wsSend(ws, JSON.stringify({ type: 'claude_usage_data', sessionId: id, usage }));
-
     } else if (parsed.type === 'claude_prompts') {
-      const id = (parsed.sessionId as string) || wsSession.get(ws); if (!id) return;
-      const session = sessions.get(id); if (!session) return;
+      const id = (parsed.sessionId as string) || wsSession.get(ws);
+      if (!id) return;
+      const session = sessions.get(id);
+      if (!session) return;
       console.log(`[claude_prompts] cwd=${session.cwd} aiPid=${session.aiPid}`);
       const prompts = getClaudePrompts(session.cwd, session.aiPid);
       console.log(`[claude_prompts] found ${prompts.length} prompts`);
@@ -971,10 +1670,15 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   });
 
   ws.on('close', (code, reason) => {
-    console.log(`${clientTag} Disconnected (code: ${code}, reason: ${reason || 'none'}) — remaining clients: ${wss.clients.size - 1}`);
-    wsSession.delete(ws); wsSubscriptions.delete(ws);
+    console.log(
+      `${clientTag} Disconnected (code: ${code}, reason: ${reason || 'none'}) — remaining clients: ${wss.clients.size - 1}`
+    );
+    wsSession.delete(ws);
+    wsSubscriptions.delete(ws);
   });
-  ws.on('error', (err) => { console.error(`${clientTag} Error: ${err.message}`); });
+  ws.on('error', (err) => {
+    console.error(`${clientTag} Error: ${err.message}`);
+  });
 });
 
 // ─── SERVER STARTUP ──────────────────────────────────────────────
@@ -982,14 +1686,19 @@ async function startServer() {
   try {
     await userDb.initUserCount();
     await userDb.ensurePlanImagesBucket();
-    console.log(`[auth] Email auth: ${userDb.getUserCount()} registered user(s), registration ${isRegistrationAllowed() ? 'allowed' : 'locked'}`);
-  } catch (err) { console.error('[supabase] Failed to initialize user count:', err); }
+    console.log(
+      `[auth] Email auth: ${userDb.getUserCount()} registered user(s), registration ${isRegistrationAllowed() ? 'allowed' : 'locked'}`
+    );
+  } catch (err) {
+    console.error('[supabase] Failed to initialize user count:', err);
+  }
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Super Terminal → http://localhost:${PORT}`);
     const nets = os.networkInterfaces();
     for (const name of Object.keys(nets)) {
       for (const net of nets[name]!) {
-        if (net.family === 'IPv4' && !net.internal) console.log(`  Network   → http://${net.address}:${PORT}`);
+        if (net.family === 'IPv4' && !net.internal)
+          console.log(`  Network   → http://${net.address}:${PORT}`);
       }
     }
     restoreSessions();
@@ -998,5 +1707,11 @@ async function startServer() {
 startServer();
 
 // Graceful shutdown
-process.on('SIGTERM', () => { db.close(); process.exit(0); });
-process.on('SIGINT', () => { db.close(); process.exit(0); });
+process.on('SIGTERM', () => {
+  db.close();
+  process.exit(0);
+});
+process.on('SIGINT', () => {
+  db.close();
+  process.exit(0);
+});

@@ -44,7 +44,9 @@ db.exec(`
 
 // ─── Settings ───────────────────────────────────────
 const stmtGetSetting = db.prepare('SELECT value FROM settings WHERE key = ?');
-const stmtSetSetting = db.prepare('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, strftime(\'%s\',\'now\'))');
+const stmtSetSetting = db.prepare(
+  "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, strftime('%s','now'))"
+);
 
 export function getSetting(key: string): string | null {
   const row = stmtGetSetting.get(key) as { value: string } | undefined;
@@ -58,7 +60,11 @@ export function setSetting(key: string, value: string): void {
 export function getSettings(): Record<string, unknown> | null {
   const raw = getSetting('app_settings');
   if (!raw) return null;
-  try { return JSON.parse(raw); } catch { return null; }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 export function saveSettings(settings: Record<string, unknown>): void {
@@ -67,7 +73,9 @@ export function saveSettings(settings: Record<string, unknown>): void {
 
 // ─── Sessions ───────────────────────────────────────
 const stmtListSessions = db.prepare('SELECT * FROM sessions ORDER BY created_at');
-const stmtUpsertSession = db.prepare('INSERT OR REPLACE INTO sessions (id, name, created_at, cwd, cmd, updated_at) VALUES (?, ?, ?, ?, ?, strftime(\'%s\',\'now\'))');
+const stmtUpsertSession = db.prepare(
+  "INSERT OR REPLACE INTO sessions (id, name, created_at, cwd, cmd, updated_at) VALUES (?, ?, ?, ?, ?, strftime('%s','now'))"
+);
 const stmtDeleteSession = db.prepare('DELETE FROM sessions WHERE id = ?');
 const stmtClearSessions = db.prepare('DELETE FROM sessions');
 
@@ -83,7 +91,13 @@ export function listSessions(): SessionRow[] {
   return stmtListSessions.all() as SessionRow[];
 }
 
-export function upsertSession(id: string, name: string, createdAt: number, cwd: string, cmd?: string): void {
+export function upsertSession(
+  id: string,
+  name: string,
+  createdAt: number,
+  cwd: string,
+  cmd?: string
+): void {
   stmtUpsertSession.run(id, name, createdAt, cwd, cmd || '');
 }
 
@@ -91,7 +105,9 @@ export function deleteSession(id: string): void {
   stmtDeleteSession.run(id);
 }
 
-export function saveSessions(sessions: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string }>): void {
+export function saveSessions(
+  sessions: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string }>
+): void {
   const transaction = db.transaction(() => {
     stmtClearSessions.run();
     for (const s of sessions) {
@@ -103,7 +119,9 @@ export function saveSessions(sessions: Array<{ id: string; name: string; created
 
 // ─── Drafts ─────────────────────────────────────────
 const stmtGetDraft = db.prepare('SELECT content FROM drafts WHERE key = ?');
-const stmtSetDraft = db.prepare('INSERT OR REPLACE INTO drafts (key, content, updated_at) VALUES (?, ?, strftime(\'%s\',\'now\'))');
+const stmtSetDraft = db.prepare(
+  "INSERT OR REPLACE INTO drafts (key, content, updated_at) VALUES (?, ?, strftime('%s','now'))"
+);
 
 export function getDraft(key: string): string | null {
   const row = stmtGetDraft.get(key) as { content: string } | undefined;
@@ -115,8 +133,12 @@ export function setDraft(key: string, content: string): void {
 }
 
 // ─── Annotations ────────────────────────────────────
-const stmtListAnnotations = db.prepare('SELECT * FROM annotations WHERE file = ? ORDER BY created_at');
-const stmtInsertAnnotation = db.prepare('INSERT INTO annotations (file, type, text) VALUES (?, ?, ?)');
+const stmtListAnnotations = db.prepare(
+  'SELECT * FROM annotations WHERE file = ? ORDER BY created_at'
+);
+const stmtInsertAnnotation = db.prepare(
+  'INSERT INTO annotations (file, type, text) VALUES (?, ?, ?)'
+);
 const stmtDeleteAnnotation = db.prepare('DELETE FROM annotations WHERE id = ?');
 
 export interface AnnotationRow {
@@ -146,6 +168,20 @@ export function close(): void {
 }
 
 // Ensure database is properly closed on process exit
-process.on('exit', () => { try { db.close(); } catch {} });
-process.on('SIGINT', () => { try { db.close(); } catch {} process.exit(0); });
-process.on('SIGTERM', () => { try { db.close(); } catch {} process.exit(0); });
+process.on('exit', () => {
+  try {
+    db.close();
+  } catch {}
+});
+process.on('SIGINT', () => {
+  try {
+    db.close();
+  } catch {}
+  process.exit(0);
+});
+process.on('SIGTERM', () => {
+  try {
+    db.close();
+  } catch {}
+  process.exit(0);
+});

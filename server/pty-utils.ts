@@ -5,7 +5,10 @@ import { WebSocket } from 'ws';
 
 export interface PtySession {
   id: string;
-  pty: { write: (data: string) => void; onData: (cb: (data: string) => void) => { dispose: () => void } };
+  pty: {
+    write: (data: string) => void;
+    onData: (cb: (data: string) => void) => { dispose: () => void };
+  };
 }
 
 /** Strip ANSI escape sequences and control characters from terminal output */

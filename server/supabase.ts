@@ -11,9 +11,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Service role client for Storage operations (bypasses RLS)
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const supabaseAdmin = serviceRoleKey
-  ? createClient(supabaseUrl, serviceRoleKey)
-  : supabase;
+const supabaseAdmin = serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : supabase;
 
 export interface UserRow {
   id: number;
@@ -28,9 +26,7 @@ export interface UserRow {
 let cachedUserCount = 0;
 
 export async function initUserCount(): Promise<void> {
-  const { count, error } = await supabase
-    .from('users')
-    .select('*', { count: 'exact', head: true });
+  const { count, error } = await supabase.from('users').select('*', { count: 'exact', head: true });
   // PGRST205: table not found — supabase not set up yet, skip gracefully
   if (error && error.code !== 'PGRST205') throw error;
   cachedUserCount = count ?? 0;
@@ -40,7 +36,11 @@ export function getUserCount(): number {
   return cachedUserCount;
 }
 
-export async function createUser(email: string, passwordHash: string, name: string): Promise<number> {
+export async function createUser(
+  email: string,
+  passwordHash: string,
+  name: string
+): Promise<number> {
   const { data, error } = await supabase
     .from('users')
     .insert({ email, password_hash: passwordHash, name })
@@ -93,17 +93,31 @@ export async function getPlans(userId: number): Promise<PlanRow[]> {
   return (data || []) as PlanRow[];
 }
 
-export async function createPlan(userId: number, plan: { id: string; title: string; content: string; category: string; status?: string }): Promise<PlanRow> {
+export async function createPlan(
+  userId: number,
+  plan: { id: string; title: string; content: string; category: string; status?: string }
+): Promise<PlanRow> {
   const { data, error } = await supabase
     .from('plans')
-    .insert({ id: plan.id, user_id: userId, title: plan.title, content: plan.content, category: plan.category, status: plan.status || 'todo' })
+    .insert({
+      id: plan.id,
+      user_id: userId,
+      title: plan.title,
+      content: plan.content,
+      category: plan.category,
+      status: plan.status || 'todo',
+    })
     .select()
     .single();
   if (error) throw error;
   return data as PlanRow;
 }
 
-export async function updatePlan(userId: number, planId: string, updates: { title?: string; content?: string; category?: string; status?: string }): Promise<PlanRow> {
+export async function updatePlan(
+  userId: number,
+  planId: string,
+  updates: { title?: string; content?: string; category?: string; status?: string }
+): Promise<PlanRow> {
   const { data, error } = await supabase
     .from('plans')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -116,15 +130,15 @@ export async function updatePlan(userId: number, planId: string, updates: { titl
 }
 
 export async function deletePlan(userId: number, planId: string): Promise<void> {
-  const { error } = await supabase
-    .from('plans')
-    .delete()
-    .eq('id', planId)
-    .eq('user_id', userId);
+  const { error } = await supabase.from('plans').delete().eq('id', planId).eq('user_id', userId);
   if (error) throw error;
 }
 
-export async function updatePlanStatus(userId: number, planId: string, status: string): Promise<PlanRow> {
+export async function updatePlanStatus(
+  userId: number,
+  planId: string,
+  status: string
+): Promise<PlanRow> {
   const { data, error } = await supabase
     .from('plans')
     .update({ status, ai_done: false, updated_at: new Date().toISOString() })
@@ -162,7 +176,10 @@ export async function getPlanLogs(userId: number, planId: string): Promise<PlanL
   return (data || []) as PlanLogRow[];
 }
 
-export async function appendPlanLog(userId: number, log: { plan_id?: string; type: string; content: string; commit_hash?: string }): Promise<{ plan: PlanRow | null; log: PlanLogRow | null }> {
+export async function appendPlanLog(
+  userId: number,
+  log: { plan_id?: string; type: string; content: string; commit_hash?: string }
+): Promise<{ plan: PlanRow | null; log: PlanLogRow | null }> {
   let planId = log.plan_id;
   if (!planId) {
     const { data: doingPlans } = await supabase
@@ -185,7 +202,12 @@ export async function appendPlanLog(userId: number, log: { plan_id?: string; typ
   }
   const { data: logRow, error: logErr } = await supabase
     .from('plan_logs')
-    .insert({ plan_id: planId, type: log.type, content: log.content, commit_hash: log.commit_hash || null })
+    .insert({
+      plan_id: planId,
+      type: log.type,
+      content: log.content,
+      commit_hash: log.commit_hash || null,
+    })
     .select()
     .single();
   if (logErr) throw logErr;
@@ -199,11 +221,7 @@ export async function appendPlanLog(userId: number, log: { plan_id?: string; typ
       .single();
     plan = updated as PlanRow;
   } else {
-    const { data: current } = await supabase
-      .from('plans')
-      .select('*')
-      .eq('id', planId)
-      .single();
+    const { data: current } = await supabase.from('plans').select('*').eq('id', planId).single();
     plan = current as PlanRow;
   }
   return { plan, log: logRow as PlanLogRow };
@@ -219,37 +237,71 @@ export async function ensurePlanImagesBucket(): Promise<void> {
   }
 }
 
-export async function uploadPlanImage(userId: number, planId: string, filename: string, buffer: Buffer, contentType: string): Promise<{ path: string; url: string }> {
+export async function uploadPlanImage(
+  userId: number,
+  planId: string,
+  filename: string,
+  buffer: Buffer,
+  contentType: string
+): Promise<{ path: string; url: string }> {
   // Verify plan belongs to user
-  const { data: plan } = await supabase.from('plans').select('id').eq('id', planId).eq('user_id', userId).single();
+  const { data: plan } = await supabase
+    .from('plans')
+    .select('id')
+    .eq('id', planId)
+    .eq('user_id', userId)
+    .single();
   if (!plan) throw new Error('Plan not found');
 
   const storagePath = `${userId}/${planId}/${filename}`;
-  const { error } = await supabaseAdmin.storage.from(PLAN_IMAGES_BUCKET).upload(storagePath, buffer, {
-    contentType,
-    upsert: true,
-  });
+  const { error } = await supabaseAdmin.storage
+    .from(PLAN_IMAGES_BUCKET)
+    .upload(storagePath, buffer, {
+      contentType,
+      upsert: true,
+    });
   if (error) throw error;
 
-  const { data: urlData } = supabaseAdmin.storage.from(PLAN_IMAGES_BUCKET).getPublicUrl(storagePath);
+  const { data: urlData } = supabaseAdmin.storage
+    .from(PLAN_IMAGES_BUCKET)
+    .getPublicUrl(storagePath);
   return { path: storagePath, url: urlData.publicUrl };
 }
 
-export async function listPlanImages(userId: number, planId: string): Promise<{ name: string; url: string }[]> {
-  const { data: plan } = await supabase.from('plans').select('id').eq('id', planId).eq('user_id', userId).single();
+export async function listPlanImages(
+  userId: number,
+  planId: string
+): Promise<{ name: string; url: string }[]> {
+  const { data: plan } = await supabase
+    .from('plans')
+    .select('id')
+    .eq('id', planId)
+    .eq('user_id', userId)
+    .single();
   if (!plan) throw new Error('Plan not found');
 
   const prefix = `${userId}/${planId}`;
   const { data, error } = await supabaseAdmin.storage.from(PLAN_IMAGES_BUCKET).list(prefix);
   if (error) throw error;
-  return (data || []).map(f => {
-    const { data: urlData } = supabaseAdmin.storage.from(PLAN_IMAGES_BUCKET).getPublicUrl(`${prefix}/${f.name}`);
+  return (data || []).map((f) => {
+    const { data: urlData } = supabaseAdmin.storage
+      .from(PLAN_IMAGES_BUCKET)
+      .getPublicUrl(`${prefix}/${f.name}`);
     return { name: f.name, url: urlData.publicUrl };
   });
 }
 
-export async function deletePlanImage(userId: number, planId: string, filename: string): Promise<void> {
-  const { data: plan } = await supabase.from('plans').select('id').eq('id', planId).eq('user_id', userId).single();
+export async function deletePlanImage(
+  userId: number,
+  planId: string,
+  filename: string
+): Promise<void> {
+  const { data: plan } = await supabase
+    .from('plans')
+    .select('id')
+    .eq('id', planId)
+    .eq('user_id', userId)
+    .single();
   if (!plan) throw new Error('Plan not found');
 
   const storagePath = `${userId}/${planId}/${filename}`;
