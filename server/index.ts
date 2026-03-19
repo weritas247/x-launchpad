@@ -118,6 +118,10 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// Vendor libraries (served without auth)
+app.use('/vendor/xterm', express.static(path.join(PROJECT_ROOT, 'node_modules/xterm')));
+app.use('/vendor/xterm-addon-fit', express.static(path.join(PROJECT_ROOT, 'node_modules/xterm-addon-fit')));
+
 app.use(authMiddleware);
 app.use(express.static(path.join(PROJECT_ROOT, 'client')));
 
