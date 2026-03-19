@@ -429,17 +429,44 @@
       <button class="plan-cat-tab" data-cat="feature">기능<span class="plan-cat-count" id="plan-count-feature">0</span></button>
       <button class="plan-cat-tab" data-cat="bug">버그<span class="plan-cat-count" id="plan-count-bug">0</span></button>
       <button class="plan-cat-tab" data-cat="other">기타<span class="plan-cat-count" id="plan-count-other">0</span></button>
+      <span class="plan-view-toggle" id="plan-view-toggle">
+        <button class="plan-view-btn active" data-view="list" title="List view">📋</button>
+        <button class="plan-view-btn" data-view="board" title="Board view">📊</button>
+      </span>
     </div>
     <div class="plan-body">
+      <!-- BOARD VIEW (kanban) -->
+      <div class="plan-board" id="plan-board" style="display:none">
+        <div class="plan-board-col" data-status="todo">
+          <div class="plan-board-col-header">TODO <span class="plan-board-count" id="plan-board-count-todo">0</span></div>
+          <div class="plan-board-cards" id="plan-board-todo"></div>
+        </div>
+        <div class="plan-board-col" data-status="doing">
+          <div class="plan-board-col-header">DOING <span class="plan-board-count" id="plan-board-count-doing">0</span></div>
+          <div class="plan-board-cards" id="plan-board-doing"></div>
+        </div>
+        <div class="plan-board-col" data-status="done">
+          <div class="plan-board-col-header">DONE <span class="plan-board-count" id="plan-board-count-done">0</span></div>
+          <div class="plan-board-cards" id="plan-board-done"></div>
+        </div>
+        <div class="plan-board-col" data-status="on_hold">
+          <div class="plan-board-col-header">ON HOLD <span class="plan-board-count" id="plan-board-count-on_hold">0</span></div>
+          <div class="plan-board-cards" id="plan-board-on_hold"></div>
+        </div>
+        <div class="plan-board-col" data-status="cancelled">
+          <div class="plan-board-col-header">CANCELLED <span class="plan-board-count" id="plan-board-count-cancelled">0</span></div>
+          <div class="plan-board-cards" id="plan-board-cancelled"></div>
+        </div>
+      </div>
       <!-- LEFT: Plan list -->
-      <div class="plan-list-col">
+      <div class="plan-list-col" id="plan-list-col">
         <div class="plan-list-toolbar">
           <button class="plan-btn-new" id="plan-btn-new" title="New Plan">+ New</button>
         </div>
         <div class="plan-list-items" id="plan-list-items"></div>
       </div>
       <!-- RIGHT: Editor -->
-      <div class="plan-editor-col">
+      <div class="plan-editor-col" id="plan-editor-col">
         <div class="plan-editor-empty" id="plan-editor-empty">
           <div class="plan-editor-empty-icon">📝</div>
           <div class="plan-editor-empty-text">Select a plan or create a new one</div>
@@ -454,12 +481,35 @@
               <option value="bug">버그</option>
               <option value="other">기타</option>
             </select>
+            <select class="plan-status-select" id="plan-status-select">
+              <option value="todo">TODO</option>
+              <option value="doing">DOING</option>
+              <option value="done">DONE</option>
+              <option value="on_hold">ON HOLD</option>
+              <option value="cancelled">CANCELLED</option>
+            </select>
             <button class="plan-btn-delete" id="plan-btn-delete" title="Delete plan">🗑 Delete</button>
+          </div>
+          <div class="plan-logs" id="plan-logs">
+            <div class="plan-logs-header">Activity Log</div>
+            <div class="plan-logs-list" id="plan-logs-list"></div>
           </div>
         </div>
       </div>
     </div>
   </div>
+</div>
+
+<div class="plan-ctx-menu" id="plan-ctx-menu" style="display:none">
+  <div class="plan-ctx-item" data-action="edit">✏️ 편집</div>
+  <div class="plan-ctx-sep"></div>
+  <div class="plan-ctx-item" data-action="status" data-status="todo">📋 TODO</div>
+  <div class="plan-ctx-item" data-action="status" data-status="doing">🔨 DOING</div>
+  <div class="plan-ctx-item" data-action="status" data-status="done">✅ DONE</div>
+  <div class="plan-ctx-item" data-action="status" data-status="on_hold">⏸ ON HOLD</div>
+  <div class="plan-ctx-item" data-action="status" data-status="cancelled">❌ CANCELLED</div>
+  <div class="plan-ctx-sep"></div>
+  <div class="plan-ctx-item plan-ctx-danger" data-action="delete">🗑 삭제</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════
@@ -965,5 +1015,6 @@
 <script type="module" src="js/scroll-float.js"></script>
 <script type="module" src="js/mobile.js"></script>
 <script type="module" src="js/main.js"></script>
+<div class="plan-toast-container" id="plan-toast-container"></div>
 </body>
 </html>
