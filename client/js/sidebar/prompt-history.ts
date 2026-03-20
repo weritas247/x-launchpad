@@ -4,8 +4,8 @@
 // terminal to that line.
 // For Claude Code sessions, fetches actual prompts from JSONL files.
 
-import { S, terminalMap, sessionMeta, stripAnsi } from '../core/state.js';
-import { wsSend } from '../core/websocket.js';
+import { S, terminalMap, sessionMeta, stripAnsi } from '../core/state';
+import { wsSend } from '../core/websocket';
 
 function fitActiveTerminal() {
   const entry = terminalMap.get(S.activeSessionId);

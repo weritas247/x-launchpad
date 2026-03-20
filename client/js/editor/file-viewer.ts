@@ -1,10 +1,10 @@
 // ─── FILE VIEWER: opens files from explorer as tabs in main view ───
-import { S, terminalMap, tabBar, tabAddBtn, termWrapper, escHtml } from '../core/state.js';
-import { wsSend } from '../core/websocket.js';
-import { registerAction } from '../core/keyboard.js';
-import { createEditor, setReadOnly, getContent, destroyEditor } from './file-editor.js';
-import { getFileIcon } from '../ui/file-icons.js';
-import { hideInputPanel } from '../sidebar/prompt-history.js';
+import { S, terminalMap, tabBar, tabAddBtn, termWrapper, escHtml } from '../core/state';
+import { wsSend } from '../core/websocket';
+import { registerAction } from '../core/keyboard';
+import { createEditor, setReadOnly, getContent, destroyEditor } from './file-editor';
+import { getFileIcon } from '../ui/file-icons';
+import { hideInputPanel } from '../sidebar/prompt-history';
 
 function isMarkdownFile(filePath) {
   return /\.(md|markdown)$/i.test(filePath);
@@ -482,7 +482,7 @@ export function handleFileSaveResult(filePath, success, error) {
   }
 }
 
-// getFileIcon is now imported from '../ui/file-icons.js'
+// getFileIcon is now imported from '../ui/file-icons'
 
 // Register the toggleFileEdit action (keybinding assigned in main.js)
 registerAction('toggleFileEdit', () => {

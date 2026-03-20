@@ -1,5 +1,5 @@
 // ─── MARKDOWN PREVIEW: renders md files as HTML ───
-import { marked, DOMPurify } from '../marked-bundle.js';
+import { marked, DOMPurify } from '../marked-bundle';
 
 // Configure marked for GFM
 marked.setOptions({

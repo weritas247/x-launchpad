@@ -1,5 +1,5 @@
-import { S, connDot, connLabel } from './state.js';
-import { showToast } from '../ui/toast.js';
+import { S, connDot, connLabel } from './state';
+import { showToast } from '../ui/toast';
 
 // ─── Latency UI elements ────────────────────────────
 const _signalBars = document.querySelector('.signal-bars');

@@ -1,9 +1,9 @@
 // ─── SOURCE CONTROL PANEL ────────────────────────────────────────
-import { S, escHtml } from '../core/state.js';
-import { wsSend } from '../core/websocket.js';
-import { showToast } from '../ui/toast.js';
-import { confirmModal } from '../ui/confirm-modal.js';
-import { setActivityBadge } from './activity-bar.js';
+import { S, escHtml } from '../core/state';
+import { wsSend } from '../core/websocket';
+import { showToast } from '../ui/toast';
+import { confirmModal } from '../ui/confirm-modal';
+import { setActivityBadge } from './activity-bar';
 
 let gitStatusFiles = [];
 let gitBranch = '';

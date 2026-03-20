@@ -7,9 +7,9 @@ import {
   tabBar,
   dropOverlay,
   dzZones,
-} from '../core/state.js';
-import { activateSession } from './session.js';
-import { wsSend } from '../core/websocket.js';
+} from '../core/state';
+import { activateSession } from './session';
+import { wsSend } from '../core/websocket';
 
 export function updateSplitPaneTitle(el, sessionId) {
   let titleEl = el.querySelector('.split-pane-title');

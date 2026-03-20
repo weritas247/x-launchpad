@@ -1,5 +1,5 @@
-import { S, terminalMap } from '../core/state.js';
-import { THEMES } from '../core/constants.js';
+import { S, terminalMap } from '../core/state';
+import { THEMES } from '../core/constants';
 
 export function updateSwatches() {
   document.querySelectorAll('.theme-swatch').forEach((el, i) => {

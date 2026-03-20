@@ -1,8 +1,8 @@
-import { S, terminalMap, customCssTag, settingsOverlay, escHtml } from '../core/state.js';
-import { confirmModal } from './confirm-modal.js';
-import { THEMES, KB_DEFS, normalizeKey } from '../core/constants.js';
-import { applyTheme, updateSwatches } from './themes.js';
-import { apiFetch } from '../core/websocket.js';
+import { S, terminalMap, customCssTag, settingsOverlay, escHtml } from '../core/state';
+import { confirmModal } from './confirm-modal';
+import { THEMES, KB_DEFS, normalizeKey } from '../core/constants';
+import { applyTheme, updateSwatches } from './themes';
+import { apiFetch } from '../core/websocket';
 
 export async function loadSettings() {
   try {

@@ -1,6 +1,6 @@
 // ─── ACTIVITY BAR (LEFT ICON BAR) ────────────────────────────────
-import { requestFileTree } from './explorer.js';
-import { requestGitStatus, startScPoll, stopScPoll } from './source-control.js';
+import { requestFileTree } from './explorer';
+import { requestGitStatus, startScPoll, stopScPoll } from './source-control';
 
 const ICON_ORDER_KEY = 'x-launchpad-activity-order';
 

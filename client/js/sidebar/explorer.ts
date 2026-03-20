@@ -1,10 +1,10 @@
 // ─── FILE EXPLORER PANEL ─────────────────────────────────────────
-import { S, sessionMeta, escHtml } from '../core/state.js';
-import { wsSend, apiFetch } from '../core/websocket.js';
-import { showToast } from '../ui/toast.js';
-import { confirmModal } from '../ui/confirm-modal.js';
-import { openFileTab } from '../editor/file-viewer.js';
-import { getFileIcon, getFolderIcon } from '../ui/file-icons.js';
+import { S, sessionMeta, escHtml } from '../core/state';
+import { wsSend, apiFetch } from '../core/websocket';
+import { showToast } from '../ui/toast';
+import { confirmModal } from '../ui/confirm-modal';
+import { openFileTab } from '../editor/file-viewer';
+import { getFileIcon, getFolderIcon } from '../ui/file-icons';
 
 let explorerTree = [];
 const expandedDirs = new Set();
@@ -235,7 +235,7 @@ function renderTreeLevel(parent, entries, depth) {
   }
 }
 
-// getFileIcon is now imported from '../ui/file-icons.js'
+// getFileIcon is now imported from '../ui/file-icons'
 
 function getGitClass(status) {
   const map = {
@@ -264,7 +264,7 @@ export function handleFileOpAck(msg) {
     requestFileTree();
     if (msg.op === 'delete') {
       // Also refresh source control after file delete
-      import('./source-control.js').then((m) => m.requestGitStatus());
+      import('./source-control').then((m) => m.requestGitStatus());
     }
     showToast(`File ${msg.op} successful`, 'success');
   } else {

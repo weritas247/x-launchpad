@@ -1,8 +1,8 @@
 // ─── PLAN MODAL: Evernote-style plan editor ─────────────────
-import { escHtml, S, sessionMeta, terminalMap } from '../core/state.js';
-import { apiFetch, getAuthToken, wsSend } from '../core/websocket.js';
-import { AI_REGISTRY } from '../core/constants.js';
-import { activateSession } from '../terminal/session.js';
+import { escHtml, S, sessionMeta, terminalMap } from '../core/state';
+import { apiFetch, getAuthToken, wsSend } from '../core/websocket';
+import { AI_REGISTRY } from '../core/constants';
+import { activateSession } from '../terminal/session';
 
 const CATEGORIES = { feature: '기능', bug: '버그', other: '기타' };
 

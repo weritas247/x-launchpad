@@ -1,5 +1,5 @@
 // ─── FLOATING SCROLL-TO-TOP / SCROLL-TO-BOTTOM BUTTONS ──────────
-import { S, terminalMap } from '../core/state.js';
+import { S, terminalMap } from '../core/state';
 
 const container = document.getElementById('scroll-float');
 const topBtn = document.getElementById('scroll-top-btn');

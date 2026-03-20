@@ -1,6 +1,6 @@
-import { S, sessionMeta, escHtml } from '../core/state.js';
-import { wsSend } from '../core/websocket.js';
-import { BRANCH_COLORS, AI_REGISTRY } from '../core/constants.js';
+import { S, sessionMeta, escHtml } from '../core/state';
+import { wsSend } from '../core/websocket';
+import { BRANCH_COLORS, AI_REGISTRY } from '../core/constants';
 
 // ─── STATE ───────────────────────────────────────────
 let isOpen = false;

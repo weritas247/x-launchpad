@@ -7,27 +7,27 @@ import {
   termWrapper,
   ctxMenu,
   escHtml,
-} from '../core/state.js';
-import { AI_REGISTRY } from '../core/constants.js';
-import { wsSend, getAuthToken, apiFetch } from '../core/websocket.js';
-import { xtermKeyHandler } from '../core/keyboard.js';
-import { trackInput } from '../sidebar/prompt-history.js';
-import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session.js';
+} from '../core/state';
+import { AI_REGISTRY } from '../core/constants';
+import { wsSend, getAuthToken, apiFetch } from '../core/websocket';
+import { xtermKeyHandler } from '../core/keyboard';
+import { trackInput } from '../sidebar/prompt-history';
+import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session';
 import {
   removeSplitPane,
   teardownSplitLayout,
   showDropZoneOverlay,
   hideDropZoneOverlay,
-} from './split-pane.js';
-import { resetTabStatus, tabStatusOnInput } from '../ui/tab-status.js';
+} from './split-pane';
+import { resetTabStatus, tabStatusOnInput } from '../ui/tab-status';
 import {
   setupTerminalImageHandlers,
   hasPendingAttachments,
   uploadAndFlush,
-} from '../ui/image-attach.js';
-import { destroyStream, bypassStream, unbypassStream, streamWrite } from './stream-writer.js';
-import { aiNotifyCheck } from '../ui/notifications.js';
-import { tabStatusCheck } from '../ui/tab-status.js';
+} from '../ui/image-attach';
+import { destroyStream, bypassStream, unbypassStream, streamWrite } from './stream-writer';
+import { aiNotifyCheck } from '../ui/notifications';
+import { tabStatusCheck } from '../ui/tab-status';
 
 export function newSession() {
   showSessionPicker();

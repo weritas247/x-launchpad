@@ -1,6 +1,6 @@
 // ─── CHAT EDITOR WITH SLASH COMMANDS ────────────────────────────
-import { S, terminalMap } from '../core/state.js';
-import { wsSend } from '../core/websocket.js';
+import { S, terminalMap } from '../core/state';
+import { wsSend } from '../core/websocket';
 
 const chatInput = document.getElementById('chat-input');
 const chatSend = document.getElementById('chat-send');

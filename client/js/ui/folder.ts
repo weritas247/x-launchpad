@@ -1,5 +1,5 @@
-import { S, terminalMap, folderMap, escHtml } from '../core/state.js';
-import { getFolderIcon } from './file-icons.js';
+import { S, terminalMap, folderMap, escHtml } from '../core/state';
+import { getFolderIcon } from './file-icons';
 
 export function createFolder(name) {
   const id = 'folder-' + ++S.folderCounter;

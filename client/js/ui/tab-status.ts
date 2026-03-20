@@ -1,4 +1,4 @@
-import { sessionMeta, terminalMap, tabStatusState, stripAnsi } from '../core/state.js';
+import { sessionMeta, terminalMap, tabStatusState, stripAnsi } from '../core/state';
 
 // ─── Constants ───────────────────────────────────────
 const STATUS_DEBOUNCE = 800;

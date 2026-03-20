@@ -1,9 +1,9 @@
-import { S, terminalMap, sessionMeta, tabBar, tabAddBtn, settingsOverlay } from './state.js';
-import { THEMES } from './constants.js';
-import { connect, wsSend, setOnInputSend, requestScrollback } from './websocket.js';
-import { initThemeSwatches } from '../ui/themes.js';
-import { activateSession, updateStatusBar, setOnSessionChangeSidePanels } from '../terminal/session.js';
-import { initSplitDnD, refitAllPanes, updateSidebarSplitGroup } from '../terminal/split-pane.js';
+import { S, terminalMap, sessionMeta, tabBar, tabAddBtn, settingsOverlay } from './state';
+import { THEMES } from './constants';
+import { connect, wsSend, setOnInputSend, requestScrollback } from './websocket';
+import { initThemeSwatches } from '../ui/themes';
+import { activateSession, updateStatusBar, setOnSessionChangeSidePanels } from '../terminal/session';
+import { initSplitDnD, refitAllPanes, updateSidebarSplitGroup } from '../terminal/split-pane';
 import {
   newSession,
   closeSession,
@@ -14,17 +14,17 @@ import {
   showSessionPicker,
   hideSessionPicker,
   initContextMenu,
-} from '../terminal/terminal.js';
+} from '../terminal/terminal';
 import {
   loadSettings,
   applySettings,
   openSettings,
   closeSettings,
   initSettingsUI,
-} from '../ui/settings.js';
-import { aiNotifyCheck, resetNotifyState, initNotifications } from '../ui/notifications.js';
-import { tabStatusCheck, tabStatusOnAiChange, suppressTabStatus } from '../ui/tab-status.js';
-import { initFolderDnD } from '../ui/folder.js';
+} from '../ui/settings';
+import { aiNotifyCheck, resetNotifyState, initNotifications } from '../ui/notifications';
+import { tabStatusCheck, tabStatusOnAiChange, suppressTabStatus } from '../ui/tab-status';
+import { initFolderDnD } from '../ui/folder';
 import {
   openGitGraph,
   closeGitGraph,
@@ -40,22 +40,22 @@ import {
   handleGitGraphSearchData,
   requestBranch,
   handleGitGraphKeydown,
-} from '../sidebar/git-graph.js';
-import { streamWrite, bypassStream, unbypassStream } from '../terminal/stream-writer.js';
-import { registerAction, buildCombo, matchCombo, tryKeybinding } from './keyboard.js';
+} from '../sidebar/git-graph';
+import { streamWrite, bypassStream, unbypassStream } from '../terminal/stream-writer';
+import { registerAction, buildCombo, matchCombo, tryKeybinding } from './keyboard';
 import {
   initInputPanel,
   toggleInputPanel,
   onSessionChange as inputPanelSessionChange,
   handleClaudePrompts,
-} from '../sidebar/prompt-history.js';
+} from '../sidebar/prompt-history';
 import {
   initActivityBar,
   getActivePanel,
   switchPanel,
   toggleSidebarExport,
   initSidebarResize,
-} from '../sidebar/activity-bar.js';
+} from '../sidebar/activity-bar';
 import {
   initExplorer,
   handleFileTreeData,
@@ -63,7 +63,7 @@ import {
   handleFileOpAck,
   onExplorerSessionChange,
   requestFileTree,
-} from '../sidebar/explorer.js';
+} from '../sidebar/explorer';
 import {
   initSourceControl,
   handleGitStatusData,
@@ -76,14 +76,14 @@ import {
   handleWorktreeAddAck,
   handleWorktreeRemoveAck,
   handleWorktreeSwitchAck,
-} from '../sidebar/source-control.js';
+} from '../sidebar/source-control';
 import {
   initSearch,
   handleSearchResults,
   handleReplaceAck,
   onSearchSessionChange,
-} from '../sidebar/search.js';
-import { setActivateSessionFn, handleFileSaveResult, getActiveFilePath, closeFileTab, activateFileTab } from '../editor/file-viewer.js';
+} from '../sidebar/search';
+import { setActivateSessionFn, handleFileSaveResult, getActiveFilePath, closeFileTab, activateFileTab } from '../editor/file-viewer';
 import {
   initPlanPanel,
   handlePlanFileData,
@@ -100,9 +100,9 @@ import {
   onHeadlessFailed,
   onHeadlessSync,
   updateAiTasksBadge,
-} from '../sidebar/plan-panel.js';
-import { initControlPanel } from '../terminal/control-panel.js';
-import '../ui/mobile.js'; // auto-initializes mobile UI
+} from '../sidebar/plan-panel';
+import { initControlPanel } from '../terminal/control-panel';
+import '../ui/mobile'; // auto-initializes mobile UI
 
 S.currentTheme = THEMES[0];
 

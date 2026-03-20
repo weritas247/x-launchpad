@@ -1,6 +1,6 @@
 // mobile.js — Mobile UI/UX module for X-Launchpad
-import { switchPanel, getActivePanel } from '../sidebar/activity-bar.js';
-import { openSettings } from './settings.js';
+import { switchPanel, getActivePanel } from '../sidebar/activity-bar';
+import { openSettings } from './settings';
 
 // ─── Mobile Detection ───
 const MQ = window.matchMedia('(max-width: 768px)');

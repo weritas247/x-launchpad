@@ -1,5 +1,5 @@
-import { terminalMap } from '../core/state.js';
-import { wsSend, apiFetch } from '../core/websocket.js';
+import { terminalMap } from '../core/state';
+import { wsSend, apiFetch } from '../core/websocket';
 
 // Per-session pending images (NOT uploaded yet): Map<sessionId, [{file, objectUrl}]>
 const attachments = new Map();

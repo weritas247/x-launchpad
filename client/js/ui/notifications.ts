@@ -7,10 +7,10 @@ import {
   notifyState,
   escHtml,
   stripAnsi,
-} from '../core/state.js';
-import { AI_REGISTRY } from '../core/constants.js';
-import { activateSession } from '../terminal/session.js';
-import { wsSend } from '../core/websocket.js';
+} from '../core/state';
+import { AI_REGISTRY } from '../core/constants';
+import { activateSession } from '../terminal/session';
+import { wsSend } from '../core/websocket';
 
 const NOTIFY_DEBOUNCE = 1200;
 

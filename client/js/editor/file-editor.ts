@@ -10,7 +10,7 @@ import {
   javascript, python, html, css, json, markdown,
   rust, cpp, java, sql, xml, yaml,
   tags,
-} from '../codemirror-bundle.js';
+} from '../codemirror-bundle';
 
 // ─── Language map (file extension → CodeMirror language function) ───
 const LANG_MAP = {

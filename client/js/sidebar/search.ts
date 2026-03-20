@@ -1,9 +1,9 @@
 // ─── SEARCH PANEL ────────────────────────────────────────────────
-import { S, sessionMeta, escHtml } from '../core/state.js';
-import { wsSend } from '../core/websocket.js';
-import { confirmModal } from '../ui/confirm-modal.js';
-import { setActivityBadge } from './activity-bar.js';
-import { showToast } from '../ui/toast.js';
+import { S, sessionMeta, escHtml } from '../core/state';
+import { wsSend } from '../core/websocket';
+import { confirmModal } from '../ui/confirm-modal';
+import { setActivityBadge } from './activity-bar';
+import { showToast } from '../ui/toast';
 
 let searchResults = [];
 let lastQuery = '';

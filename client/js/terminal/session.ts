@@ -1,8 +1,8 @@
-import { S, terminalMap, sessionMeta, hdrCount, sessionEmpty, emptyState } from '../core/state.js';
-import { requestBranch } from '../sidebar/git-graph.js';
-import { collectPaneIds, teardownSplitLayout } from './split-pane.js';
-import { onSessionChange as inputPanelSessionChange } from '../sidebar/prompt-history.js';
-import { deactivateAllFileTabs } from '../editor/file-viewer.js';
+import { S, terminalMap, sessionMeta, hdrCount, sessionEmpty, emptyState } from '../core/state';
+import { requestBranch } from '../sidebar/git-graph';
+import { collectPaneIds, teardownSplitLayout } from './split-pane';
+import { onSessionChange as inputPanelSessionChange } from '../sidebar/prompt-history';
+import { deactivateAllFileTabs } from '../editor/file-viewer';
 
 // Lazy-loaded callbacks to avoid circular imports
 let _onSessionChangeSidePanels = null;
