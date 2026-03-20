@@ -241,6 +241,20 @@ export function attachTerminal(sessionId, name) {
   const fitAddon = new FitAddon.FitAddon();
   term.loadAddon(fitAddon);
   term.open(div);
+
+  // WebGL renderer for GPU-accelerated rendering (falls back to DOM renderer on failure)
+  if (typeof WebglAddon !== 'undefined') {
+    try {
+      const webglAddon = new WebglAddon.WebglAddon();
+      webglAddon.onContextLoss(() => {
+        webglAddon.dispose();
+      });
+      term.loadAddon(webglAddon);
+    } catch (e) {
+      console.warn('[webgl] Failed to load WebGL renderer, using DOM renderer:', e.message);
+    }
+  }
+
   fitAddon.fit();
 
   // Let app-level keybindings override xterm — execute action immediately
