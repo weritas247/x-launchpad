@@ -7,7 +7,7 @@ export function updateSwatches() {
   });
 }
 
-export function applyTheme(t) {
+export function applyTheme(t, preview = false) {
   S.currentTheme = t;
   document.body.className = '';
   if (t.css) {
@@ -19,7 +19,9 @@ export function applyTheme(t) {
   terminalMap.forEach(({ term }) => {
     term.options.theme = t.term;
   });
-  updateSwatches();
+  if (!preview) {
+    updateSwatches();
+  }
 }
 
 export function initThemeSwatches() {
