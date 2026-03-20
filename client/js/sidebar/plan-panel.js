@@ -230,7 +230,8 @@ function flushSave() {
   plan.category = catSelect.value;
   plan.updated = Date.now();
   updateCount();
-  renderList();
+  if (currentView === 'board') renderBoard();
+  else renderList();
   dateEl.textContent = formatDate(plan.updated);
   apiUpdatePlan(plan);
 }
