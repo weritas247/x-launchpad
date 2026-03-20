@@ -2448,6 +2448,7 @@ body::after {
 
 .plan-cat-tab {
     position: relative;
+    flex: 1;
     background: none;
     border: none;
     border-bottom: 2px solid transparent;
@@ -2576,6 +2577,28 @@ body::after {
     display: flex;
     flex: 1;
     overflow: hidden;
+}
+
+.plan-body--board {
+    flex-direction: column;
+}
+
+.plan-body--board .plan-editor-col {
+    flex: none;
+    height: 260px;
+    border-top: 1px solid var(--border);
+    border-right: none;
+    overflow: hidden;
+    animation: plan-detail-fold-in 0.25s ease-out;
+}
+
+@keyframes plan-detail-fold-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.plan-body--board .plan-editor-area {
+    overflow-y: auto;
 }
 
 /* ── LEFT COLUMN: Plan list ── */
@@ -7966,8 +7989,9 @@ body::after {
 
 /* ─── Board Divider (resize handle) ─── */
 .plan-board-divider {
-    width: 5px;
-    cursor: col-resize;
+    height: 5px;
+    width: 100%;
+    cursor: row-resize;
     background: transparent;
     flex-shrink: 0;
     position: relative;
@@ -7986,8 +8010,8 @@ body::after {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 3px;
-    height: 30px;
+    width: 30px;
+    height: 3px;
     border-radius: 2px;
     background: rgba(255, 255, 255, 0.15);
 }
@@ -8440,7 +8464,7 @@ body::after {
 .plan-images {
     border-top: 1px solid #333;
     margin-top: 8px;
-    padding-top: 6px;
+    padding: 6px 8px;
 }
 
 .plan-images-header {

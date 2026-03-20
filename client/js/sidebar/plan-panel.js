@@ -263,18 +263,22 @@ function switchView(view) {
   viewToggleEl?.querySelectorAll('.plan-view-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.view === view);
   });
+  const body = document.querySelector('.plan-body');
   if (view === 'board') {
+    if (body) body.classList.add('plan-body--board');
     if (boardEl) boardEl.style.display = 'flex';
     if (listColEl) listColEl.style.display = 'none';
-    if (editorColEl) editorColEl.style.display = 'none';
-    if (boardDivider) boardDivider.style.display = 'none';
-    restoreBoardSplit();
+    hideBoardEditor();
     renderBoard();
   } else {
+    if (body) body.classList.remove('plan-body--board');
     if (boardEl) boardEl.style.display = 'none';
     if (boardDivider) boardDivider.style.display = 'none';
+    if (editorColEl) {
+      editorColEl.style.display = '';
+      editorColEl.style.height = '';
+    }
     if (listColEl) listColEl.style.display = '';
-    if (editorColEl) editorColEl.style.display = '';
     renderList();
   }
 }
@@ -283,29 +287,25 @@ const editorCloseBtn = document.getElementById('plan-editor-close');
 
 function showBoardEditor() {
   if (boardDivider) boardDivider.style.display = '';
-  if (editorColEl) editorColEl.style.display = '';
+  if (editorColEl) {
+    editorColEl.style.display = '';
+    const savedH = localStorage.getItem('plan-board-editor-h');
+    editorColEl.style.height = savedH ? `${savedH}px` : '260px';
+  }
   if (editorCloseBtn) editorCloseBtn.style.display = 'block';
-  restoreBoardSplit();
+  if (boardEl) boardEl.style.flex = '1';
 }
 
 function hideBoardEditor() {
   flushSave();
-  if (editorColEl) editorColEl.style.display = 'none';
+  if (editorColEl) {
+    editorColEl.style.display = 'none';
+    editorColEl.style.height = '';
+  }
   if (boardDivider) boardDivider.style.display = 'none';
   if (editorCloseBtn) editorCloseBtn.style.display = 'none';
   if (boardEl) boardEl.style.flex = '1';
   activeId = null;
-}
-
-function restoreBoardSplit() {
-  if (!boardEl) return;
-  // Only apply saved split when editor is visible
-  if (editorColEl && editorColEl.style.display !== 'none') {
-    const saved = localStorage.getItem('plan-board-split');
-    boardEl.style.flex = saved ? `0 0 ${saved}px` : '2';
-  } else {
-    boardEl.style.flex = '1';
-  }
 }
 
 // ─── Rendering ──────────────────────────────────────
@@ -455,30 +455,30 @@ function initBoardDragDrop() {
 
 // ─── Board Divider Drag ─────────────────────────────
 function initBoardDivider() {
-  if (!boardDivider || !boardEl) return;
-  let startX = 0;
-  let startW = 0;
+  if (!boardDivider || !editorColEl) return;
+  let startY = 0;
+  let startH = 0;
 
   boardDivider.addEventListener('mousedown', (e) => {
     e.preventDefault();
-    startX = e.clientX;
-    startW = boardEl.offsetWidth;
+    startY = e.clientY;
+    startH = editorColEl.offsetHeight;
     boardDivider.classList.add('dragging');
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   });
 
   function onMove(e) {
-    const delta = e.clientX - startX;
-    const newW = Math.max(200, startW + delta);
-    boardEl.style.flex = `0 0 ${newW}px`;
+    const delta = startY - e.clientY;
+    const newH = Math.max(120, Math.min(startH + delta, window.innerHeight * 0.7));
+    editorColEl.style.height = `${newH}px`;
   }
 
   function onUp() {
     boardDivider.classList.remove('dragging');
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('mouseup', onUp);
-    localStorage.setItem('plan-board-split', String(boardEl.offsetWidth));
+    localStorage.setItem('plan-board-editor-h', String(editorColEl.offsetHeight));
   }
 }
 
@@ -639,15 +639,24 @@ export async function openPlanModal() {
   if (!isLoggedIn()) return;
   await loadPlans();
   if (activeId && !plans.find((p) => p.id === activeId)) activeId = null;
-  if (currentView === 'board') renderBoard();
-  else renderList();
-  const filtered = filteredPlans();
-  if (activeId && filtered.find((p) => p.id === activeId)) {
-    selectPlan(activeId);
-  } else if (filtered.length > 0) {
-    selectPlan(filtered[0].id);
+  const body = document.querySelector('.plan-body');
+  if (currentView === 'board') {
+    if (body) body.classList.add('plan-body--board');
+    renderBoard();
+    // Board view: editor is hidden until a card is clicked
+    if (editorColEl) editorColEl.style.display = 'none';
+    if (boardDivider) boardDivider.style.display = 'none';
   } else {
-    showEmptyState();
+    if (body) body.classList.remove('plan-body--board');
+    renderList();
+    const filtered = filteredPlans();
+    if (activeId && filtered.find((p) => p.id === activeId)) {
+      selectPlan(activeId);
+    } else if (filtered.length > 0) {
+      selectPlan(filtered[0].id);
+    } else {
+      showEmptyState();
+    }
   }
   restoreModalSize();
   overlay.classList.add('open');
@@ -784,6 +793,11 @@ export function initPlanPanel() {
     if (!card) return;
     // skip if clicking AI session badge
     if (e.target.closest('.plan-board-card-ai-session')) return;
+    // toggle: click same card again → close detail
+    if (activeId === card.dataset.id) {
+      hideBoardEditor();
+      return;
+    }
     flushSave();
     selectPlan(card.dataset.id);
     showBoardEditor();
