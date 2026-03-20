@@ -15,7 +15,8 @@ function openOrActivateSession(sid) {
     return;
   }
   // Session tab doesn't exist — open a new tab that resumes the claude session
-  wsSend({ type: 'session_create', name: 'Claude', cmd: `claude --dangerously-skip-permissions --resume ${sid}` });
+  const meta = sessionMeta.get(sid);
+  wsSend({ type: 'session_create', name: 'Claude', cmd: `claude --dangerously-skip-permissions --resume ${sid}`, cwd: meta?.cwd || undefined });
 }
 
 // DOM refs
