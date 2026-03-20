@@ -23,6 +23,7 @@ db.exec(`
     created_at INTEGER NOT NULL,
     cwd TEXT DEFAULT '',
     cmd TEXT DEFAULT '',
+    scrollback TEXT DEFAULT '',
     updated_at INTEGER DEFAULT (strftime('%s','now'))
   );
 
@@ -41,6 +42,11 @@ db.exec(`
   );
 
 `);
+
+// Migration: add scrollback column if missing
+try {
+  db.exec(`ALTER TABLE sessions ADD COLUMN scrollback TEXT DEFAULT ''`);
+} catch {}
 
 // ─── Settings ───────────────────────────────────────
 const stmtGetSetting = db.prepare('SELECT value FROM settings WHERE key = ?');
@@ -74,7 +80,7 @@ export function saveSettings(settings: Record<string, unknown>): void {
 // ─── Sessions ───────────────────────────────────────
 const stmtListSessions = db.prepare('SELECT * FROM sessions ORDER BY created_at');
 const stmtUpsertSession = db.prepare(
-  "INSERT OR REPLACE INTO sessions (id, name, created_at, cwd, cmd, updated_at) VALUES (?, ?, ?, ?, ?, strftime('%s','now'))"
+  "INSERT OR REPLACE INTO sessions (id, name, created_at, cwd, cmd, scrollback, updated_at) VALUES (?, ?, ?, ?, ?, ?, strftime('%s','now'))"
 );
 const stmtDeleteSession = db.prepare('DELETE FROM sessions WHERE id = ?');
 const stmtClearSessions = db.prepare('DELETE FROM sessions');
@@ -85,6 +91,7 @@ export interface SessionRow {
   created_at: number;
   cwd: string;
   cmd: string;
+  scrollback: string;
 }
 
 export function listSessions(): SessionRow[] {
@@ -96,9 +103,10 @@ export function upsertSession(
   name: string,
   createdAt: number,
   cwd: string,
-  cmd?: string
+  cmd?: string,
+  scrollback?: string
 ): void {
-  stmtUpsertSession.run(id, name, createdAt, cwd, cmd || '');
+  stmtUpsertSession.run(id, name, createdAt, cwd, cmd || '', scrollback || '');
 }
 
 export function deleteSession(id: string): void {
@@ -106,12 +114,12 @@ export function deleteSession(id: string): void {
 }
 
 export function saveSessions(
-  sessions: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string }>
+  sessions: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string; scrollback?: string }>
 ): void {
   const transaction = db.transaction(() => {
     stmtClearSessions.run();
     for (const s of sessions) {
-      stmtUpsertSession.run(s.id, s.name, s.createdAt, s.cwd, s.cmd || '');
+      stmtUpsertSession.run(s.id, s.name, s.createdAt, s.cwd, s.cmd || '', s.scrollback || '');
     }
   });
   transaction();

@@ -1288,13 +1288,14 @@ body::after {
 #main-content {
     flex: 1;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     overflow: hidden;
     position: relative;
 }
 
 #terminal-wrapper {
     flex: 1;
+    min-width: 0;
     position: relative;
     overflow: hidden;
 }
@@ -1431,12 +1432,11 @@ body::after {
 
 /* ═══ INPUT HISTORY PANEL ═══ */
 .input-panel {
+    position: relative;
     display: flex;
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 10;
+    flex-shrink: 0;
+    width: 260px;
+    border-left: 1px solid var(--border);
     transition: width 0.2s ease;
 }
 
@@ -1446,11 +1446,6 @@ body::after {
 
 .input-panel.collapsed {
     width: 24px;
-}
-
-.input-panel:not(.collapsed) {
-    width: 260px;
-    border-left: 1px solid var(--border);
 }
 
 .input-panel-toggle {
@@ -1489,7 +1484,8 @@ body::after {
     display: none;
     flex-direction: column;
     margin-left: 24px;
-    width: calc(100% - 24px);
+    flex: 1;
+    min-width: 0;
     background: var(--bg-panel);
     overflow: hidden;
 }
@@ -2455,13 +2451,13 @@ body::after {
     flex: 1;
     background: none;
     border: none;
-    border-bottom: 2px solid transparent;
+    border-bottom: 3px solid transparent;
     color: var(--text-ghost);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 16px;
     font-weight: 600;
     letter-spacing: 0.08em;
-    padding: 9px 18px 8px;
+    padding: 14px 27px 12px;
     cursor: pointer;
     transition: all 0.15s;
     text-transform: uppercase;
@@ -2494,12 +2490,12 @@ body::after {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
-    margin-left: 6px;
-    border-radius: 8px;
-    font-size: 9px;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    margin-left: 8px;
+    border-radius: 12px;
+    font-size: 13px;
     font-weight: 700;
     background: var(--bg-surface);
     color: var(--text-ghost);
@@ -8073,6 +8069,16 @@ body::after {
     align-items: center;
     margin-top: 4px;
 }
+.plan-board-card-footer-left {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.plan-board-card-footer-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
 
 .plan-board-card-date {
     font-size: 9px;
@@ -8085,6 +8091,31 @@ body::after {
     border-radius: 3px;
     background: rgba(255, 255, 255, 0.08);
     color: #888;
+}
+
+.plan-board-card-wt {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    font-size: 11px;
+    opacity: 0.5;
+    transition: opacity 0.15s;
+    user-select: none;
+}
+.plan-board-card-wt:has(.plan-wt-check:checked) {
+    opacity: 1;
+}
+.plan-wt-check {
+    width: 12px;
+    height: 12px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: #4caf50;
+}
+.plan-wt-icon {
+    font-size: 10px;
+    line-height: 1;
 }
 
 .plan-board-card-ai-badge {

@@ -386,7 +386,11 @@ export function updateSessionInfo(sessionId, cwd, ai) {
 
   const tabNameEl = entry.tabEl.querySelector('.tab-name');
   const meta = sessionMeta.get(sessionId);
-  const baseName = meta ? meta.name : sessionId;
+  let baseName = meta ? meta.name : sessionId;
+  if (ai && baseName === 'Shell') {
+    const reg = AI_REGISTRY[ai];
+    baseName = reg ? reg.label : ai;
+  }
   const wtTag = wtName ? ` [${wtName}]` : '';
   tabNameEl.textContent = `${baseName}${wtTag}  ${shortCwd}`;
 
@@ -407,6 +411,7 @@ export function updateSessionInfo(sessionId, cwd, ai) {
       titleEl.querySelector('.spt-path').textContent = shortCwd;
     }
   }
+
 }
 
 export function createTab(sessionId, name) {

@@ -549,6 +549,7 @@ function persistSessions() {
     createdAt: s.createdAt,
     cwd: s.cwd,
     cmd: s.cmd,
+    scrollback: s.scrollback,
   }));
   try {
     db.saveSessions(data);
@@ -589,7 +590,7 @@ function cmdForSession(s: { name: string; cmd?: string }): string | undefined {
 
 function restoreSessions() {
   try {
-    let saved: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string }>;
+    let saved: Array<{ id: string; name: string; createdAt: number; cwd: string; cmd?: string; scrollback?: string }>;
     const dbSessions = db.listSessions();
     if (dbSessions.length > 0) {
       saved = dbSessions.map((r) => ({
@@ -598,6 +599,7 @@ function restoreSessions() {
         createdAt: r.created_at,
         cwd: r.cwd,
         cmd: r.cmd || undefined,
+        scrollback: r.scrollback || undefined,
       }));
     } else if (fs.existsSync(SESSIONS_PATH)) {
       saved = JSON.parse(fs.readFileSync(SESSIONS_PATH, 'utf-8'));
@@ -610,13 +612,16 @@ function restoreSessions() {
     for (const s of saved) {
       const tmuxName = s.id.replace(/[.:]/g, '-');
       const tmuxAlive = liveTmux.has(tmuxName);
+
       if (tmuxAvailable && tmuxAlive) {
         console.log(`[session] Reattaching to live tmux session: ${s.name} (${tmuxName})`);
         const sess = createSession(s.id, s.name, s.cwd);
         sess.resized = false;
+        if (s.scrollback) sess.scrollback = s.scrollback;
       } else {
         const cmd = cmdForSession(s);
         const sess = createSession(s.id, s.name, s.cwd, cmd);
+        if (s.scrollback) sess.scrollback = s.scrollback;
         if (cmd) {
           console.log(
             `[session] Will run '${cmd}' in restored session '${s.name}' after first resize`
