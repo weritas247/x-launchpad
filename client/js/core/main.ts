@@ -302,14 +302,20 @@ registerCommand({ id: 'toggleFileEdit', label: 'Toggle File Edit', category: 'UI
 
 // Git commands
 registerCommand({ id: 'gitGraph', label: 'Git Graph', category: 'Git', execute: () => { isGitGraphOpen() ? closeGitGraph() : openGitGraph(); } });
-registerCommand({ id: 'git:status', label: 'Git: Status', category: 'Git', execute: () => { switchPanel('source-control'); } });
+registerCommand({ id: 'git:status', label: 'Git: Status', category: 'Git', execute: () => { switchPanel('source-control'); onSourceControlSessionChange(); } });
 registerCommand({ id: 'git:commit', label: 'Git: Commit', category: 'Git', execute: () => { switchPanel('source-control'); setTimeout(() => { const commitInput = document.getElementById('sc-commit-msg'); if (commitInput) commitInput.focus(); }, 100); } });
-registerCommand({ id: 'git:push', label: 'Git: Push', category: 'Git', execute: () => { wsSend({ type: 'git_push' }); } });
-registerCommand({ id: 'git:pull', label: 'Git: Pull', category: 'Git', execute: () => { wsSend({ type: 'git_pull' }); } });
+registerCommand({ id: 'git:push', label: 'Git: Push', category: 'Git', execute: () => { wsSend({ type: 'git_push' }); }, when: () => !!S.activeSessionId });
+registerCommand({ id: 'git:pull', label: 'Git: Pull', category: 'Git', execute: () => { wsSend({ type: 'git_pull' }); }, when: () => !!S.activeSessionId });
 
 // File commands
-registerCommand({ id: 'file:newFile', label: 'New File', category: 'File', execute: () => { switchPanel('explorer'); } });
-registerCommand({ id: 'file:newFolder', label: 'New Folder', category: 'File', execute: () => { switchPanel('explorer'); } });
+registerCommand({ id: 'file:newFile', label: 'New File', category: 'File', execute: () => {
+  switchPanel('explorer');
+  import('../sidebar/explorer').then((m) => { if (m.createNewFile) m.createNewFile(); });
+}});
+registerCommand({ id: 'file:newFolder', label: 'New Folder', category: 'File', execute: () => {
+  switchPanel('explorer');
+  import('../sidebar/explorer').then((m) => { if (m.createNewFolder) m.createNewFolder(); });
+}});
 registerCommand({ id: 'file:revealInFinder', label: 'Reveal in Finder', category: 'File', execute: () => { const meta = sessionMeta.get(S.activeSessionId); const cwd = meta?.cwd || ''; fetch('/api/reveal-in-finder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: cwd }) }); }, when: () => !!S.activeSessionId });
 
 // Plan

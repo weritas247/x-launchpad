@@ -285,3 +285,15 @@ export function handleFileReadData(msg) {
 export function onExplorerSessionChange() {
   requestFileTree();
 }
+
+export function createNewFile() {
+  const name = prompt('New file name:');
+  if (!name || !S.activeSessionId) return;
+  wsSend({ type: 'file_create', sessionId: S.activeSessionId, filePath: name, isDir: false });
+}
+
+export function createNewFolder() {
+  const name = prompt('New folder name:');
+  if (!name || !S.activeSessionId) return;
+  wsSend({ type: 'file_create', sessionId: S.activeSessionId, filePath: name, isDir: true });
+}

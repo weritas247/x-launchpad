@@ -221,6 +221,13 @@ function buildThemeItems(query: string): PaletteItem[] {
           }
           if (S.settings) {
             S.settings.appearance.theme = t.id;
+            import('../core/websocket').then(({ apiFetch }) => {
+              apiFetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(S.settings),
+              });
+            });
           }
         },
       } as PaletteItem & { score: number };
@@ -274,7 +281,8 @@ function onInput() {
       }
     }
     if (recentItems.length) {
-      items = [...recentItems, ...items];
+      const recentIds = new Set(recentItems.map(i => i.id));
+      items = [...recentItems, ...items.filter(i => !recentIds.has(i.id))];
     }
   }
 
@@ -369,24 +377,27 @@ function selectItem(idx: number) {
 // ═══════════════════════════════════════════════════
 
 function onKeydown(e: KeyboardEvent) {
-  e.stopPropagation();
-
   switch (e.key) {
     case 'ArrowDown':
       e.preventDefault();
+      e.stopPropagation();
       setActive(Math.min(activeIndex + 1, currentItems.length - 1));
       break;
     case 'ArrowUp':
       e.preventDefault();
+      e.stopPropagation();
       setActive(Math.max(activeIndex - 1, 0));
       break;
     case 'Enter':
       e.preventDefault();
+      e.stopPropagation();
       selectItem(activeIndex);
       break;
     case 'Escape':
       e.preventDefault();
+      e.stopPropagation();
       closePalette();
       break;
+    // All other keys: let them propagate (allows Cmd+P toggle to work via tryKeybinding)
   }
 }
