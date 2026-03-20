@@ -1,10 +1,22 @@
 // ─── PLAN MODAL: Evernote-style plan editor ─────────────────
-import { escHtml, S, sessionMeta } from '../core/state.js';
+import { escHtml, S, sessionMeta, terminalMap } from '../core/state.js';
 import { apiFetch, getAuthToken, wsSend } from '../core/websocket.js';
 import { AI_REGISTRY } from '../core/constants.js';
 import { activateSession } from '../terminal/session.js';
 
 const CATEGORIES = { feature: '기능', bug: '버그', other: '기타' };
+
+/** Activate existing session tab, or resume the claude session in a new tab */
+function openOrActivateSession(sid) {
+  if (!sid) return;
+  if (terminalMap.has(sid)) {
+    activateSession(sid);
+    wsSend({ type: 'session_attach', sessionId: sid });
+    return;
+  }
+  // Session tab doesn't exist — open a new tab that resumes the claude session
+  wsSend({ type: 'session_create', name: 'Claude', cmd: `claude --dangerously-skip-permissions --resume ${sid}` });
+}
 
 // DOM refs
 const overlay = document.getElementById('plan-overlay');
@@ -803,7 +815,7 @@ export function initPlanPanel() {
         const sid = badge.dataset.sessionId;
         // headless 세션은 탭 전환 안 함
         if (sid && headlessJobs.has(sid)) return;
-        if (sid) activateSession(sid);
+        if (sid) openOrActivateSession(sid);
         return;
       }
     },
@@ -1359,7 +1371,7 @@ aiDashBody?.addEventListener('click', (e) => {
   if (goBtn) {
     const sid = goBtn.dataset.sid;
     if (sid) {
-      activateSession(sid);
+      openOrActivateSession(sid);
       closeAiDashboard();
     }
     return;
@@ -1369,14 +1381,14 @@ aiDashBody?.addEventListener('click', (e) => {
   if (sidEl) {
     const sid = sidEl.dataset.sid;
     if (sid) {
-      activateSession(sid);
+      openOrActivateSession(sid);
       closeAiDashboard();
     }
     return;
   }
   const card = e.target.closest('.ai-dash-card');
   if (card && card.dataset.sessionId) {
-    activateSession(card.dataset.sessionId);
+    openOrActivateSession(card.dataset.sessionId);
     closeAiDashboard();
   }
 });
