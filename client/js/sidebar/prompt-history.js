@@ -236,9 +236,15 @@ function escAttr(s) {
 /** Call when active session changes to refresh the panel */
 export function onSessionChange() {
   if (S.activeSessionId && isClaudeSession(S.activeSessionId)) {
+    // Show panel expanded (unfold) for Claude sessions
+    panel.classList.remove('hidden');
+    panel.classList.remove('collapsed');
+    toggle.textContent = '◂';
     fetchClaudePrompts(S.activeSessionId);
     startClaudePoll();
   } else {
+    // Hide panel entirely for non-Claude sessions
+    panel.classList.add('hidden');
     stopClaudePoll();
   }
   renderPanel();

@@ -1440,6 +1440,10 @@ body::after {
     transition: width 0.2s ease;
 }
 
+.input-panel.hidden {
+    display: none !important;
+}
+
 .input-panel.collapsed {
     width: 24px;
 }
