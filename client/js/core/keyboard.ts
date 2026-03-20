@@ -49,10 +49,18 @@ export function buildCombo(e) {
 }
 
 /** Returns the matched action name, or null */
+function normalizeCombo(c: string): string {
+  const parts = c.split('+');
+  const key = parts.pop()!;
+  parts.sort();
+  return [...parts, key].join('+');
+}
+
 export function matchCombo(combo) {
   const kb = S.settings?.keybindings || {};
+  const norm = normalizeCombo(combo);
   for (const [action, binding] of Object.entries(kb)) {
-    if (binding === combo) return action;
+    if (normalizeCombo(binding as string) === norm) return action;
   }
   return null;
 }
