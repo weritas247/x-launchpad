@@ -1,16 +1,22 @@
 // ─── FILE EDITOR: CodeMirror 6 wrapper ───
-import {
-  EditorState, Compartment, EditorView, keymap, lineNumbers,
-  highlightActiveLine, highlightActiveLineGutter,
-  drawSelection, dropCursor,
-  defaultKeymap, history, historyKeymap, indentWithTab,
-  searchKeymap, openSearchPanel, search, highlightSelectionMatches,
-  syntaxHighlighting, HighlightStyle,
-  indentOnInput, bracketMatching, foldGutter, foldKeymap,
-  javascript, python, html, css, json, markdown,
-  rust, cpp, java, sql, xml, yaml,
-  tags,
-} from '../codemirror-bundle';
+import { EditorState, Compartment } from '@codemirror/state';
+import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, dropCursor } from '@codemirror/view';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { searchKeymap, openSearchPanel, search, highlightSelectionMatches } from '@codemirror/search';
+import { syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap } from '@codemirror/language';
+import { javascript } from '@codemirror/lang-javascript';
+import { python } from '@codemirror/lang-python';
+import { html } from '@codemirror/lang-html';
+import { css } from '@codemirror/lang-css';
+import { json } from '@codemirror/lang-json';
+import { markdown } from '@codemirror/lang-markdown';
+import { rust } from '@codemirror/lang-rust';
+import { cpp } from '@codemirror/lang-cpp';
+import { java } from '@codemirror/lang-java';
+import { sql } from '@codemirror/lang-sql';
+import { xml } from '@codemirror/lang-xml';
+import { yaml } from '@codemirror/lang-yaml';
+import { tags } from '@lezer/highlight';
 
 // ─── Language map (file extension → CodeMirror language function) ───
 const LANG_MAP = {
@@ -196,6 +202,3 @@ function destroyEditor(view) {
 }
 
 export { createEditor, setReadOnly, getContent, destroyEditor };
-
-// Expose on window for non-module scripts
-window.FileEditor = { createEditor, setReadOnly, getContent, destroyEditor };

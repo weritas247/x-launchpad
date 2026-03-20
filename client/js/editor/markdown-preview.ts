@@ -1,5 +1,6 @@
 // ─── MARKDOWN PREVIEW: renders md files as HTML ───
-import { marked, DOMPurify } from '../marked-bundle';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 // Configure marked for GFM
 marked.setOptions({
@@ -27,5 +28,3 @@ export function destroyPreview(container) {
   if (preview) preview.remove();
 }
 
-// Expose globally for file-viewer.js (non-module script access)
-window.MarkdownPreview = { renderPreview, destroyPreview };

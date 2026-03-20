@@ -3,6 +3,7 @@ import { S, terminalMap, tabBar, tabAddBtn, termWrapper, escHtml } from '../core
 import { wsSend } from '../core/websocket';
 import { registerAction } from '../core/keyboard';
 import { createEditor, setReadOnly, getContent, destroyEditor } from './file-editor';
+import { renderPreview, destroyPreview } from './markdown-preview';
 import { getFileIcon } from '../ui/file-icons';
 import { hideInputPanel } from '../sidebar/prompt-history';
 
@@ -206,7 +207,7 @@ function updateFileContent(filePath, content, opts = {}) {
 
   // Markdown files: show preview by default, hide CodeMirror
   // Guard: graceful degradation if MarkdownPreview module hasn't loaded yet
-  if (isMarkdownFile(filePath) && window.MarkdownPreview) {
+  if (isMarkdownFile(filePath)) {
     // Hide CodeMirror
     const cmEl = contentEl.querySelector('.cm-editor');
     if (cmEl) cmEl.classList.add('cm-hidden');
@@ -215,7 +216,7 @@ function updateFileContent(filePath, content, opts = {}) {
     const previewEl = document.createElement('div');
     previewEl.className = 'md-preview-container';
     contentEl.appendChild(previewEl);
-    window.MarkdownPreview.renderPreview(previewEl, text);
+    renderPreview(previewEl, text);
 
     entry.isPreview = true;
     entry.previewEl = previewEl;
@@ -287,7 +288,7 @@ function switchToSource(filePath) {
 
 function switchToPreview(filePath) {
   const entry = fileTabs.get(filePath);
-  if (!entry || !window.MarkdownPreview) return;
+  if (!entry) return;
 
   // Hide CodeMirror
   const cmEl = entry.contentEl.querySelector('.cm-editor');
@@ -299,7 +300,7 @@ function switchToPreview(filePath) {
   entry.contentEl.appendChild(previewEl);
 
   const text = entry.originalContent || '';
-  window.MarkdownPreview.renderPreview(previewEl, text);
+  renderPreview(previewEl, text);
 
   entry.isPreview = true;
   entry.previewEl = previewEl;
