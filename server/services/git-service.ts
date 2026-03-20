@@ -6,7 +6,7 @@ import { promisify } from 'util';
 const execFileAsync = promisify(execFile);
 
 /** Check if fullPath is safely within cwd (prevents path traversal via startsWith prefix attack) */
-function isPathWithin(fullPath: string, cwd: string): boolean {
+export function isPathWithin(fullPath: string, cwd: string): boolean {
   const resolvedCwd = resolve(cwd);
   const resolvedPath = resolve(fullPath);
   return resolvedPath === resolvedCwd || resolvedPath.startsWith(resolvedCwd + sep);
