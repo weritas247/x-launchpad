@@ -72,12 +72,13 @@ function startHeartbeat() {
   _lastPong = Date.now();
   _heartbeatTimer = setInterval(() => {
     if (!S.ws || S.ws.readyState !== WebSocket.OPEN) return;
-    S.ws.send(JSON.stringify({ type: 'ping', t: Date.now() }));
-    // Check if server responded to previous ping
+    // Check if server responded to previous ping before sending a new one
     if (Date.now() - _lastPong > PONG_TIMEOUT) {
       alertDisconnect('서버 응답 없음 (heartbeat timeout)');
       S.ws.close();
+      return;
     }
+    S.ws.send(JSON.stringify({ type: 'ping', t: Date.now() }));
   }, HEARTBEAT_INTERVAL);
 }
 
@@ -158,8 +159,6 @@ export function wsSend(obj) {
     console.warn(`[WS] 메시지 전송 실패 (연결 안됨): ${obj.type}`);
   }
 }
-
-const _textDecoder = new TextDecoder();
 
 export function getAuthToken() {
   const urlParams = new URLSearchParams(location.search);

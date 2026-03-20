@@ -8,32 +8,20 @@ import { WsHandler, getSession } from './types';
 import * as gitService from '../services/git-service';
 
 const handlers: Record<string, WsHandler> = {
-  git_worktree_list(ctx, parsed) {
+  async git_worktree_list(ctx, parsed) {
     const r = getSession(ctx, parsed);
     if (!r) return;
     const { id, session } = r;
-    try {
-      const worktrees = gitService.getWorktreeList(session.cwd);
-      ctx.wsSend(
-        ctx.ws,
-        JSON.stringify({
-          type: 'git_worktree_list_data',
-          sessionId: id,
-          worktrees,
-          currentPath: session.cwd,
-        })
-      );
-    } catch (e) {
-      ctx.wsSend(
-        ctx.ws,
-        JSON.stringify({
-          type: 'git_worktree_list_data',
-          sessionId: id,
-          worktrees: [],
-          error: String(e),
-        })
-      );
-    }
+    const worktrees = await gitService.getWorktreeListAsync(session.cwd);
+    ctx.wsSend(
+      ctx.ws,
+      JSON.stringify({
+        type: 'git_worktree_list_data',
+        sessionId: id,
+        worktrees,
+        currentPath: session.cwd,
+      })
+    );
   },
 
   git_worktree_add(ctx, parsed) {

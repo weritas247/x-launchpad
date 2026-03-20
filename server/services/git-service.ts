@@ -1,6 +1,9 @@
-import { execFileSync } from 'child_process';
+import { execFileSync, execFile } from 'child_process';
 import { readFileSync } from 'fs';
 import { join, resolve, sep } from 'path';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 
 /** Check if fullPath is safely within cwd (prevents path traversal via startsWith prefix attack) */
 function isPathWithin(fullPath: string, cwd: string): boolean {
@@ -271,6 +274,28 @@ export function getCurrentBranch(cwd: string): string | null {
   return branch || null;
 }
 
+export async function getCurrentBranchAsync(cwd: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('git', ['branch', '--show-current'], {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 3000,
+    });
+    let branch = stdout.trim();
+    if (!branch) {
+      const r = await execFileAsync('git', ['rev-parse', '--short', 'HEAD'], {
+        cwd,
+        encoding: 'utf-8',
+        timeout: 3000,
+      });
+      branch = r.stdout.trim();
+    }
+    return branch || null;
+  } catch {
+    return null;
+  }
+}
+
 export function getBranchList(cwd: string): BranchEntry[] {
   const raw = execFileSync('git', ['branch', '-a', '--format=%(HEAD)%(refname:short)'], {
     cwd,
@@ -403,6 +428,109 @@ export function getGitStatus(cwd: string): GitStatusEntry[] {
         }
         return { status: y, path: filePath, staged: false }; // Unstaged change
       });
+  } catch {
+    return [];
+  }
+}
+
+function parseGitStatus(raw: string): GitStatusEntry[] {
+  if (!raw) return [];
+  return raw
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const x = line[0];
+      const y = line[1];
+      const filePath = line.slice(3);
+      if (x === '?' && y === '?') return { status: 'U', path: filePath, staged: false };
+      if (x !== ' ' && x !== '?') return { status: x, path: filePath, staged: true };
+      return { status: y, path: filePath, staged: false };
+    });
+}
+
+export async function getGitStatusAsync(cwd: string): Promise<GitStatusEntry[]> {
+  try {
+    const { stdout } = await execFileAsync('git', ['status', '--porcelain', '-u'], {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 5000,
+    });
+    return parseGitStatus(stdout.trim());
+  } catch {
+    return [];
+  }
+}
+
+export async function isGitRepoAsync(cwd: string): Promise<boolean> {
+  try {
+    await execFileAsync('git', ['rev-parse', '--is-inside-work-tree'], {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 2000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function getGitRootAsync(cwd: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('git', ['rev-parse', '--show-toplevel'], {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 2000,
+    });
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getUpstreamStatusAsync(cwd: string): Promise<{ ahead: number; behind: number }> {
+  try {
+    const { stdout } = await execFileAsync(
+      'git',
+      ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'],
+      { cwd, encoding: 'utf-8', timeout: 3000 }
+    );
+    const [ahead, behind] = stdout.trim().split(/\s+/).map(Number);
+    return { ahead: ahead || 0, behind: behind || 0 };
+  } catch {
+    return { ahead: 0, behind: 0 };
+  }
+}
+
+export async function getWorktreeListAsync(cwd: string): Promise<WorktreeEntry[]> {
+  try {
+    const { stdout } = await execFileAsync('git', ['worktree', 'list', '--porcelain'], {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 5000,
+    });
+    const raw = stdout.trim();
+    if (!raw) return [];
+
+    const entries: WorktreeEntry[] = [];
+    let current: Partial<WorktreeEntry> = {};
+
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('worktree ')) {
+        if (current.path) entries.push(current as WorktreeEntry);
+        current = { path: line.slice(9), branch: '', head: '', isMain: false, isBare: false };
+      } else if (line.startsWith('HEAD ')) {
+        current.head = line.slice(5, 12);
+      } else if (line.startsWith('branch ')) {
+        current.branch = line.slice(7).replace('refs/heads/', '');
+      } else if (line === 'bare') {
+        current.isBare = true;
+      } else if (line === 'detached') {
+        current.branch = current.head || '(detached)';
+      }
+    }
+    if (current.path) entries.push(current as WorktreeEntry);
+    if (entries.length > 0) entries[0].isMain = true;
+    return entries;
   } catch {
     return [];
   }
