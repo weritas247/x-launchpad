@@ -19,6 +19,24 @@ let worktrees = [];
 let currentWorktreePath = '';
 let worktreeCollapsed = true; // worktree section collapsed by default
 
+// ─── Auto-refresh polling when source-control panel is visible ───
+let scPollTimer = null;
+const SC_POLL_INTERVAL = 3000;
+
+export function startScPoll() {
+  stopScPoll();
+  scPollTimer = setInterval(() => {
+    if (S.activeSessionId) requestGitStatus();
+  }, SC_POLL_INTERVAL);
+}
+
+export function stopScPoll() {
+  if (scPollTimer) {
+    clearInterval(scPollTimer);
+    scPollTimer = null;
+  }
+}
+
 // ─── Multi-select state ──────────────────────────────
 const selectedItems = new Set(); // Set of "staged:path" or "unstaged:path"
 let lastClickedKey = null; // for shift-click range select

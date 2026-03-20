@@ -2803,6 +2803,22 @@ body::after {
     overflow: hidden;
 }
 
+.plan-editor-body {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.plan-editor-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+
 .plan-editor-title {
     background: none;
     border: none;
@@ -8604,9 +8620,11 @@ body::after {
 
 /* ─── Plan Images ─── */
 .plan-images {
-    border-top: 1px solid #333;
-    margin-top: 8px;
-    padding: 6px 8px;
+    width: 200px;
+    flex-shrink: 0;
+    border-left: 1px solid #333;
+    padding: 8px;
+    overflow-y: auto;
 }
 
 .plan-images-header {
@@ -8624,14 +8642,15 @@ body::after {
 
 .plan-images-grid {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 6px;
 }
 
 .plan-image-thumb {
     position: relative;
-    width: 80px;
-    height: 80px;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 10;
     border-radius: 4px;
     overflow: hidden;
     cursor: pointer;

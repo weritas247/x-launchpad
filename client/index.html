@@ -645,45 +645,49 @@
               <button class="plan-editor-close" id="plan-editor-close" title="Close editor">
                 ✕
               </button>
-              <input
-                class="plan-editor-title"
-                id="plan-editor-title"
-                placeholder="Plan title..."
-                spellcheck="false"
-              />
-              <textarea
-                class="plan-editor-content"
-                id="plan-editor-content"
-                placeholder="Write your plan here..."
-                spellcheck="false"
-              ></textarea>
-              <div class="plan-editor-footer">
-                <span class="plan-editor-date" id="plan-editor-date"></span>
-                <select class="plan-cat-select" id="plan-cat-select">
-                  <option value="feature">기능</option>
-                  <option value="bug">버그</option>
-                  <option value="other">기타</option>
-                </select>
-                <select class="plan-status-select" id="plan-status-select">
-                  <option value="todo">TODO</option>
-                  <option value="doing">DOING</option>
-                  <option value="done">DONE</option>
-                  <option value="on_hold">ON HOLD</option>
-                  <option value="cancelled">CANCELLED</option>
-                </select>
-                <button class="plan-btn-delete" id="plan-btn-delete" title="Delete plan">
-                  🗑 Delete
-                </button>
-              </div>
-              <div class="plan-images" id="plan-images">
-                <div class="plan-images-header">
-                  Images <span class="plan-images-hint">(Ctrl+V to paste)</span>
+              <div class="plan-editor-body">
+                <div class="plan-editor-main">
+                  <input
+                    class="plan-editor-title"
+                    id="plan-editor-title"
+                    placeholder="Plan title..."
+                    spellcheck="false"
+                  />
+                  <textarea
+                    class="plan-editor-content"
+                    id="plan-editor-content"
+                    placeholder="Write your plan here..."
+                    spellcheck="false"
+                  ></textarea>
+                  <div class="plan-editor-footer">
+                    <span class="plan-editor-date" id="plan-editor-date"></span>
+                    <select class="plan-cat-select" id="plan-cat-select">
+                      <option value="feature">기능</option>
+                      <option value="bug">버그</option>
+                      <option value="other">기타</option>
+                    </select>
+                    <select class="plan-status-select" id="plan-status-select">
+                      <option value="todo">TODO</option>
+                      <option value="doing">DOING</option>
+                      <option value="done">DONE</option>
+                      <option value="on_hold">ON HOLD</option>
+                      <option value="cancelled">CANCELLED</option>
+                    </select>
+                    <button class="plan-btn-delete" id="plan-btn-delete" title="Delete plan">
+                      🗑 Delete
+                    </button>
+                  </div>
+                  <div class="plan-logs" id="plan-logs">
+                    <div class="plan-logs-header">Activity Log</div>
+                    <div class="plan-logs-list" id="plan-logs-list"></div>
+                  </div>
                 </div>
-                <div class="plan-images-grid" id="plan-images-grid"></div>
-              </div>
-              <div class="plan-logs" id="plan-logs">
-                <div class="plan-logs-header">Activity Log</div>
-                <div class="plan-logs-list" id="plan-logs-list"></div>
+                <div class="plan-images" id="plan-images">
+                  <div class="plan-images-header">
+                    Images <span class="plan-images-hint">(Ctrl+V to paste)</span>
+                  </div>
+                  <div class="plan-images-grid" id="plan-images-grid"></div>
+                </div>
               </div>
             </div>
           </div>

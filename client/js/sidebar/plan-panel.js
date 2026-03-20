@@ -1251,6 +1251,8 @@ function getActiveAiTasks() {
         });
         continue;
       }
+      // 완료된 interactive 세션은 History 탭에서 표시
+      if (plan.ai_done || plan.status === 'done') continue;
       tasks.push({
         planId: plan.id,
         planTitle: plan.title || 'Untitled',
@@ -1334,7 +1336,7 @@ function renderAiDashCard(t) {
   </div>`;
 }
 
-function getCompletedHeadlessTasks() {
+function getCompletedTasks() {
   const historySessionIds = new Set(headlessHistory.map((h) => h.sessionId));
   const tasks = [...headlessHistory].reverse().map((h) => {
     const plan = plans.find((p) => p.id === h.planId);
@@ -1343,17 +1345,29 @@ function getCompletedHeadlessTasks() {
   for (const plan of plans) {
     if (!plan.ai_sessions) continue;
     for (const s of plan.ai_sessions) {
-      if (s.mode !== 'headless') continue;
-      if (historySessionIds.has(s.sessionId)) continue;
-      if (headlessJobs.has(s.sessionId)) continue;
-      if (plan.ai_done || plan.status === 'done') {
-        tasks.push({
-          ...s,
-          planId: plan.id,
-          planTitle: plan.title || 'Untitled',
-          planStatus: plan.status,
-          status: 'done',
-        });
+      if (s.mode === 'headless') {
+        if (historySessionIds.has(s.sessionId)) continue;
+        if (headlessJobs.has(s.sessionId)) continue;
+        if (plan.ai_done || plan.status === 'done') {
+          tasks.push({
+            ...s,
+            planId: plan.id,
+            planTitle: plan.title || 'Untitled',
+            planStatus: plan.status,
+            status: 'done',
+          });
+        }
+      } else {
+        // Interactive sessions that are completed
+        if (plan.ai_done || plan.status === 'done') {
+          tasks.push({
+            ...s,
+            planId: plan.id,
+            planTitle: plan.title || 'Untitled',
+            planStatus: plan.status,
+            status: 'done',
+          });
+        }
       }
     }
   }
@@ -1362,7 +1376,7 @@ function getCompletedHeadlessTasks() {
 
 function renderAiDashboard() {
   const tasks = getActiveAiTasks();
-  const historyTasks = getCompletedHeadlessTasks();
+  const historyTasks = getCompletedTasks();
   const historyCount = historyTasks.length;
   const activeCount = tasks.length;
 

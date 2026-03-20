@@ -1,6 +1,6 @@
 // ─── ACTIVITY BAR (LEFT ICON BAR) ────────────────────────────────
 import { requestFileTree } from './explorer.js';
-import { requestGitStatus } from './source-control.js';
+import { requestGitStatus, startScPoll, stopScPoll } from './source-control.js';
 
 const ICON_ORDER_KEY = 'x-launchpad-activity-order';
 
@@ -544,12 +544,16 @@ function clearSidebarDropZones() {
 function triggerPanelLoad(panel) {
   if (panel === 'explorer') {
     requestFileTree();
+    stopScPoll();
   } else if (panel === 'source-control') {
     requestGitStatus();
+    startScPoll();
   } else if (panel === 'search') {
     document.getElementById('search-input')?.focus();
+    stopScPoll();
+  } else {
+    stopScPoll();
   }
-  // Plan panel doesn't need auto-load — user manually opens files
 }
 
 export function switchPanel(panel) {
