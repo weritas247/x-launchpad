@@ -1536,7 +1536,7 @@ body::after {
 }
 
 .input-entry {
-    padding: 6px 10px;
+    padding: 5px 6px;
     font-size: 11px;
     color: var(--text-dim);
     cursor: pointer;
@@ -1578,14 +1578,22 @@ body::after {
     white-space: normal;
     word-break: break-word;
     line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+}
+
+.claude-prompt-entry {
+    flex-direction: column;
+    gap: 2px;
+}
+
+.claude-prompt-entry .input-entry-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .claude-prompt-entry {
     cursor: pointer;
+    padding: 5px 6px;
 }
 
 .claude-prompt-entry.copied {

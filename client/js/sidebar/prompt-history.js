@@ -168,11 +168,12 @@ function renderClaudePrompts() {
     const el = document.createElement('div');
     el.className = 'input-entry claude-prompt-entry';
     const timeStr = p.timestamp ? new Date(p.timestamp).toTimeString().slice(0, 5) : '';
-    const preview = p.text.length > 120 ? p.text.slice(0, 120) + '…' : p.text;
     el.innerHTML = `
-      <span class="input-entry-num">${i + 1}</span>
-      <span class="input-entry-text" title="${escAttr(p.text)}">${escHtml(preview)}</span>
-      <span class="input-entry-time">${timeStr}</span>
+      <div class="input-entry-meta">
+        <span class="input-entry-num">${i + 1}</span>
+        <span class="input-entry-time">${timeStr}</span>
+      </div>
+      <span class="input-entry-text">${escHtml(p.text)}</span>
     `;
     el.addEventListener('click', () => {
       scrollToPromptInTerminal(p.text);
