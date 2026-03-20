@@ -43,7 +43,8 @@ import {
   handleGitGraphKeydown,
 } from '../sidebar/git-graph';
 import { streamWrite, bypassStream, unbypassStream } from '../terminal/stream-writer';
-import { registerAction, buildCombo, matchCombo, tryKeybinding } from './keyboard';
+import { buildCombo, matchCombo, tryKeybinding } from './keyboard';
+import { registerCommand } from './command-registry';
 import {
   initInputPanel,
   toggleInputPanel,
@@ -270,40 +271,53 @@ function handleMessage(msg) {
   }
 }
 
-// ─── REGISTER KEYBINDING ACTIONS ─────────────────────
-registerAction('newSession', () => newSession());
+// ─── REGISTER COMMANDS WITH FULL METADATA ─────────────────────
 const closeTabAction = () => {
   const fp = getActiveFilePath();
   if (fp) closeFileTab(fp);
   else if (S.activeSessionId) closeSession(S.activeSessionId);
 };
-registerAction('closeTab', closeTabAction);
-registerAction('closeSession', closeTabAction); // backward-compat: old saved keybindings
-registerAction('openSettings', () => openSettings());
-registerAction('fullscreen', () => toggleFullscreen());
-registerAction('nextTab', () => switchTabBy(1));
-registerAction('prevTab', () => switchTabBy(-1));
-registerAction('renameSession', () => {
-  if (S.activeSessionId) promptRenameSession(S.activeSessionId);
-});
-registerAction('clearTerminal', () => clearActiveTerminal());
-registerAction('gitGraph', () => {
-  isGitGraphOpen() ? closeGitGraph() : openGitGraph();
-});
-registerAction('toggleSidebar', () => toggleSidebarExport());
-registerAction('focusSearch', () => switchPanel('search'));
-registerAction('focusExplorer', () => switchPanel('explorer'));
-registerAction('focusSourceControl', () => switchPanel('source-control'));
-registerAction('toggleInputPanel', () => toggleInputPanel());
-registerAction('planModal', () => {
-  isPlanModalOpen() ? closePlanModal() : openPlanModal();
-});
-registerAction('openPalette', () => {
-  isPaletteOpen() ? closePalette() : openPalette('quick-open');
-});
-registerAction('openCommandPalette', () => {
-  isPaletteOpen() ? closePalette() : openPalette('command');
-});
+
+// Session commands
+registerCommand({ id: 'newSession', label: 'New Session', category: 'Session', execute: () => newSession() });
+registerCommand({ id: 'closeTab', label: 'Close Tab', category: 'Session', execute: closeTabAction });
+registerCommand({ id: 'closeSession', label: 'Close Tab', category: 'Session', execute: closeTabAction }); // backward-compat alias
+registerCommand({ id: 'renameSession', label: 'Rename Session', category: 'Session', execute: () => { if (S.activeSessionId) promptRenameSession(S.activeSessionId); }, when: () => !!S.activeSessionId });
+registerCommand({ id: 'nextTab', label: 'Next Tab', category: 'Session', execute: () => switchTabBy(1) });
+registerCommand({ id: 'prevTab', label: 'Previous Tab', category: 'Session', execute: () => switchTabBy(-1) });
+
+// Terminal commands
+registerCommand({ id: 'clearTerminal', label: 'Clear Terminal', category: 'Terminal', execute: () => clearActiveTerminal(), when: () => !!S.activeSessionId });
+registerCommand({ id: 'toggleInputPanel', label: 'Toggle Input Panel', category: 'Terminal', execute: () => toggleInputPanel() });
+
+// UI commands
+registerCommand({ id: 'toggleSidebar', label: 'Toggle Sidebar', category: 'UI', execute: () => toggleSidebarExport() });
+registerCommand({ id: 'openSettings', label: 'Open Settings', category: 'UI', execute: () => openSettings() });
+registerCommand({ id: 'fullscreen', label: 'Toggle Fullscreen', category: 'UI', execute: () => toggleFullscreen() });
+registerCommand({ id: 'focusSearch', label: 'Focus Search', category: 'UI', execute: () => switchPanel('search') });
+registerCommand({ id: 'focusExplorer', label: 'Focus Explorer', category: 'UI', execute: () => switchPanel('explorer') });
+registerCommand({ id: 'focusSourceControl', label: 'Focus Source Control', category: 'UI', execute: () => switchPanel('source-control') });
+registerCommand({ id: 'ui:changeTheme', label: 'Change Theme', category: 'UI', execute: () => {} }); // Handled specially by palette
+registerCommand({ id: 'toggleFileEdit', label: 'Toggle File Edit', category: 'UI', execute: () => {} }); // placeholder if exists
+
+// Git commands
+registerCommand({ id: 'gitGraph', label: 'Git Graph', category: 'Git', execute: () => { isGitGraphOpen() ? closeGitGraph() : openGitGraph(); } });
+registerCommand({ id: 'git:status', label: 'Git: Status', category: 'Git', execute: () => { switchPanel('source-control'); } });
+registerCommand({ id: 'git:commit', label: 'Git: Commit', category: 'Git', execute: () => { switchPanel('source-control'); setTimeout(() => { const commitInput = document.getElementById('sc-commit-msg'); if (commitInput) commitInput.focus(); }, 100); } });
+registerCommand({ id: 'git:push', label: 'Git: Push', category: 'Git', execute: () => { wsSend({ type: 'git_push' }); } });
+registerCommand({ id: 'git:pull', label: 'Git: Pull', category: 'Git', execute: () => { wsSend({ type: 'git_pull' }); } });
+
+// File commands
+registerCommand({ id: 'file:newFile', label: 'New File', category: 'File', execute: () => { switchPanel('explorer'); } });
+registerCommand({ id: 'file:newFolder', label: 'New Folder', category: 'File', execute: () => { switchPanel('explorer'); } });
+registerCommand({ id: 'file:revealInFinder', label: 'Reveal in Finder', category: 'File', execute: () => { const meta = sessionMeta.get(S.activeSessionId); const cwd = meta?.cwd || ''; fetch('/api/reveal-in-finder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: cwd }) }); }, when: () => !!S.activeSessionId });
+
+// Plan
+registerCommand({ id: 'planModal', label: 'Plan Notes', category: 'Plan', execute: () => { isPlanModalOpen() ? closePlanModal() : openPlanModal(); } });
+
+// Palette
+registerCommand({ id: 'openPalette', label: 'Quick Open', category: 'UI', execute: () => { isPaletteOpen() ? closePalette() : openPalette('quick-open'); } });
+registerCommand({ id: 'openCommandPalette', label: 'Command Palette', category: 'UI', execute: () => { isPaletteOpen() ? closePalette() : openPalette('command'); } });
 
 document.addEventListener('keydown', (e) => {
   if (!S.settings) return;
