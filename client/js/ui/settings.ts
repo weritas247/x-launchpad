@@ -3,6 +3,7 @@ import { confirmModal } from './confirm-modal';
 import { THEMES, KB_DEFS, normalizeKey } from '../core/constants';
 import { applyTheme, updateSwatches } from './themes';
 import { apiFetch } from '../core/websocket';
+import { initNotificationSettings, populateNotificationForm, readNotificationForm } from './notification-settings';
 
 const $input = (id: string) => document.getElementById(id) as HTMLInputElement;
 const $select = (id: string) => document.getElementById(id) as HTMLSelectElement;
@@ -278,6 +279,8 @@ function populateForm(s) {
   $input('s-customCss').value = adv.customCss || '';
   $input('s-wsReconnectInterval').value = adv.wsReconnectInterval;
   setSelectValue('s-logLevel', adv.logLevel);
+
+  populateNotificationForm(s);
 }
 
 function setSelectValue(id, val) {
@@ -361,6 +364,8 @@ function readForm() {
   s.advanced.customCss = $input('s-customCss').value;
   s.advanced.wsReconnectInterval = parseInt($input('s-wsReconnectInterval').value);
   s.advanced.logLevel = $input('s-logLevel').value;
+
+  s.notifications = readNotificationForm();
 
   return s;
 }
@@ -481,4 +486,6 @@ export function initSettingsUI() {
   });
 
   document.getElementById('btn-settings').addEventListener('click', openSettings);
+
+  initNotificationSettings();
 }

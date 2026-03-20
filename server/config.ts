@@ -63,6 +63,23 @@ export const DEFAULT_SETTINGS = {
     planModal: 'Ctrl+p',
     toggleFileEdit: 'Ctrl+e',
   },
+  notifications: {
+    global: {
+      volume: 80,
+      soundEnabled: true,
+      osNotification: true,
+      position: 'top-right' as const,
+      duration: 5000,
+      customSound: null as string | null,
+    },
+    types: {
+      success:    { enabled: true, volume: null as number | null, soundEnabled: false as boolean | null, osNotification: false as boolean | null, position: null as string | null, duration: 3000 as number | null, customSound: null as string | null },
+      error:      { enabled: true, volume: null as number | null, soundEnabled: false as boolean | null, osNotification: false as boolean | null, position: null as string | null, duration: 5000 as number | null, customSound: null as string | null },
+      info:       { enabled: true, volume: null as number | null, soundEnabled: false as boolean | null, osNotification: false as boolean | null, position: null as string | null, duration: 3000 as number | null, customSound: null as string | null },
+      aiDone:     { enabled: true, volume: null as number | null, soundEnabled: null as boolean | null, osNotification: null as boolean | null, position: null as string | null, duration: null as number | null, customSound: null as string | null },
+      aiQuestion: { enabled: true, volume: null as number | null, soundEnabled: null as boolean | null, osNotification: null as boolean | null, position: null as string | null, duration: null as number | null, customSound: null as string | null },
+    },
+  },
   advanced: {
     customCss: '',
     wsReconnectInterval: 3000,

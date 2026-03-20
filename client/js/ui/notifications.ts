@@ -11,6 +11,7 @@ import {
 import { AI_REGISTRY } from '../core/constants';
 import { activateSession } from '../terminal/session';
 import { wsSend } from '../core/websocket';
+import { getNotificationConfig, playNotificationSound, mapNotifType, getOrCreateToastZone } from './notification-config';
 
 const NOTIFY_DEBOUNCE = 1200;
 
@@ -74,6 +75,10 @@ export function aiNotifyCheck(sessionId, chunk) {
       if (prevState === matched.type) return;
       notifyState.set(sessionId, matched.type);
 
+      const notifType = mapNotifType(matched.type);
+      const cfg = getNotificationConfig(notifType);
+      if (!cfg.enabled) return;
+
       const meta = sessionMeta.get(sessionId);
       const sessName = meta?.name || sessionId;
       const icon = getAiIcon(currentAi);
@@ -86,10 +91,10 @@ export function aiNotifyCheck(sessionId, chunk) {
       const isActiveVisible =
         sessionId === S.activeSessionId && document.visibilityState === 'visible';
       if (!isActiveVisible) {
-        showToast(title, body, sessionId);
+        showToast(title, body, sessionId, notifType);
       }
 
-      if (document.visibilityState === 'hidden' || !document.hasFocus()) {
+      if (cfg.osNotification && (document.visibilityState === 'hidden' || !document.hasFocus())) {
         if ('Notification' in window) {
           if (Notification.permission === 'granted') {
             fireOsNotification(title, body, sessionId);
@@ -115,7 +120,7 @@ function fireOsNotification(title, body, sessionId) {
     body,
     icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="%2300ffe5" opacity=".15"/><polyline points="10,7 6,16 14,16 10,25 22,13 15,13 19,7" fill="%2300ffe5"/></svg>',
     tag: `x-launchpad-${sessionId}`,
-    silent: false,
+    silent: true,
   });
   n.onclick = () => {
     window.focus();
@@ -127,24 +132,11 @@ function fireOsNotification(title, body, sessionId) {
   };
 }
 
-const alertSound = new Audio('/alert.m4a');
-let toastContainer = null;
-function getToastContainer() {
-  if (!toastContainer) {
-    toastContainer =
-      document.getElementById('ai-toast-container') ||
-      (() => {
-        const el = document.createElement('div');
-        el.id = 'ai-toast-container';
-        document.body.appendChild(el);
-        return el;
-      })();
-  }
-  return toastContainer;
-}
+export function showToast(title: string, body: string, sessionId: string, notifType?: string) {
+  const type = notifType || 'aiDone';
+  const cfg = getNotificationConfig(type);
+  const zone = getOrCreateToastZone(cfg.position);
 
-export function showToast(title, body, sessionId) {
-  const c = getToastContainer();
   const t = document.createElement('div');
   t.className = 'toast';
   t.innerHTML = `
@@ -163,13 +155,13 @@ export function showToast(title, body, sessionId) {
     }
     t.remove();
   });
-  c.appendChild(t);
-  alertSound.currentTime = 0;
-  alertSound.play().catch(() => {});
-  setTimeout(() => t.classList.add('toast-hide'), 5500);
-  setTimeout(() => {
-    if (t.parentNode) t.remove();
-  }, 6200);
+  zone.appendChild(t);
+
+  playNotificationSound(type);
+
+  const duration = cfg.duration;
+  setTimeout(() => t.classList.add('toast-hide'), duration);
+  setTimeout(() => { if (t.parentNode) t.remove(); }, duration + 700);
 }
 
 export function initNotifications() {

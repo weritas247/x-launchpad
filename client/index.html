@@ -754,6 +754,9 @@
             <div class="nav-item" data-panel="keybindings">
               <span class="nav-icon">⌨</span>Keybindings
             </div>
+            <div class="nav-item" data-panel="notifications">
+              <span class="nav-icon">🔔</span>Notifications
+            </div>
             <div class="nav-item" data-panel="advanced">
               <span class="nav-icon">⚡</span>Advanced
             </div>
@@ -1283,6 +1286,82 @@
               </div>
             </div>
             <!-- /keybindings -->
+
+            <!-- ── NOTIFICATIONS ── -->
+            <div class="settings-panel" id="panel-notifications">
+              <!-- Global Defaults -->
+              <div class="panel-section">
+                <div class="section-title">Global Defaults</div>
+
+                <div class="field-row">
+                  <div class="field-label">Volume<small>0–100%</small></div>
+                  <div class="field-control" style="display:flex;align-items:center;gap:8px;">
+                    <input type="range" class="s-range" id="s-notif-volume" min="0" max="100" step="1" style="flex:1;" />
+                    <span id="s-notif-volume-val" style="min-width:32px;text-align:right;">80</span>%
+                    <button class="btn-sm" id="btn-notif-test-global" title="Test sound">🔊</button>
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <div class="field-label">Sound<small>Play alert sound</small></div>
+                  <div class="field-control">
+                    <label class="switch"><input type="checkbox" id="s-notif-sound" /><span class="slider"></span></label>
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <div class="field-label">OS Notification<small>Browser notification</small></div>
+                  <div class="field-control" style="display:flex;align-items:center;gap:8px;">
+                    <label class="switch"><input type="checkbox" id="s-notif-os" /><span class="slider"></span></label>
+                    <button class="btn-sm" id="btn-notif-request-perm" style="display:none;" title="Request permission">Request Permission</button>
+                    <span id="notif-perm-denied" style="display:none;font-size:10px;color:var(--danger);">Blocked in browser settings</span>
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <div class="field-label">Position<small>Where toasts appear</small></div>
+                  <div class="field-control">
+                    <select class="s-select" id="s-notif-position">
+                      <option value="top-right">Top Right</option>
+                      <option value="top-left">Top Left</option>
+                      <option value="bottom-right">Bottom Right</option>
+                      <option value="bottom-left">Bottom Left</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <div class="field-label">Duration<small>Auto-dismiss time</small></div>
+                  <div class="field-control">
+                    <select class="s-select" id="s-notif-duration">
+                      <option value="3000">3s</option>
+                      <option value="5000">5s</option>
+                      <option value="8000">8s</option>
+                      <option value="10000">10s</option>
+                      <option value="15000">15s</option>
+                      <option value="30000">30s</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <div class="field-label">Custom Sound<small>Upload audio file (max 500KB)</small></div>
+                  <div class="field-control" style="display:flex;align-items:center;gap:8px;">
+                    <button class="btn-sm" id="btn-notif-sound-upload">Choose File</button>
+                    <input type="file" id="notif-sound-file" accept="audio/*" style="display:none;" />
+                    <span id="notif-sound-name" style="font-size:10px;color:var(--text-dim);">Default (alert.m4a)</span>
+                    <button class="btn-sm" id="btn-notif-sound-reset" style="display:none;">Reset</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Per-Type Overrides -->
+              <div class="panel-section">
+                <div class="section-title">Per-Type Overrides</div>
+                <div id="notif-type-overrides"></div>
+              </div>
+            </div>
+            <!-- /notifications -->
 
             <!-- ── ADVANCED ── -->
             <div class="settings-panel" id="panel-advanced">
