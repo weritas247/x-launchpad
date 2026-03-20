@@ -120,7 +120,14 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use(authMiddleware);
-app.use(express.static(path.join(PROJECT_ROOT, 'client')));
+// Production: serve built client files; Development: Vite handles client
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(PROJECT_ROOT, 'dist/client')));
+} else {
+  // In dev, Vite serves client files. Express only handles API/WS.
+  // Keep client static for any non-Vite direct access (fallback)
+  app.use(express.static(path.join(PROJECT_ROOT, 'client')));
+}
 
 // Auth endpoints (extracted to routes/auth.ts)
 app.use('/api/auth', createAuthRouter());
