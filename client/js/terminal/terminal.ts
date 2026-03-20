@@ -77,7 +77,7 @@ export function showSessionPicker() {
       }
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (spFocusIdx >= 0 && spFocusIdx < len) btns[spFocusIdx].click();
+        if (spFocusIdx >= 0 && spFocusIdx < len) (btns[spFocusIdx] as HTMLElement).click();
         return;
       }
       if (e.key === 'ArrowRight') {
@@ -480,7 +480,7 @@ export function createTab(sessionId, name) {
     <button class="tab-close-btn">✕</button>
   `;
   el.addEventListener('click', (e) => {
-    if (e.target.closest('.tab-close-btn')) {
+    if ((e.target as HTMLElement).closest('.tab-close-btn')) {
       closeSession(sessionId);
       return;
     }

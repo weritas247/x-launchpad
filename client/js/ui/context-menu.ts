@@ -1,5 +1,10 @@
 // ─── REUSABLE CONTEXT MENU ──────────────────────────────────────
 export class ContextMenu {
+  _items: any;
+  _handler: any;
+  _el: any;
+  _onDocClick: any;
+  _backdrop: any;
   /**
    * @param {Array<{label:string, action:string, danger?:boolean, when?:(ctx:any)=>boolean}|'---'>} items
    * @param {(action:string, context:any)=>void} handler

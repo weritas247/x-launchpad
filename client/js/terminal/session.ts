@@ -57,7 +57,7 @@ export function activateSession(id) {
 
 export function updateStatusBar() {
   const c = terminalMap.size;
-  hdrCount.textContent = c;
+  hdrCount.textContent = String(c);
   sessionEmpty.style.display = c === 0 ? 'block' : 'none';
 
   // Update project name in statusbar

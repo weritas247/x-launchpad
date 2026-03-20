@@ -14,7 +14,7 @@ marked.setOptions({
  * @param {string} markdownText - Raw markdown string
  */
 export function renderPreview(container, markdownText) {
-  const rawHtml = marked.parse(markdownText);
+  const rawHtml = marked.parse(markdownText) as string;
   const cleanHtml = DOMPurify.sanitize(rawHtml);
   container.innerHTML = `<div class="md-preview">${cleanHtml}</div>`;
 }

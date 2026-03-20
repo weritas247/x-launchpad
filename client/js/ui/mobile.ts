@@ -141,7 +141,7 @@ function toggleInputHistory() {
     closeMobileOverlay();
     panel.classList.remove('collapsed');
     panel.classList.add('mobile-sheet');
-    const content = panel.querySelector('.input-panel-content');
+    const content = panel.querySelector('.input-panel-content') as HTMLElement;
     if (content) content.style.display = 'flex';
     updateBottomNavActive('input-history');
   }

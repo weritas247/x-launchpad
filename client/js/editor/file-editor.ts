@@ -146,7 +146,7 @@ const editableComp = new WeakMap();
 
 // ─── Public API ───
 
-function createEditor(container, content, filePath, { readOnly = true, onSave, onChange } = {}) {
+function createEditor(container, content, filePath, { readOnly = true, onSave, onChange }: any = {}) {
   const roComp = new Compartment();
   const edComp = new Compartment();
 

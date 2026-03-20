@@ -28,13 +28,13 @@ export function initSearch() {
 
   const doSearch = () => {
     if (!input || !S.activeSessionId) return;
-    const query = input.value.trim();
+    const query = (input as HTMLInputElement).value.trim();
     if (!query) {
       clearResults();
       return;
     }
     lastQuery = query;
-    const include = includeInput?.value.trim() || '';
+    const include = (includeInput as HTMLInputElement)?.value.trim() || '';
     wsSend({
       type: 'file_search',
       sessionId: S.activeSessionId,
@@ -60,7 +60,7 @@ export function initSearch() {
   if (btn) btn.addEventListener('click', doSearch);
   if (clearBtn)
     clearBtn.addEventListener('click', () => {
-      if (input) input.value = '';
+      if (input) (input as HTMLInputElement).value = '';
       lastQuery = '';
       clearResults();
     });
@@ -96,7 +96,7 @@ export function initSearch() {
   if (replaceBtn)
     replaceBtn.addEventListener('click', () => {
       if (!lastQuery || !replaceInput || !S.activeSessionId) return;
-      const replacement = replaceInput.value;
+      const replacement = (replaceInput as HTMLInputElement).value;
       // Replace in first matching file
       if (searchResults.length > 0) {
         const file = searchResults[0].file;
@@ -114,7 +114,7 @@ export function initSearch() {
   if (replaceAllBtn)
     replaceAllBtn.addEventListener('click', async () => {
       if (!lastQuery || !replaceInput || !S.activeSessionId) return;
-      const replacement = replaceInput.value;
+      const replacement = (replaceInput as HTMLInputElement).value;
       if (
         !(await confirmModal(
           `Replace all occurrences of "${lastQuery}" with "${replacement}"?`,
@@ -122,7 +122,7 @@ export function initSearch() {
         ))
       )
         return;
-      const includeVal = includeInput?.value.trim() || '';
+      const includeVal = (includeInput as HTMLInputElement)?.value.trim() || '';
       wsSend({
         type: 'file_replace_all',
         sessionId: S.activeSessionId,
@@ -180,7 +180,7 @@ function renderResults() {
   }
 
   // Group by file
-  const grouped = {};
+  const grouped: Record<string, any[]> = {};
   let totalMatches = 0;
   for (const r of searchResults) {
     if (!grouped[r.file]) grouped[r.file] = [];

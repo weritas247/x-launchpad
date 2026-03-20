@@ -165,7 +165,7 @@ export function getAuthToken() {
   return urlParams.get('token') || localStorage.getItem('x-launchpad-token') || '';
 }
 
-export function apiFetch(url, options = {}) {
+export function apiFetch(url, options: any = {}) {
   const token = getAuthToken();
   if (token) {
     options.headers = { Authorization: `Bearer ${token}`, ...options.headers };

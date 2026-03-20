@@ -24,12 +24,12 @@ const overlay = document.getElementById('plan-overlay');
 const listEl = document.getElementById('plan-list-items');
 const editorArea = document.getElementById('plan-editor-area');
 const editorEmpty = document.getElementById('plan-editor-empty');
-const titleInput = document.getElementById('plan-editor-title');
-const contentInput = document.getElementById('plan-editor-content');
+const titleInput = document.getElementById('plan-editor-title') as HTMLInputElement;
+const contentInput = document.getElementById('plan-editor-content') as HTMLTextAreaElement;
 const dateEl = document.getElementById('plan-editor-date');
 const todoCountEl = document.getElementById('sb-plan-todo');
 const doingCountEl = document.getElementById('sb-plan-doing');
-const catSelect = document.getElementById('plan-cat-select');
+const catSelect = document.getElementById('plan-cat-select') as HTMLSelectElement;
 const catTabsEl = document.getElementById('plan-category-tabs');
 
 const boardEl = document.getElementById('plan-board');
@@ -37,13 +37,13 @@ const boardDivider = document.getElementById('plan-board-divider');
 const listColEl = document.getElementById('plan-list-col');
 const editorColEl = document.getElementById('plan-editor-col');
 const viewToggleEl = document.getElementById('plan-view-toggle');
-const statusSelect = document.getElementById('plan-status-select');
+const statusSelect = document.getElementById('plan-status-select') as HTMLSelectElement;
 const logsListEl = document.getElementById('plan-logs-list');
 const toastContainer = document.getElementById('plan-toast-container');
 const ctxMenuEl = document.getElementById('plan-ctx-menu');
 const imagesGridEl = document.getElementById('plan-images-grid');
 const lightboxEl = document.getElementById('plan-lightbox');
-const lightboxImg = document.getElementById('plan-lightbox-img');
+const lightboxImg = document.getElementById('plan-lightbox-img') as HTMLImageElement;
 const lightboxClose = document.getElementById('plan-lightbox-close');
 
 let plans = [];
@@ -141,16 +141,16 @@ async function apiDeletePlan(id) {
 function updateCount() {
   const todoCount = plans.filter((p) => (p.status || 'todo') === 'todo').length;
   const doingCount = plans.filter((p) => p.status === 'doing').length;
-  if (todoCountEl) todoCountEl.textContent = todoCount;
-  if (doingCountEl) doingCountEl.textContent = doingCount;
+  if (todoCountEl) todoCountEl.textContent = String(todoCount);
+  if (doingCountEl) doingCountEl.textContent = String(doingCount);
   const allEl = document.getElementById('plan-count-all');
   const featEl = document.getElementById('plan-count-feature');
   const bugEl = document.getElementById('plan-count-bug');
   const otherEl = document.getElementById('plan-count-other');
-  if (allEl) allEl.textContent = plans.length;
-  if (featEl) featEl.textContent = plans.filter((p) => p.category === 'feature').length;
-  if (bugEl) bugEl.textContent = plans.filter((p) => p.category === 'bug').length;
-  if (otherEl) otherEl.textContent = plans.filter((p) => p.category === 'other').length;
+  if (allEl) allEl.textContent = String(plans.length);
+  if (featEl) featEl.textContent = String(plans.filter((p) => p.category === 'feature').length);
+  if (bugEl) bugEl.textContent = String(plans.filter((p) => p.category === 'bug').length);
+  if (otherEl) otherEl.textContent = String(plans.filter((p) => p.category === 'other').length);
 }
 
 // ─── Filtered list ──────────────────────────────────
@@ -231,7 +231,7 @@ function selectPlan(id) {
   loadPlanImages(id);
 
   listEl.querySelectorAll('.plan-item').forEach((el) => {
-    el.classList.toggle('active', el.dataset.id === id);
+    el.classList.toggle('active', (el as HTMLElement).dataset!.id === id);
   });
 }
 
@@ -269,7 +269,7 @@ function flushSave() {
 function switchCategory(cat) {
   activeCategory = cat;
   catTabsEl.querySelectorAll('.plan-cat-tab').forEach((el) => {
-    el.classList.toggle('active', el.dataset.cat === cat);
+    el.classList.toggle('active', (el as HTMLElement).dataset.cat === cat);
   });
   if (currentView === 'board') renderBoard();
   else renderList();
@@ -289,7 +289,7 @@ function switchView(view) {
   currentView = view;
   localStorage.setItem('plan-view', view);
   viewToggleEl?.querySelectorAll('.plan-view-btn').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.view === view);
+    btn.classList.toggle('active', (btn as HTMLElement).dataset.view === view);
   });
   const body = document.querySelector('.plan-body');
   if (view === 'board') {
@@ -368,7 +368,7 @@ function renderBoard() {
     const countBadge = document.getElementById(`plan-board-count-${status}`);
     if (!col) continue;
     const cards = filtered.filter((p) => (p.status || 'todo') === status);
-    if (countBadge) countBadge.textContent = cards.length;
+    if (countBadge) countBadge.textContent = String(cards.length);
     col.innerHTML = cards
       .map((p) => {
         const title = escHtml(p.title || 'Untitled');
@@ -414,7 +414,7 @@ function formatDate(ts) {
   const pad = (n) => String(n).padStart(2, '0');
   const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   if (d.toDateString() === now.toDateString()) return `Today ${time}`;
-  const diff = Math.floor((now - d) / 86400000);
+  const diff = Math.floor((now.getTime() - d.getTime()) / 86400000);
   if (diff === 1) return `Yesterday ${time}`;
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`;
 }
@@ -430,17 +430,17 @@ function toggleColCollapse(status) {
 
 function applyColCollapse() {
   boardEl?.querySelectorAll('.plan-board-col').forEach((col) => {
-    const status = col.dataset.status;
+    const status = (col as HTMLElement).dataset.status;
     col.classList.toggle('collapsed', collapsedCols.includes(status));
   });
 }
 
 function initColCollapse() {
   boardEl?.querySelectorAll('.plan-board-col-header').forEach((header) => {
-    header.style.cursor = 'pointer';
+    (header as HTMLElement).style.cursor = 'pointer';
     header.addEventListener('click', () => {
       const col = header.closest('.plan-board-col');
-      if (col) toggleColCollapse(col.dataset.status);
+      if (col) toggleColCollapse((col as HTMLElement).dataset.status);
     });
   });
 }
@@ -448,29 +448,29 @@ function initColCollapse() {
 // ─── Drag and Drop ───────────────────────────────────
 function initBoardDragDrop() {
   boardEl?.addEventListener('dragstart', (e) => {
-    const card = e.target.closest('.plan-board-card');
+    const card = (e.target as HTMLElement).closest('.plan-board-card');
     if (!card) return;
     card.classList.add('dragging');
-    e.dataTransfer.setData('text/plain', card.dataset.id);
+    e.dataTransfer.setData('text/plain', (card as HTMLElement).dataset.id);
     e.dataTransfer.effectAllowed = 'move';
   });
   boardEl?.addEventListener('dragend', (e) => {
-    const card = e.target.closest('.plan-board-card');
+    const card = (e.target as HTMLElement).closest('.plan-board-card');
     if (card) card.classList.remove('dragging');
     boardEl.querySelectorAll('.plan-board-col').forEach((col) => col.classList.remove('drag-over'));
   });
   boardEl?.querySelectorAll('.plan-board-col').forEach((col) => {
-    col.addEventListener('dragover', (e) => {
+    col.addEventListener('dragover', (e: DragEvent) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       col.classList.add('drag-over');
     });
     col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
-    col.addEventListener('drop', async (e) => {
+    col.addEventListener('drop', async (e: DragEvent) => {
       e.preventDefault();
       col.classList.remove('drag-over');
       const planId = e.dataTransfer.getData('text/plain');
-      const newStatus = col.dataset.status;
+      const newStatus = (col as HTMLElement).dataset.status;
       if (!planId || !newStatus) return;
       const plan = plans.find((p) => p.id === planId);
       if (!plan || plan.status === newStatus) return;
@@ -728,9 +728,9 @@ export function initPlanPanel() {
   if (!isLoggedIn()) {
     if (sbPlan) sbPlan.style.display = 'none';
     const activityPlanBtn = document.querySelector('.activity-btn[data-panel="plan"]');
-    if (activityPlanBtn) activityPlanBtn.style.display = 'none';
+    if (activityPlanBtn) (activityPlanBtn as HTMLElement).style.display = 'none';
     const bnavPlanBtn = document.querySelector('.bnav-btn[data-panel="plan"]');
-    if (bnavPlanBtn) bnavPlanBtn.style.display = 'none';
+    if (bnavPlanBtn) (bnavPlanBtn as HTMLElement).style.display = 'none';
     return;
   }
 
@@ -750,10 +750,10 @@ export function initPlanPanel() {
 
   // Category tab clicks
   catTabsEl?.addEventListener('click', (e) => {
-    const tab = e.target.closest('.plan-cat-tab');
+    const tab = (e.target as HTMLElement).closest('.plan-cat-tab');
     if (tab) {
       flushSave();
-      switchCategory(tab.dataset.cat);
+      switchCategory((tab as HTMLElement).dataset.cat);
     }
   });
 
@@ -768,10 +768,10 @@ export function initPlanPanel() {
 
   // List click delegation
   listEl?.addEventListener('click', (e) => {
-    const item = e.target.closest('.plan-item');
+    const item = (e.target as HTMLElement).closest('.plan-item');
     if (item) {
       flushSave();
-      selectPlan(item.dataset.id);
+      selectPlan((item as HTMLElement).dataset.id);
     }
   });
 
@@ -794,8 +794,8 @@ export function initPlanPanel() {
 
   // View toggle
   viewToggleEl?.addEventListener('click', (e) => {
-    const btn = e.target.closest('.plan-view-btn');
-    if (btn) switchView(btn.dataset.view);
+    const btn = (e.target as HTMLElement).closest('.plan-view-btn');
+    if (btn) switchView((btn as HTMLElement).dataset.view);
   });
 
   // Status select change
@@ -824,10 +824,10 @@ export function initPlanPanel() {
   boardEl?.addEventListener(
     'click',
     (e) => {
-      const badge = e.target.closest('.plan-board-card-ai-session');
+      const badge = (e.target as HTMLElement).closest('.plan-board-card-ai-session');
       if (badge) {
         e.stopPropagation();
-        const sid = badge.dataset.sessionId;
+        const sid = (badge as HTMLElement).dataset.sessionId;
         // headless 세션은 탭 전환 안 함
         if (sid && headlessJobs.has(sid)) return;
         if (sid) {
@@ -842,12 +842,12 @@ export function initPlanPanel() {
 
   // Worktree checkbox toggle
   boardEl?.addEventListener('change', async (e) => {
-    const cb = e.target.closest('.plan-wt-check');
+    const cb = (e.target as HTMLElement).closest('.plan-wt-check');
     if (!cb) return;
-    const planId = cb.dataset.id;
+    const planId = (cb as HTMLInputElement).dataset.id;
     const plan = plans.find((p) => p.id === planId);
     if (!plan) return;
-    plan.use_worktree = cb.checked;
+    plan.use_worktree = (cb as HTMLInputElement).checked;
     try {
       await apiFetch(`/api/plans/${planId}`, {
         method: 'PUT',
@@ -861,12 +861,12 @@ export function initPlanPanel() {
 
   // Headless checkbox toggle
   boardEl?.addEventListener('change', async (e) => {
-    const cb = e.target.closest('.plan-headless-check');
+    const cb = (e.target as HTMLElement).closest('.plan-headless-check');
     if (!cb) return;
-    const planId = cb.dataset.id;
+    const planId = (cb as HTMLInputElement).dataset.id;
     const plan = plans.find((p) => p.id === planId);
     if (!plan) return;
-    plan.use_headless = cb.checked;
+    plan.use_headless = (cb as HTMLInputElement).checked;
     try {
       await apiFetch(`/api/plans/${planId}`, {
         method: 'PUT',
@@ -880,42 +880,42 @@ export function initPlanPanel() {
 
   // Board card click → editor
   boardEl?.addEventListener('click', (e) => {
-    const card = e.target.closest('.plan-board-card');
+    const card = (e.target as HTMLElement).closest('.plan-board-card');
     if (!card) return;
     // skip if clicking worktree or headless checkbox
-    if (e.target.closest('.plan-board-card-wt') || e.target.closest('.plan-wt-check') || e.target.closest('.plan-board-card-hl') || e.target.closest('.plan-headless-check')) return;
+    if ((e.target as HTMLElement).closest('.plan-board-card-wt') || (e.target as HTMLElement).closest('.plan-wt-check') || (e.target as HTMLElement).closest('.plan-board-card-hl') || (e.target as HTMLElement).closest('.plan-headless-check')) return;
     // skip if clicking AI session badge
-    if (e.target.closest('.plan-board-card-ai-session')) return;
+    if ((e.target as HTMLElement).closest('.plan-board-card-ai-session')) return;
     // toggle: click same card again → close detail
-    if (activeId === card.dataset.id) {
+    if (activeId === (card as HTMLElement).dataset.id) {
       hideBoardEditor();
       return;
     }
     flushSave();
-    selectPlan(card.dataset.id);
+    selectPlan((card as HTMLElement).dataset.id);
     showBoardEditor();
-    loadPlanLogs(card.dataset.id);
+    loadPlanLogs((card as HTMLElement).dataset.id);
   });
 
   // Board card right-click → context menu
   boardEl?.addEventListener('contextmenu', (e) => {
-    const card = e.target.closest('.plan-board-card');
+    const card = (e.target as HTMLElement).closest('.plan-board-card');
     if (!card) return;
     e.preventDefault();
-    showPlanCtxMenu(e.clientX, e.clientY, card.dataset.id);
+    showPlanCtxMenu(e.clientX, e.clientY, (card as HTMLElement).dataset.id);
   });
 
   // Context menu actions
   ctxMenuEl?.addEventListener('click', async (e) => {
     e.stopPropagation();
-    const item = e.target.closest('.plan-ctx-item');
+    const item = (e.target as HTMLElement).closest('.plan-ctx-item');
     if (!item || !ctxTargetPlanId) return;
-    const action = item.dataset.action;
+    const action = (item as HTMLElement).dataset.action;
     if (action === 'edit') {
       selectPlan(ctxTargetPlanId);
       if (currentView === 'board') showBoardEditor();
     } else if (action === 'status') {
-      const newStatus = item.dataset.status;
+      const newStatus = (item as HTMLElement).dataset.status;
       const plan = plans.find((p) => p.id === ctxTargetPlanId);
       if (plan && plan.status !== newStatus) {
         plan.status = newStatus;
@@ -935,7 +935,7 @@ export function initPlanPanel() {
     } else if (action === 'delete') {
       deletePlan(ctxTargetPlanId);
     } else if (action === 'ai-assign') {
-      const aiType = item.dataset.ai;
+      const aiType = (item as HTMLElement).dataset.ai;
       assignAiToplan(ctxTargetPlanId, aiType);
       closePlanModal();
     }
@@ -972,15 +972,15 @@ export function initPlanPanel() {
 
   // Image grid: click to lightbox, delete button
   imagesGridEl?.addEventListener('click', (e) => {
-    const delBtn = e.target.closest('.plan-image-delete');
+    const delBtn = (e.target as HTMLElement).closest('.plan-image-delete');
     if (delBtn) {
       e.stopPropagation();
       const thumb = delBtn.closest('.plan-image-thumb');
-      if (thumb && activeId) deletePlanImage(activeId, thumb.dataset.name);
+      if (thumb && activeId) deletePlanImage(activeId, (thumb as HTMLElement).dataset.name);
       return;
     }
-    const thumb = e.target.closest('.plan-image-thumb');
-    if (thumb) openLightbox(thumb.dataset.url);
+    const thumb = (e.target as HTMLElement).closest('.plan-image-thumb');
+    if (thumb) openLightbox((thumb as HTMLElement).dataset.url);
   });
 
   // Lightbox close
@@ -1291,7 +1291,7 @@ export function updateAiTasksBadge() {
   const count = tasks.length;
   sbAiTasks.style.display = '';
   sbAiTasksSep.style.display = '';
-  sbAiTasksCount.textContent = count;
+  sbAiTasksCount.textContent = String(count);
 }
 
 let aiDashTab = 'active'; // 'active' | 'history'
@@ -1419,23 +1419,23 @@ aiDashOverlay?.addEventListener('click', (e) => {
   if (e.target === aiDashOverlay) closeAiDashboard();
 });
 aiDashBody?.addEventListener('click', (e) => {
-  const tab = e.target.closest('.ai-dash-tab');
+  const tab = (e.target as HTMLElement).closest('.ai-dash-tab');
   if (tab) {
-    aiDashTab = tab.dataset.tab;
+    aiDashTab = (tab as HTMLElement).dataset.tab;
     renderAiDashboard();
     return;
   }
-  const cancelBtn = e.target.closest('.ai-dash-card-cancel');
+  const cancelBtn = (e.target as HTMLElement).closest('.ai-dash-card-cancel');
   if (cancelBtn) {
-    const planId = cancelBtn.dataset.planId;
-    const sid = cancelBtn.dataset.sid;
+    const planId = (cancelBtn as HTMLElement).dataset.planId;
+    const sid = (cancelBtn as HTMLElement).dataset.sid;
     apiFetch(`/api/plans/${planId}/headless/${sid}`, { method: 'DELETE' })
       .catch((err) => console.error('[plan] headless cancel failed:', err));
     return;
   }
-  const goBtn = e.target.closest('.ai-dash-card-go');
+  const goBtn = (e.target as HTMLElement).closest('.ai-dash-card-go');
   if (goBtn) {
-    const sid = goBtn.dataset.sid;
+    const sid = (goBtn as HTMLElement).dataset.sid;
     if (sid) {
       openOrActivateSession(sid);
       closeAiDashboard();
@@ -1443,18 +1443,18 @@ aiDashBody?.addEventListener('click', (e) => {
     return;
   }
   // Session ID click → activate that session tab
-  const sidEl = e.target.closest('.ai-dash-card-sid');
+  const sidEl = (e.target as HTMLElement).closest('.ai-dash-card-sid');
   if (sidEl) {
-    const sid = sidEl.dataset.sid;
+    const sid = (sidEl as HTMLElement).dataset.sid;
     if (sid) {
       openOrActivateSession(sid);
       closeAiDashboard();
     }
     return;
   }
-  const card = e.target.closest('.ai-dash-card');
-  if (card && card.dataset.sessionId) {
-    openOrActivateSession(card.dataset.sessionId);
+  const card = (e.target as HTMLElement).closest('.ai-dash-card');
+  if (card && (card as HTMLElement).dataset.sessionId) {
+    openOrActivateSession((card as HTMLElement).dataset.sessionId);
     closeAiDashboard();
   }
 });

@@ -17,7 +17,7 @@ function findSplitByPanel(panel) {
 
 function saveIconOrder() {
   const bar = document.getElementById('activity-bar');
-  const order = [...bar.querySelectorAll('.activity-btn[data-panel]')].map((b) => b.dataset.panel);
+  const order = [...bar.querySelectorAll('.activity-btn[data-panel]')].map((b) => (b as HTMLElement).dataset.panel);
   try {
     localStorage.setItem(ICON_ORDER_KEY, JSON.stringify(order));
   } catch {}
@@ -30,7 +30,7 @@ function restoreIconOrder() {
     const bar = document.getElementById('activity-bar');
     const btnMap = {};
     bar.querySelectorAll('.activity-btn[data-panel]').forEach((b) => {
-      btnMap[b.dataset.panel] = b;
+      btnMap[(b as HTMLElement).dataset.panel] = b;
     });
     // source-control is always first
     if (btnMap['source-control']) bar.appendChild(btnMap['source-control']);
@@ -53,11 +53,11 @@ export function initActivityBar() {
   // Activate the first icon's panel on startup
   const firstBtn = document.querySelector('#activity-bar .activity-btn[data-panel]');
   if (firstBtn) {
-    const firstPanel = firstBtn.dataset.panel;
+    const firstPanel = (firstBtn as HTMLElement).dataset.panel;
     activePanel = firstPanel;
     // Update active states
     document.querySelectorAll('.activity-btn').forEach((b) => {
-      b.classList.toggle('active', b.dataset.panel === firstPanel);
+      b.classList.toggle('active', (b as HTMLElement).dataset.panel === firstPanel);
     });
     document.querySelectorAll('.sidebar-panel').forEach((p) => {
       p.classList.toggle('active', p.id === `panel-${firstPanel}`);
@@ -68,10 +68,10 @@ export function initActivityBar() {
   const buttons = document.querySelectorAll('.activity-btn');
   buttons.forEach((btn) => {
     btn.addEventListener('click', () => {
-      const panel = btn.dataset.panel;
+      const panel = (btn as HTMLElement).dataset.panel;
 
       // Split button click
-      const splitId = btn.dataset.splitId;
+      const splitId = (btn as HTMLElement).dataset.splitId;
       if (splitId) {
         const split = splits.find((s) => s.id === splitId);
         if (!split) return;
@@ -101,8 +101,8 @@ export function initActivityBar() {
     btn.addEventListener('dragstart', (e) => {
       dragSrcBtn = btn;
       btn.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/activity-panel', btn.dataset.panel);
+      (e as DragEvent).dataTransfer.effectAllowed = 'move';
+      (e as DragEvent).dataTransfer.setData('text/activity-panel', (btn as HTMLElement).dataset.panel);
     });
 
     btn.addEventListener('dragend', () => {
@@ -117,11 +117,11 @@ export function initActivityBar() {
     btn.addEventListener('dragover', (e) => {
       e.preventDefault();
       if (!dragSrcBtn || dragSrcBtn === btn) return;
-      e.dataTransfer.dropEffect = 'move';
+      (e as DragEvent).dataTransfer.dropEffect = 'move';
       const rect = btn.getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
-      btn.classList.toggle('drag-over-top', e.clientY < midY);
-      btn.classList.toggle('drag-over-bottom', e.clientY >= midY);
+      btn.classList.toggle('drag-over-top', (e as DragEvent).clientY < midY);
+      btn.classList.toggle('drag-over-bottom', (e as DragEvent).clientY >= midY);
     });
 
     btn.addEventListener('dragleave', () => {
@@ -135,7 +135,7 @@ export function initActivityBar() {
       const bar = document.getElementById('activity-bar');
       const rect = btn.getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
-      if (e.clientY < midY) {
+      if ((e as DragEvent).clientY < midY) {
         bar.insertBefore(dragSrcBtn, btn);
       } else {
         bar.insertBefore(dragSrcBtn, btn.nextSibling);
@@ -164,7 +164,7 @@ export function initActivityBar() {
   });
 
   sidebar.addEventListener('dragleave', (e) => {
-    if (!sidebar.contains(e.relatedTarget)) {
+    if (!sidebar.contains(e.relatedTarget as Node)) {
       clearSidebarDropZones();
     }
   });
@@ -213,7 +213,7 @@ export function initActivityBar() {
 
   // ─── Panel header drag (for split rearranging) ───
   sidebar.addEventListener('dragstart', (e) => {
-    const header = e.target.closest('.sidebar-header');
+    const header = (e.target as HTMLElement).closest('.sidebar-header');
     if (!header || !activeSplitId) return;
     const panel = header.closest('.sidebar-panel');
     if (!panel) return;
@@ -224,7 +224,7 @@ export function initActivityBar() {
   });
 
   sidebar.addEventListener('dragend', (e) => {
-    const header = e.target.closest('.sidebar-header');
+    const header = (e.target as HTMLElement).closest('.sidebar-header');
     if (!header) return;
     header.classList.remove('dragging');
     clearSidebarDropZones();
@@ -275,7 +275,7 @@ function showSplitView(splitId) {
 
   // Update activity bar: this split's button active, all others not
   document.querySelectorAll('.activity-btn').forEach((btn) => {
-    if (btn.dataset.splitId === splitId) {
+    if ((btn as HTMLElement).dataset.splitId === splitId) {
       btn.classList.add('active');
     } else {
       btn.classList.remove('active');
@@ -297,7 +297,7 @@ function showSplitView(splitId) {
   });
 
   sidebar.classList.add('sidebar-split');
-  sidebar.style.setProperty('--sidebar-split-ratio', split.ratio);
+  sidebar.style.setProperty('--sidebar-split-ratio', String(split.ratio));
 
   // Reorder DOM
   const primaryEl = document.getElementById(`panel-${split.primary}`);
@@ -365,8 +365,8 @@ function destroySplit(splitId) {
   // Restore original icons
   const primaryBtn = document.querySelector(`.activity-btn[data-panel="${split.primary}"]`);
   const secondaryBtn = document.querySelector(`.activity-btn[data-panel="${split.secondary}"]`);
-  if (primaryBtn) primaryBtn.style.display = '';
-  if (secondaryBtn) secondaryBtn.style.display = '';
+  if (primaryBtn) (primaryBtn as HTMLElement).style.display = '';
+  if (secondaryBtn) (secondaryBtn as HTMLElement).style.display = '';
 
   // Remove from array
   splits.splice(idx, 1);
@@ -426,14 +426,14 @@ function createSplitButton(split) {
   // Hide original icons
   const primaryBtn = document.querySelector(`.activity-btn[data-panel="${split.primary}"]`);
   const secondaryBtn = document.querySelector(`.activity-btn[data-panel="${split.secondary}"]`);
-  if (primaryBtn) primaryBtn.style.display = 'none';
-  if (secondaryBtn) secondaryBtn.style.display = 'none';
+  if (primaryBtn) (primaryBtn as HTMLElement).style.display = 'none';
+  if (secondaryBtn) (secondaryBtn as HTMLElement).style.display = 'none';
 
   // Create split icon button
   const splitBtn = document.createElement('button');
   splitBtn.className = 'activity-btn activity-btn-split';
   splitBtn.dataset.splitId = split.id;
-  splitBtn.title = `${primaryBtn?.title || split.primary} + ${secondaryBtn?.title || split.secondary}`;
+  splitBtn.title = `${(primaryBtn as HTMLElement)?.title || split.primary} + ${(secondaryBtn as HTMLElement)?.title || split.secondary}`;
   splitBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
     <rect x="3" y="3" width="18" height="8" rx="1.5"/>
     <rect x="3" y="13" width="18" height="8" rx="1.5"/>
@@ -511,22 +511,22 @@ function initSidebarSplitResize() {
     startRatio = 0.5;
 
   sidebar.addEventListener('mousedown', (e) => {
-    if (!e.target.classList.contains('sidebar-split-resize')) return;
+    if (!(e.target as HTMLElement).classList.contains('sidebar-split-resize')) return;
     e.preventDefault();
     startY = e.clientY;
     const computed = getComputedStyle(sidebar).getPropertyValue('--sidebar-split-ratio');
     startRatio = computed ? parseFloat(computed) : 0.5;
-    e.target.classList.add('dragging');
+    (e.target as HTMLElement).classList.add('dragging');
 
     const onMove = (ev) => {
       const rect = sidebar.getBoundingClientRect();
       const deltaRatio = (ev.clientY - startY) / rect.height;
       const newRatio = Math.max(0.15, Math.min(0.85, startRatio + deltaRatio));
-      sidebar.style.setProperty('--sidebar-split-ratio', newRatio);
+      sidebar.style.setProperty('--sidebar-split-ratio', String(newRatio));
     };
 
     const onUp = () => {
-      e.target.classList.remove('dragging');
+      (e.target as HTMLElement).classList.remove('dragging');
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     };
@@ -565,10 +565,10 @@ export function switchPanel(panel) {
 
   // Update active button
   document.querySelectorAll('.activity-btn').forEach((btn) => {
-    if (btn.dataset.splitId) {
+    if ((btn as HTMLElement).dataset.splitId) {
       btn.classList.remove('active');
     } else {
-      btn.classList.toggle('active', btn.dataset.panel === panel);
+      btn.classList.toggle('active', (btn as HTMLElement).dataset.panel === panel);
     }
   });
 
@@ -624,7 +624,7 @@ export function getActivePanel() {
   return activePanel;
 }
 
-export function setActivityBadge(panel, count, opts) {
+export function setActivityBadge(panel, count, opts?) {
   const btn = document.querySelector(`.activity-btn[data-panel="${panel}"]`);
   if (!btn) return;
 

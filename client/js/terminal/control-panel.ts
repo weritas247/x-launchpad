@@ -79,7 +79,7 @@ if (cpBtnLogs) cpBtnLogs.addEventListener('click', () => {
 
 // 패널 밖 클릭 시 닫기
 document.addEventListener('click', (e) => {
-  if (panelOpen && controlPanel && !controlPanel.contains(e.target) && e.target !== floatingBtn) {
+  if (panelOpen && controlPanel && !controlPanel.contains(e.target as Node) && e.target !== floatingBtn) {
     panelOpen = false;
     controlPanel.classList.remove('open');
   }

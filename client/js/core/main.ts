@@ -177,7 +177,7 @@ function handleMessage(msg) {
     updateSessionInfo(msg.sessionId, msg.cwd, msg.ai);
     tabStatusOnAiChange(msg.sessionId, msg.ai);
 
-    if (msg.ai) onAiSessionReady(msg.sessionId, msg.ai);
+    if (msg.ai) onAiSessionReady(msg.sessionId);
     if (msg.sessionId === S.activeSessionId) {
       updateProjectName(msg.cwd);
       requestBranch(msg.sessionId);
@@ -249,7 +249,7 @@ function handleMessage(msg) {
     handleFileReadData(msg);
     // Also route to plan panel for .md files
     if (msg.filePath && /\.(md|markdown)$/i.test(msg.filePath)) {
-      handlePlanFileData(msg);
+      handlePlanFileData();
     }
   } else if (msg.type === 'file_save_result') {
     handleFileSaveResult(msg.filePath, msg.success, msg.error);
@@ -337,8 +337,8 @@ document.addEventListener('keydown', (e) => {
       const target = tabs[n - 1];
       if (target) {
         e.preventDefault();
-        const sessionId = target.dataset.sessionId;
-        const filePath = target.dataset.filePath;
+        const sessionId = (target as HTMLElement).dataset.sessionId;
+        const filePath = (target as HTMLElement).dataset.filePath;
         if (sessionId) {
           activateSession(sessionId);
           wsSend({ type: 'session_attach', sessionId });
@@ -374,8 +374,8 @@ function switchTabBy(dir) {
   const activeIdx = tabs.findIndex((t) => t.classList.contains('active'));
   const nextIdx = (activeIdx + dir + tabs.length) % tabs.length;
   const target = tabs[nextIdx];
-  const sessionId = target.dataset.sessionId;
-  const filePath = target.dataset.filePath;
+  const sessionId = (target as HTMLElement).dataset.sessionId;
+  const filePath = (target as HTMLElement).dataset.filePath;
   if (sessionId) {
     activateSession(sessionId);
     wsSend({ type: 'session_attach', sessionId });
@@ -463,19 +463,19 @@ function getCurrentSessionCwd() {
   return meta?.cwd || undefined;
 }
 
-document.querySelectorAll('.sp-btn').forEach((btn) => {
+document.querySelectorAll('.sp-btn').forEach((btn: Element) => {
   btn.addEventListener('click', () => {
-    const label = btn.dataset.label || 'Shell';
-    const cmd = btn.dataset.cmd || null;
+    const label = (btn as HTMLElement).dataset.label || 'Shell';
+    const cmd = (btn as HTMLElement).dataset.cmd || null;
     hideSessionPicker();
     wsSend({ type: 'session_create', name: label, cmd, cwd: getCurrentSessionCwd() });
   });
 });
 
-document.querySelectorAll('.btn-ai-quick').forEach((btn) => {
+document.querySelectorAll('.btn-ai-quick').forEach((btn: Element) => {
   btn.addEventListener('click', () => {
-    const label = btn.dataset.label || btn.dataset.ai;
-    const cmd = btn.dataset.cmd;
+    const label = (btn as HTMLElement).dataset.label || (btn as HTMLElement).dataset.ai;
+    const cmd = (btn as HTMLElement).dataset.cmd;
     wsSend({ type: 'session_create', name: label, cmd, cwd: getCurrentSessionCwd() });
   });
 });

@@ -288,7 +288,7 @@ export function showDropZoneOverlay() {
   const paneCount = terminalMap.size;
   if (paneCount >= 4) return;
   dropOverlay.classList.add('active');
-  dropOverlay.querySelector('.dz-center').style.display = paneCount === 1 ? '' : 'none';
+  (dropOverlay.querySelector('.dz-center') as HTMLElement).style.display = paneCount === 1 ? '' : 'none';
 }
 
 export function hideDropZoneOverlay() {
@@ -298,17 +298,17 @@ export function hideDropZoneOverlay() {
 
 export function initSplitDnD() {
   dzZones.forEach((zone) => {
-    zone.addEventListener('dragover', (e) => {
+    zone.addEventListener('dragover', (e: DragEvent) => {
       if (!e.dataTransfer.types.includes('text/split-tab')) return;
       e.preventDefault();
       dzZones.forEach((z) => z.classList.remove('dz-hover'));
       zone.classList.add('dz-hover');
     });
     zone.addEventListener('dragleave', () => zone.classList.remove('dz-hover'));
-    zone.addEventListener('drop', async (e) => {
+    zone.addEventListener('drop', async (e: DragEvent) => {
       e.preventDefault();
       hideDropZoneOverlay();
-      const z = zone.dataset.zone;
+      const z = (zone as HTMLElement).dataset.zone;
       const existingId = S.activeSessionId;
       if (!existingId) return;
 

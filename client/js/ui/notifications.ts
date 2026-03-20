@@ -153,7 +153,7 @@ export function showToast(title, body, sessionId) {
     <button class="toast-close">✕</button>
   `;
   t.addEventListener('click', (e) => {
-    if (e.target.closest('.toast-close')) {
+    if ((e.target as HTMLElement).closest('.toast-close')) {
       t.remove();
       return;
     }

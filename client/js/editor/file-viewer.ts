@@ -16,7 +16,7 @@ const fileTabs = new Map();
 let activeFilePath = null;
 let previewFilePath = null; // single preview tab (replaced on next click)
 
-export function openFileTab(filePath, content, opts = {}) {
+export function openFileTab(filePath, content, opts: any = {}) {
   const isBinary = opts.binary;
   const isImage = opts.isImage;
   const imageData = opts.imageData;
@@ -55,7 +55,7 @@ export function openFileTab(filePath, content, opts = {}) {
   tabEl.title = filePath;
 
   tabEl.addEventListener('click', (e) => {
-    if (e.target.closest('.tab-close-btn')) {
+    if ((e.target as HTMLElement).closest('.tab-close-btn')) {
       closeFileTab(filePath);
       return;
     }
@@ -127,7 +127,7 @@ export function openFileTab(filePath, content, opts = {}) {
   activateFileTab(filePath);
 }
 
-function updateFileContent(filePath, content, opts = {}) {
+function updateFileContent(filePath, content, opts: any = {}) {
   const entry = fileTabs.get(filePath);
   if (!entry) return;
 

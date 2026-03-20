@@ -13,7 +13,7 @@ export function applyTheme(t) {
   if (t.css) {
     const root = document.documentElement;
     for (const [prop, val] of Object.entries(t.css)) {
-      root.style.setProperty(prop, val);
+      root.style.setProperty(prop, val as string);
     }
   }
   terminalMap.forEach(({ term }) => {
@@ -34,7 +34,7 @@ export function initThemeSwatches() {
       if (S.pendingSettings) {
         S.pendingSettings.appearance.theme = t.id;
         document.querySelectorAll('.theme-grid .theme-card').forEach((el) => {
-          el.classList.toggle('active', el.dataset.themeId === t.id);
+          el.classList.toggle('active', (el as HTMLElement).dataset.themeId === t.id);
         });
       }
       applyTheme(t);

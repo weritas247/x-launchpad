@@ -74,10 +74,10 @@ export function initSourceControl() {
 
   const doCommit = (andPush = false) => {
     if (!commitInput || !S.activeSessionId) return;
-    const message = commitInput.value.trim();
+    const message = (commitInput as HTMLInputElement).value.trim();
     if (!message) return;
     wsSend({ type: 'git_commit', sessionId: S.activeSessionId, message, push: andPush });
-    commitInput.value = '';
+    (commitInput as HTMLInputElement).value = '';
   };
 
   if (commitBtn) commitBtn.addEventListener('click', () => doCommit(false));
@@ -94,8 +94,8 @@ export function initSourceControl() {
   if (generateBtn) {
     generateBtn.addEventListener('click', () => {
       if (!S.activeSessionId) return;
-      generateBtn.textContent = '...';
-      generateBtn.disabled = true;
+      (generateBtn as HTMLButtonElement).textContent = '...';
+      (generateBtn as HTMLButtonElement).disabled = true;
       wsSend({ type: 'git_generate_message', sessionId: S.activeSessionId });
     });
   }
@@ -110,7 +110,7 @@ export function initSourceControl() {
     scInitialized = true;
 
     commitMenu.addEventListener('click', (e) => {
-      const action = e.target.dataset?.action;
+      const action = (e.target as HTMLElement).dataset?.action;
       if (action === 'commit-push') doCommit(true);
       else if (action === 'push') wsSend({ type: 'git_push', sessionId: S.activeSessionId });
       commitMenu.classList.remove('show');
@@ -121,7 +121,7 @@ export function initSourceControl() {
   const wtHeader = document.getElementById('sc-worktree-header');
   if (wtHeader) {
     wtHeader.addEventListener('click', (e) => {
-      if (e.target.closest('#sc-worktree-add-btn')) return;
+      if ((e.target as HTMLElement).closest('#sc-worktree-add-btn')) return;
       worktreeCollapsed = !worktreeCollapsed;
       const section = document.getElementById('sc-worktree-section');
       if (section) section.classList.toggle('collapsed', worktreeCollapsed);
@@ -147,7 +147,7 @@ export function initSourceControl() {
       const pathInput = document.getElementById('sc-worktree-path');
       const newBranchCb = document.getElementById('sc-worktree-new-branch');
       if (!pathInput || !S.activeSessionId) return;
-      const value = pathInput.value.trim();
+      const value = (pathInput as HTMLInputElement).value.trim();
       if (!value) return;
       // Sanitize: only allow alphanumeric, hyphens, underscores, dots
       const safeName = value.replace(/[^a-zA-Z0-9._-]/g, '-');
@@ -155,7 +155,7 @@ export function initSourceControl() {
         showToast('Invalid branch/worktree name', 'error');
         return;
       }
-      const isNewBranch = newBranchCb?.checked || false;
+      const isNewBranch = (newBranchCb as HTMLInputElement)?.checked || false;
       const path = `.claude/worktrees/${safeName}`;
       wsSend({
         type: 'git_worktree_add',
@@ -164,8 +164,8 @@ export function initSourceControl() {
         branch: isNewBranch ? safeName : value,
         createBranch: isNewBranch,
       });
-      pathInput.value = '';
-      if (newBranchCb) newBranchCb.checked = false;
+      (pathInput as HTMLInputElement).value = '';
+      if (newBranchCb) (newBranchCb as HTMLInputElement).checked = false;
       document.getElementById('sc-worktree-add-form').style.display = 'none';
     });
   }
@@ -216,11 +216,11 @@ export function handleGitGenerateMessage(msg) {
   const commitInput = document.getElementById('sc-commit-input');
   const generateBtn = document.getElementById('sc-generate-btn');
   if (generateBtn) {
-    generateBtn.textContent = 'Generate ✦';
-    generateBtn.disabled = false;
+    (generateBtn as HTMLButtonElement).textContent = 'Generate ✦';
+    (generateBtn as HTMLButtonElement).disabled = false;
   }
   if (commitInput && msg.message) {
-    commitInput.value = msg.message;
+    (commitInput as HTMLInputElement).value = msg.message;
     commitInput.focus();
   }
 }
@@ -304,7 +304,7 @@ export function handleGitStatusData(msg) {
         mainCount: mainFiles.length,
       });
     } else {
-      setActivityBadge('source-control', mainFiles.length);
+      setActivityBadge('source-control', mainFiles.length, undefined);
     }
   }
   renderSourceControl();
@@ -419,12 +419,12 @@ function renderSourceControl() {
     if (parts.length) branchText += ` ${parts.join(' ')}`;
     branchEl.textContent = branchText;
   }
-  if (countEl) countEl.textContent = gitStatusFiles.length > 0 ? gitStatusFiles.length : '';
+  if (countEl) countEl.textContent = gitStatusFiles.length > 0 ? String(gitStatusFiles.length) : '';
 
   // Update commit input placeholder with branch name
   const commitInput = document.getElementById('sc-commit-input');
   if (commitInput) {
-    commitInput.placeholder = gitBranch
+    (commitInput as HTMLInputElement).placeholder = gitBranch
       ? `Message (Enter to commit on "${gitBranch}")`
       : 'Message (Enter to commit)';
   }
@@ -630,15 +630,15 @@ function renderTreeView(parent, files, isStaged) {
 
   function renderNode(parentEl, node, prefix, depth) {
     const entries = Object.entries(node).sort(([a, av], [b, bv]) => {
-      const aIsDir = typeof av === 'object' && !av.status;
-      const bIsDir = typeof bv === 'object' && !bv.status;
+      const aIsDir = typeof av === 'object' && !(av as any).status;
+      const bIsDir = typeof bv === 'object' && !(bv as any).status;
       if (aIsDir !== bIsDir) return aIsDir ? -1 : 1;
       return a.localeCompare(b);
     });
 
     for (const [name, value] of entries) {
       const fullPath = prefix ? `${prefix}/${name}` : name;
-      if (value && typeof value === 'object' && !value.status) {
+      if (value && typeof value === 'object' && !(value as any).status) {
         // Directory
         const dirItem = document.createElement('div');
         dirItem.className = 'sc-tree-dir';
@@ -668,7 +668,7 @@ function renderTreeView(parent, files, isStaged) {
   renderNode(parent, tree, '', 0);
 }
 
-function createFileItem(file, isStaged, treeDepth) {
+function createFileItem(file, isStaged, treeDepth?) {
   const item = document.createElement('div');
   item.className = 'sc-file-item';
   if (treeDepth !== undefined) {
@@ -755,13 +755,13 @@ function createFileItem(file, isStaged, treeDepth) {
 
   // Click for select
   item.addEventListener('click', (e) => {
-    if (e.target.closest('.sc-file-action')) return;
+    if ((e.target as HTMLElement).closest('.sc-file-action')) return;
     handleFileItemClick(e, file, isStaged, key);
   });
 
   // Double-click for diff modal
   item.addEventListener('dblclick', (e) => {
-    if (e.target.closest('.sc-file-action')) return;
+    if ((e.target as HTMLElement).closest('.sc-file-action')) return;
     handleFileItemDblClick(file, isStaged);
   });
 
@@ -817,7 +817,7 @@ function updateSelectionVisuals() {
   const container = document.getElementById('sc-file-list');
   if (!container) return;
   container.querySelectorAll('.sc-file-item').forEach((el) => {
-    const key = el.dataset.fileKey;
+    const key = (el as HTMLElement).dataset.fileKey;
     if (key && selectedItems.has(key)) {
       el.classList.add('sc-selected');
     } else {
@@ -890,7 +890,7 @@ function initDragSelect() {
   container.addEventListener('mousedown', (e) => {
     // Only left button, ignore buttons/actions
     if (e.button !== 0) return;
-    if (e.target.closest('.sc-file-action, .sc-action-btn, .sc-section-header, .sc-tree-dir'))
+    if ((e.target as HTMLElement).closest('.sc-file-action, .sc-action-btn, .sc-section-header, .sc-tree-dir'))
       return;
 
     dragStartedInside = true;
@@ -934,7 +934,7 @@ function initDragSelect() {
       const rect = el.getBoundingClientRect();
       const overlaps =
         rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right;
-      const key = el.dataset.fileKey;
+      const key = (el as HTMLElement).dataset.fileKey;
       if (!key) return;
       if (overlaps) {
         selectedItems.add(key);
@@ -1099,7 +1099,7 @@ function renderWorktrees() {
   }
 
   section.style.display = '';
-  if (countEl) countEl.textContent = worktrees.length;
+  if (countEl) countEl.textContent = String(worktrees.length);
 
   list.innerHTML = '';
   for (const wt of worktrees) {

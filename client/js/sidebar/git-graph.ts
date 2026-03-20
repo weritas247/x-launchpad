@@ -40,7 +40,7 @@ const sbBrName = document.getElementById('sb-branch-name');
 const loadMore = document.getElementById('gg-load-more');
 const searchToggle = document.getElementById('gg-search-toggle');
 const searchBar = document.getElementById('gg-search-bar');
-const searchInput = document.getElementById('gg-search-input');
+const searchInput = document.getElementById('gg-search-input') as HTMLInputElement;
 const searchEmpty = document.getElementById('gg-search-empty');
 
 // Branch dropdown
@@ -136,7 +136,7 @@ export function openGitGraph() {
   wsSend({ type: 'git_remote_url', sessionId: S.activeSessionId });
 
   // Blur terminal so keydown events reach document listener
-  if (document.activeElement) document.activeElement.blur();
+  if (document.activeElement) (document.activeElement as HTMLElement).blur();
   modal.focus();
 
   // Close dropdown on outside click
@@ -145,7 +145,7 @@ export function openGitGraph() {
   document.addEventListener(
     'click',
     (e) => {
-      if (!branchDropdown.contains(e.target)) {
+      if (!branchDropdown.contains(e.target as Node)) {
         branchMenu.classList.remove('open');
       }
     },
@@ -270,7 +270,7 @@ export function handleGitGraphKeydown(e) {
       e.preventDefault();
       if (cur) {
         branchMenu.classList.remove('open');
-        const branch = cur.dataset.branch;
+        const branch = (cur as HTMLElement).dataset.branch;
         if (branch && !cur.classList.contains('current')) {
           showCheckoutConfirm(branch);
         }
@@ -288,7 +288,7 @@ export function handleGitGraphKeydown(e) {
     e.preventDefault();
     const newIdx = focusedRowIdx < rows.length - 1 ? focusedRowIdx + 1 : 0;
     updateRowFocus(rows, newIdx);
-    const hash = rows[newIdx].dataset.hash;
+    const hash = (rows[newIdx] as HTMLElement).dataset.hash;
     if (hash) selectCommit(hash);
     return true;
   }
@@ -296,7 +296,7 @@ export function handleGitGraphKeydown(e) {
     e.preventDefault();
     const newIdx = focusedRowIdx > 0 ? focusedRowIdx - 1 : rows.length - 1;
     updateRowFocus(rows, newIdx);
-    const hash = rows[newIdx].dataset.hash;
+    const hash = (rows[newIdx] as HTMLElement).dataset.hash;
     if (hash) selectCommit(hash);
     return true;
   }
@@ -304,7 +304,7 @@ export function handleGitGraphKeydown(e) {
   // Enter — select focused commit
   if ((e.key === 'Enter' || e.key === ' ') && focusedRowIdx >= 0 && focusedRowIdx < rows.length) {
     e.preventDefault();
-    const hash = rows[focusedRowIdx].dataset.hash;
+    const hash = (rows[focusedRowIdx] as HTMLElement).dataset.hash;
     if (hash) onCommitClick(hash);
     return true;
   }
@@ -460,23 +460,23 @@ function insertDetailRow(hash, commit) {
 
   // Apply saved width
   const rightEl = wrapper.querySelector('.gg-inline-right');
-  if (rightEl) rightEl.style.width = getSavedSplitWidth() + 'px';
+  if (rightEl) (rightEl as HTMLElement).style.width = getSavedSplitWidth() + 'px';
 
   // Drag-to-resize divider
   const divider = wrapper.querySelector('.gg-inline-divider');
   if (divider && rightEl) {
-    divider.addEventListener('mousedown', (e) => {
+    divider.addEventListener('mousedown', (e: MouseEvent) => {
       e.preventDefault();
       const startX = e.clientX;
-      const startW = rightEl.offsetWidth;
+      const startW = (rightEl as HTMLElement).offsetWidth;
       divider.classList.add('dragging');
       function onMove(ev) {
         const newW = Math.max(DETAIL_SPLIT_MIN, Math.min(DETAIL_SPLIT_MAX, startW - (ev.clientX - startX)));
-        rightEl.style.width = newW + 'px';
+        (rightEl as HTMLElement).style.width = newW + 'px';
       }
       function onUp() {
         divider.classList.remove('dragging');
-        try { localStorage.setItem(DETAIL_SPLIT_KEY, rightEl.offsetWidth); } catch {}
+        try { localStorage.setItem(DETAIL_SPLIT_KEY, String((rightEl as HTMLElement).offsetWidth)); } catch {}
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
       }
@@ -490,29 +490,29 @@ function insertDetailRow(hash, commit) {
   if (leftEl && commit) leftEl.innerHTML = buildMetaHtml(commit, null);
 
   wrapper.addEventListener('click', (e) => {
-    const copyEl = e.target.closest('[data-copy]');
+    const copyEl = (e.target as HTMLElement).closest('[data-copy]');
     if (copyEl) {
-      navigator.clipboard.writeText(copyEl.dataset.copy).then(() => {
+      navigator.clipboard.writeText((copyEl as HTMLElement).dataset.copy).then(() => {
         const orig = copyEl.textContent;
         copyEl.textContent = 'Copied!';
         setTimeout(() => { copyEl.textContent = orig; }, 1200);
       });
       return;
     }
-    const parentLink = e.target.closest('.gg-detail-hash-link[data-hash]');
+    const parentLink = (e.target as HTMLElement).closest('.gg-detail-hash-link[data-hash]');
     if (parentLink) {
-      const ph = parentLink.dataset.hash;
+      const ph = (parentLink as HTMLElement).dataset.hash;
       const rows = commitBox.querySelectorAll('.gg-row');
-      const idx = [...rows].findIndex((r) => r.dataset.hash?.startsWith(ph) || ph.startsWith(r.dataset.hash || ''));
+      const idx = [...rows].findIndex((r) => (r as HTMLElement).dataset.hash?.startsWith(ph) || ph.startsWith((r as HTMLElement).dataset.hash || ''));
       if (idx >= 0) {
         updateRowFocus(rows, idx);
-        onCommitClick(rows[idx].dataset.hash);
+        onCommitClick((rows[idx] as HTMLElement).dataset.hash!);
       }
       return;
     }
-    const fileItem = e.target.closest('.gg-detail-file-item[data-path]');
+    const fileItem = (e.target as HTMLElement).closest('.gg-detail-file-item[data-path]');
     if (fileItem) {
-      wsSend({ type: 'file_read', sessionId: S.activeSessionId, filePath: fileItem.dataset.path });
+      wsSend({ type: 'file_read', sessionId: S.activeSessionId, filePath: (fileItem as HTMLElement).dataset.path });
       hideGitGraph();
     }
   });
@@ -522,7 +522,7 @@ function insertDetailRow(hash, commit) {
 const ctxMenu = document.getElementById('gg-ctx-menu');
 const inputDialog = document.getElementById('gg-input-dialog');
 const inputDialogMessage = document.getElementById('gg-input-dialog-message');
-const inputDialogField = document.getElementById('gg-input-dialog-field');
+const inputDialogField = document.getElementById('gg-input-dialog-field') as HTMLInputElement;
 const inputDialogOk = document.getElementById('gg-input-dialog-ok');
 const inputDialogCancel = document.getElementById('gg-input-dialog-cancel');
 
@@ -623,7 +623,7 @@ function showCtxMenu(x, y, hash, commit) {
 
 // Dismiss context menu on outside click or Esc
 document.addEventListener('click', (e) => {
-  if (ctxMenu.style.display !== 'none' && !ctxMenu.contains(e.target)) {
+  if (ctxMenu.style.display !== 'none' && !ctxMenu.contains(e.target as Node)) {
     hideCtxMenu();
   }
 });
@@ -1034,8 +1034,8 @@ function readDomY(positions) {
   // commitBox may have its own offsetTop within gg-scroll; rows' offsetTop is within commitBox
   const boxTop = commitBox.offsetTop;
   const domY = new Map();
-  commitBox.querySelectorAll('.gg-row[data-hash]').forEach((el) => {
-    domY.set(el.dataset.hash, boxTop + el.offsetTop + ROW_H / 2);
+  commitBox.querySelectorAll('.gg-row[data-hash]').forEach((el: Element) => {
+    domY.set((el as HTMLElement).dataset.hash!, boxTop + (el as HTMLElement).offsetTop + ROW_H / 2);
   });
   // Fallback to nominal Y (boxTop + index * ROW_H + ROW_H/2) for rows not in DOM
   for (const [hash, pos] of positions) {
@@ -1052,11 +1052,11 @@ function renderSvg(commits, positions, svgWidth) {
   const lastRow = rows[rows.length - 1];
   const boxTop = commitBox.offsetTop;
   const svgHeight = lastRow
-    ? boxTop + lastRow.offsetTop + ROW_H
+    ? boxTop + (lastRow as HTMLElement).offsetTop + ROW_H
     : boxTop + commits.length * ROW_H;
 
-  svgEl.setAttribute('width', svgWidth);
-  svgEl.setAttribute('height', svgHeight);
+  svgEl.setAttribute('width', String(svgWidth));
+  svgEl.setAttribute('height', String(svgHeight));
   svgEl.style.width = svgWidth + 'px';
   svgEl.style.minWidth = svgWidth + 'px';
 
@@ -1162,7 +1162,7 @@ function selectCommit(hash) {
   if (selectedHash === hash) return;
   selectedHash = hash;
   commitBox.querySelectorAll('.gg-row').forEach((r) => {
-    r.classList.toggle('selected', r.dataset.hash === hash);
+    r.classList.toggle('selected', (r as HTMLElement).dataset.hash === hash);
   });
   const commit = cachedCommits.find((c) => c.hash === hash);
   insertDetailRow(hash, commit);
@@ -1179,7 +1179,7 @@ function onCommitClick(hash) {
   }
   selectedHash = hash;
   commitBox.querySelectorAll('.gg-row').forEach((r) => {
-    r.classList.toggle('selected', r.dataset.hash === hash);
+    r.classList.toggle('selected', (r as HTMLElement).dataset.hash === hash);
   });
   const commit = cachedCommits.find((c) => c.hash === hash);
   insertDetailRow(hash, commit);
@@ -1237,7 +1237,7 @@ function doSearch(query) {
       renderSearchResults(clientResults, query);
     } else {
       svgEl.innerHTML = '';
-      svgEl.setAttribute('height', 0);
+      svgEl.setAttribute('height', '0');
       commitBox.innerHTML = '';
     }
     wsSend({ type: 'git_graph_search', sessionId: S.activeSessionId, query });
@@ -1249,7 +1249,7 @@ function renderSearchResults(commits, query) {
     searchEmpty.textContent = "No commits matching '" + query + "'";
     searchEmpty.style.display = 'flex';
     svgEl.innerHTML = '';
-    svgEl.setAttribute('height', 0);
+    svgEl.setAttribute('height', '0');
     commitBox.innerHTML = '';
     return;
   }
@@ -1289,10 +1289,10 @@ overlay.addEventListener('click', (e) => {
 
 commitBox.addEventListener('click', (e) => {
   // Hash click → copy to clipboard
-  const hashEl = e.target.closest('.gg-hash');
+  const hashEl = (e.target as HTMLElement).closest('.gg-hash');
   if (hashEl) {
     e.stopPropagation();
-    const fullHash = hashEl.dataset.hash;
+    const fullHash = (hashEl as HTMLElement).dataset.hash;
     navigator.clipboard.writeText(fullHash).then(() => {
       hashEl.classList.add('gg-hash-copied');
       const orig = hashEl.textContent;
@@ -1306,24 +1306,24 @@ commitBox.addEventListener('click', (e) => {
   }
 
   // Branch/remote ref badge click → checkout
-  const refBadgeEl = e.target.closest('[data-checkout-branch]');
+  const refBadgeEl = (e.target as HTMLElement).closest('[data-checkout-branch]');
   if (refBadgeEl) {
     e.stopPropagation();
-    showCheckoutConfirm(refBadgeEl.dataset.checkoutBranch);
+    showCheckoutConfirm((refBadgeEl as HTMLElement).dataset.checkoutBranch);
     return;
   }
 
   // Normal row click → show files
-  const row = e.target.closest('.gg-row');
-  if (row) onCommitClick(row.dataset.hash);
+  const row = (e.target as HTMLElement).closest('.gg-row');
+  if (row) onCommitClick((row as HTMLElement).dataset.hash);
 });
 
 // Context menu on commit rows
 commitBox.addEventListener('contextmenu', (e) => {
-  const row = e.target.closest('.gg-row[data-hash]');
+  const row = (e.target as HTMLElement).closest('.gg-row[data-hash]');
   if (!row) return;
   e.preventDefault();
-  const hash = row.dataset.hash;
+  const hash = (row as HTMLElement).dataset.hash;
   const commit = cachedCommits.find((c) => c.hash === hash);
   showCtxMenu(e.clientX, e.clientY, hash, commit);
 });
@@ -1337,10 +1337,10 @@ branchTrigger.addEventListener('click', (e) => {
 });
 
 branchMenu.addEventListener('click', (e) => {
-  const item = e.target.closest('.gg-branch-item');
+  const item = (e.target as HTMLElement).closest('.gg-branch-item');
   if (!item) return;
   branchMenu.classList.remove('open');
-  const branch = item.dataset.branch;
+  const branch = (item as HTMLElement).dataset.branch;
   if (branch && !item.classList.contains('current')) {
     showCheckoutConfirm(branch);
   }

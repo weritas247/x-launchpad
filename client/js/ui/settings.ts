@@ -4,6 +4,9 @@ import { THEMES, KB_DEFS, normalizeKey } from '../core/constants';
 import { applyTheme, updateSwatches } from './themes';
 import { apiFetch } from '../core/websocket';
 
+const $input = (id: string) => document.getElementById(id) as HTMLInputElement;
+const $select = (id: string) => document.getElementById(id) as HTMLSelectElement;
+
 export async function loadSettings() {
   try {
     const r = await apiFetch('/api/settings');
@@ -195,7 +198,7 @@ function buildKbList(kb) {
 function buildEnvList(env) {
   const list = document.getElementById('env-list');
   list.innerHTML = '';
-  Object.entries(env || {}).forEach(([k, v]) => addEnvRow(k, v));
+  Object.entries(env || {}).forEach(([k, v]) => addEnvRow(k as string, v as string));
 }
 
 function addEnvRow(k = '', v = '') {
@@ -207,20 +210,20 @@ function addEnvRow(k = '', v = '') {
     <input class="env-val" placeholder="value" value="${escHtml(v)}"/>
     <button class="env-remove">✕</button>
   `;
-  row.querySelector('.env-remove').addEventListener('click', () => {
+  (row.querySelector('.env-remove') as HTMLElement).addEventListener('click', () => {
     row.remove();
     syncEnvToPending();
   });
-  row.querySelector('.env-key').addEventListener('input', syncEnvToPending);
-  row.querySelector('.env-val').addEventListener('input', syncEnvToPending);
+  (row.querySelector('.env-key') as HTMLElement).addEventListener('input', syncEnvToPending);
+  (row.querySelector('.env-val') as HTMLElement).addEventListener('input', syncEnvToPending);
   list.appendChild(row);
 }
 
 function syncEnvToPending() {
   const env = {};
   document.querySelectorAll('.env-row').forEach((row) => {
-    const k = row.querySelector('.env-key').value.trim();
-    const v = row.querySelector('.env-val').value;
+    const k = (row.querySelector('.env-key') as HTMLInputElement).value.trim();
+    const v = (row.querySelector('.env-val') as HTMLInputElement).value;
     if (k) env[k] = v;
   });
   if (S.pendingSettings) S.pendingSettings.shell.env = env;
@@ -238,11 +241,11 @@ function populateForm(s) {
   setRangeValue('s-fontSize', ap.fontSize, 'px');
   setRangeValue('s-lineHeight', ap.lineHeight, '');
   setSelectValue('s-cursorStyle', ap.cursorStyle);
-  document.getElementById('s-cursorBlink').checked = ap.cursorBlink !== false;
-  document.getElementById('s-crtScanlines').checked = ap.crtScanlines !== false;
+  $input('s-cursorBlink').checked = ap.cursorBlink !== false;
+  $input('s-crtScanlines').checked = ap.crtScanlines !== false;
   setRangeValue('s-crtScanlinesIntensity', ap.crtScanlinesIntensity, '');
-  document.getElementById('s-crtFlicker').checked = ap.crtFlicker !== false;
-  document.getElementById('s-vignette').checked = ap.vignette !== false;
+  $input('s-crtFlicker').checked = ap.crtFlicker !== false;
+  $input('s-vignette').checked = ap.vignette !== false;
   setRangeValue('s-glowIntensity', ap.glowIntensity, '');
   setRangeValue('s-backgroundOpacity', ap.backgroundOpacity, '');
   setRangeValue('s-screenDimOpacity', ap.screenDimOpacity ?? 0, '');
@@ -256,29 +259,29 @@ function populateForm(s) {
   setRangeValue('s-gitGraphFontSize', ap.gitGraphFontSize ?? 12, 'px');
   setRangeValue('s-kanbanFontSize', ap.kanbanFontSize ?? 12, 'px');
 
-  document.getElementById('s-scrollback').value = te.scrollback;
+  $input('s-scrollback').value = te.scrollback;
   setSelectValue('s-bellStyle', te.bellStyle);
-  document.getElementById('s-copyOnSelect').checked = te.copyOnSelect;
-  document.getElementById('s-rightClickPaste').checked = te.rightClickPaste;
-  document.getElementById('s-trimCopied').checked = te.trimCopied;
-  document.getElementById('s-wordSeparators').value = te.wordSeparators;
+  $input('s-copyOnSelect').checked = te.copyOnSelect;
+  $input('s-rightClickPaste').checked = te.rightClickPaste;
+  $input('s-trimCopied').checked = te.trimCopied;
+  $input('s-wordSeparators').value = te.wordSeparators;
   setSelectValue('s-renderer', te.renderer);
 
-  document.getElementById('s-shellPath').value = sh.shellPath;
-  document.getElementById('s-startDirectory').value = sh.startDirectory;
-  document.getElementById('s-sessionNameFormat').value = sh.sessionNameFormat;
-  document.getElementById('s-autoReconnect').checked = sh.autoReconnect;
+  $input('s-shellPath').value = sh.shellPath;
+  $input('s-startDirectory').value = sh.startDirectory;
+  $input('s-sessionNameFormat').value = sh.sessionNameFormat;
+  $input('s-autoReconnect').checked = sh.autoReconnect;
   buildEnvList(sh.env);
 
   buildKbList(kb);
 
-  document.getElementById('s-customCss').value = adv.customCss || '';
-  document.getElementById('s-wsReconnectInterval').value = adv.wsReconnectInterval;
+  $input('s-customCss').value = adv.customCss || '';
+  $input('s-wsReconnectInterval').value = adv.wsReconnectInterval;
   setSelectValue('s-logLevel', adv.logLevel);
 }
 
 function setSelectValue(id, val) {
-  const el = document.getElementById(id);
+  const el = document.getElementById(id) as HTMLSelectElement;
   if (!el) return;
   for (let i = 0; i < el.options.length; i++) {
     if (el.options[i].value === String(val)) {
@@ -289,9 +292,9 @@ function setSelectValue(id, val) {
 }
 
 function setRangeValue(id, val, _unit) {
-  const range = document.getElementById(id);
+  const range = document.getElementById(id) as HTMLInputElement;
   const display = document.getElementById(id + '-val');
-  const numInput = document.getElementById(id + '-num');
+  const numInput = document.getElementById(id + '-num') as HTMLInputElement;
   if (!range) return;
   range.value = val;
   if (display) display.textContent = parseFloat(val).toFixed(val < 1 ? 2 : val % 1 === 0 ? 0 : 1);
@@ -309,55 +312,55 @@ function updateFontPreview(fontFamily, fontSize) {
 function readForm() {
   const s = S.pendingSettings;
 
-  s.appearance.fontFamily = document.getElementById('s-fontFamily').value;
+  s.appearance.fontFamily = (document.getElementById('s-fontFamily') as HTMLInputElement).value;
   const fontSizeNumEl = document.getElementById('s-fontSize-num');
   s.appearance.fontSize =
-    parseInt(fontSizeNumEl ? fontSizeNumEl.value : document.getElementById('s-fontSize').value) ||
+    parseInt(fontSizeNumEl ? (fontSizeNumEl as HTMLInputElement).value : (document.getElementById('s-fontSize') as HTMLInputElement).value) ||
     14;
-  s.appearance.lineHeight = parseFloat(document.getElementById('s-lineHeight').value);
-  s.appearance.cursorStyle = document.getElementById('s-cursorStyle').value;
-  s.appearance.cursorBlink = document.getElementById('s-cursorBlink').checked;
-  s.appearance.crtScanlines = document.getElementById('s-crtScanlines').checked;
+  s.appearance.lineHeight = parseFloat($input('s-lineHeight').value);
+  s.appearance.cursorStyle = $input('s-cursorStyle').value;
+  s.appearance.cursorBlink = $input('s-cursorBlink').checked;
+  s.appearance.crtScanlines = $input('s-crtScanlines').checked;
   s.appearance.crtScanlinesIntensity = parseFloat(
-    document.getElementById('s-crtScanlinesIntensity').value
+    $input('s-crtScanlinesIntensity').value
   );
-  s.appearance.crtFlicker = document.getElementById('s-crtFlicker').checked;
-  s.appearance.vignette = document.getElementById('s-vignette').checked;
-  s.appearance.glowIntensity = parseFloat(document.getElementById('s-glowIntensity').value);
-  s.appearance.backgroundOpacity = parseFloat(document.getElementById('s-backgroundOpacity').value);
-  s.appearance.screenDimOpacity = parseFloat(document.getElementById('s-screenDimOpacity').value);
+  s.appearance.crtFlicker = $input('s-crtFlicker').checked;
+  s.appearance.vignette = $input('s-vignette').checked;
+  s.appearance.glowIntensity = parseFloat($input('s-glowIntensity').value);
+  s.appearance.backgroundOpacity = parseFloat($input('s-backgroundOpacity').value);
+  s.appearance.screenDimOpacity = parseFloat($input('s-screenDimOpacity').value);
 
   s.appearance.sidebarFontSize =
-    parseInt(document.getElementById('s-sidebarFontSize')?.value) || 12;
+    parseInt($input('s-sidebarFontSize')?.value) || 12;
   s.appearance.statusBarFontSize =
-    parseInt(document.getElementById('s-statusBarFontSize')?.value) || 11;
-  s.appearance.tabBarFontSize = parseInt(document.getElementById('s-tabBarFontSize')?.value) || 12;
+    parseInt($input('s-statusBarFontSize')?.value) || 11;
+  s.appearance.tabBarFontSize = parseInt($input('s-tabBarFontSize')?.value) || 12;
   s.appearance.inputPanelFontSize =
-    parseInt(document.getElementById('s-inputPanelFontSize')?.value) || 11;
+    parseInt($input('s-inputPanelFontSize')?.value) || 11;
   s.appearance.fileViewerFontSize =
-    parseInt(document.getElementById('s-fileViewerFontSize')?.value) || 13;
+    parseInt($input('s-fileViewerFontSize')?.value) || 13;
   s.appearance.gitGraphFontSize =
-    parseInt(document.getElementById('s-gitGraphFontSize')?.value) || 12;
+    parseInt($input('s-gitGraphFontSize')?.value) || 12;
   s.appearance.kanbanFontSize =
-    parseInt(document.getElementById('s-kanbanFontSize')?.value) || 12;
+    parseInt($input('s-kanbanFontSize')?.value) || 12;
 
-  s.terminal.scrollback = parseInt(document.getElementById('s-scrollback').value);
-  s.terminal.bellStyle = document.getElementById('s-bellStyle').value;
-  s.terminal.copyOnSelect = document.getElementById('s-copyOnSelect').checked;
-  s.terminal.rightClickPaste = document.getElementById('s-rightClickPaste').checked;
-  s.terminal.trimCopied = document.getElementById('s-trimCopied').checked;
-  s.terminal.wordSeparators = document.getElementById('s-wordSeparators').value;
-  s.terminal.renderer = document.getElementById('s-renderer').value;
+  s.terminal.scrollback = parseInt($input('s-scrollback').value);
+  s.terminal.bellStyle = $input('s-bellStyle').value;
+  s.terminal.copyOnSelect = $input('s-copyOnSelect').checked;
+  s.terminal.rightClickPaste = $input('s-rightClickPaste').checked;
+  s.terminal.trimCopied = $input('s-trimCopied').checked;
+  s.terminal.wordSeparators = $input('s-wordSeparators').value;
+  s.terminal.renderer = $input('s-renderer').value;
 
-  s.shell.shellPath = document.getElementById('s-shellPath').value;
-  s.shell.startDirectory = document.getElementById('s-startDirectory').value;
-  s.shell.sessionNameFormat = document.getElementById('s-sessionNameFormat').value;
-  s.shell.autoReconnect = document.getElementById('s-autoReconnect').checked;
+  s.shell.shellPath = $input('s-shellPath').value;
+  s.shell.startDirectory = $input('s-startDirectory').value;
+  s.shell.sessionNameFormat = $input('s-sessionNameFormat').value;
+  s.shell.autoReconnect = $input('s-autoReconnect').checked;
   syncEnvToPending();
 
-  s.advanced.customCss = document.getElementById('s-customCss').value;
-  s.advanced.wsReconnectInterval = parseInt(document.getElementById('s-wsReconnectInterval').value);
-  s.advanced.logLevel = document.getElementById('s-logLevel').value;
+  s.advanced.customCss = $input('s-customCss').value;
+  s.advanced.wsReconnectInterval = parseInt($input('s-wsReconnectInterval').value);
+  s.advanced.logLevel = $input('s-logLevel').value;
 
   return s;
 }
@@ -365,7 +368,7 @@ function readForm() {
 function activateNavPanel(panelId) {
   document
     .querySelectorAll('.nav-item')
-    .forEach((el) => el.classList.toggle('active', el.dataset.panel === panelId));
+    .forEach((el) => el.classList.toggle('active', (el as HTMLElement).dataset.panel === panelId));
   document
     .querySelectorAll('.settings-panel')
     .forEach((el) => el.classList.toggle('active', el.id === `panel-${panelId}`));
@@ -373,15 +376,15 @@ function activateNavPanel(panelId) {
 
 export function initSettingsUI() {
   document.getElementById('settings-nav').addEventListener('click', (e) => {
-    const item = e.target.closest('.nav-item');
+    const item = (e.target as HTMLElement).closest('.nav-item') as HTMLElement;
     if (!item) return;
     activateNavPanel(item.dataset.panel);
   });
 
-  document.querySelectorAll('.s-range').forEach((range) => {
+  document.querySelectorAll<HTMLInputElement>('.s-range').forEach((range) => {
     range.addEventListener('input', () => {
       const valEl = document.getElementById(range.id + '-val');
-      const numInput = document.getElementById(range.id + '-num');
+      const numInput = document.getElementById(range.id + '-num') as HTMLInputElement;
       if (valEl) {
         const v = parseFloat(range.value);
         valEl.textContent = v.toFixed(v < 1 ? 2 : v % 1 === 0 ? 0 : 1);
@@ -389,8 +392,8 @@ export function initSettingsUI() {
       if (numInput) numInput.value = range.value;
       if (range.id === 's-fontSize' || range.id === 's-lineHeight') {
         updateFontPreview(
-          document.getElementById('s-fontFamily').value,
-          document.getElementById('s-fontSize').value
+          (document.getElementById('s-fontFamily') as HTMLInputElement).value,
+          (document.getElementById('s-fontSize') as HTMLInputElement).value
         );
       }
     });
@@ -399,14 +402,14 @@ export function initSettingsUI() {
   const fontSizeNum = document.getElementById('s-fontSize-num');
   if (fontSizeNum) {
     fontSizeNum.addEventListener('input', () => {
-      const v = Math.min(32, Math.max(8, parseInt(fontSizeNum.value) || 14));
-      document.getElementById('s-fontSize').value = v;
-      updateFontPreview(document.getElementById('s-fontFamily').value, v);
+      const v = Math.min(32, Math.max(8, parseInt((fontSizeNum as HTMLInputElement).value) || 14));
+      (document.getElementById('s-fontSize') as HTMLInputElement).value = String(v);
+      updateFontPreview((document.getElementById('s-fontFamily') as HTMLInputElement).value, v);
     });
   }
 
   document.getElementById('s-fontFamily').addEventListener('change', (e) => {
-    updateFontPreview(e.target.value, document.getElementById('s-fontSize').value);
+    updateFontPreview((e.target as HTMLSelectElement).value, (document.getElementById('s-fontSize') as HTMLInputElement).value);
   });
 
   document.getElementById('btn-save-settings').addEventListener('click', async () => {
@@ -450,12 +453,12 @@ export function initSettingsUI() {
     document.getElementById('import-file-input').click();
   });
   document.getElementById('import-file-input').addEventListener('change', (e) => {
-    const file = e.target.files[0];
+    const file = (e.target as HTMLInputElement).files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
-        const imported = JSON.parse(ev.target.result);
+        const imported = JSON.parse(ev.target!.result as string);
         S.pendingSettings = imported;
         populateForm(imported);
         applySettings(imported);
@@ -470,7 +473,7 @@ export function initSettingsUI() {
       }
     };
     reader.readAsText(file);
-    e.target.value = '';
+    (e.target as HTMLInputElement).value = '';
   });
 
   document.getElementById('btn-add-env').addEventListener('click', () => {

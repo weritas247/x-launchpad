@@ -2,7 +2,7 @@
 import { S, terminalMap } from '../core/state';
 import { wsSend } from '../core/websocket';
 
-const chatInput = document.getElementById('chat-input');
+const chatInput = document.getElementById('chat-input') as HTMLTextAreaElement;
 const chatSend = document.getElementById('chat-send');
 const chatHint = document.getElementById('chat-hint');
 const slashMenu = document.getElementById('chat-slash-menu');
@@ -110,7 +110,7 @@ function renderSlashMenu() {
 
   slashMenu.querySelectorAll('.slash-item').forEach((el) => {
     el.addEventListener('click', () => {
-      const idx = parseInt(el.dataset.idx);
+      const idx = parseInt((el as HTMLElement).dataset.idx);
       applySlashCommand(slashFiltered[idx]);
     });
   });
@@ -278,6 +278,6 @@ export function initChatEditor() {
 
   // Close slash menu on outside click
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('#chat-editor')) hideSlashMenu();
+    if (!(e.target as HTMLElement).closest('#chat-editor')) hideSlashMenu();
   });
 }

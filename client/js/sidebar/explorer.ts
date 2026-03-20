@@ -70,7 +70,7 @@ export function initExplorer() {
 
   // Upload button
   const uploadBtn = document.getElementById('explorer-upload');
-  const uploadInput = document.getElementById('explorer-upload-input');
+  const uploadInput = document.getElementById('explorer-upload-input') as HTMLInputElement;
   uploadBtn?.addEventListener('click', () => uploadInput?.click());
   uploadInput?.addEventListener('change', async () => {
     if (!uploadInput.files?.length || !S.activeSessionId) return;

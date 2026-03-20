@@ -16,7 +16,7 @@ function handlePaste(e, sessionId) {
     }
   }
   if (files.length === 0) return;
-  files.sort((a, b) =>
+  files.sort((a: File, b: File) =>
     a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
   );
   files.forEach((f) => addAttachment(f, sessionId));
@@ -46,11 +46,11 @@ function handleDrop(e, sessionId) {
   if (!e.dataTransfer?.files.length) return;
 
   const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-  const files = Array.from(e.dataTransfer.files).filter((f) => imageTypes.includes(f.type));
+  const files = Array.from(e.dataTransfer.files).filter((f: File) => imageTypes.includes(f.type));
   if (files.length === 0) return;
   e.preventDefault();
   e.stopPropagation();
-  files.sort((a, b) =>
+  files.sort((a: File, b: File) =>
     a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
   );
   files.forEach((f) => addAttachment(f, sessionId));
@@ -221,7 +221,7 @@ function adjustXtermForBar(entry, barHeight) {
 // ─── IMAGE PREVIEW MODAL ────────────────────────────────────────
 function showImagePreview(src) {
   const overlay = document.getElementById('img-preview-overlay');
-  const img = document.getElementById('img-preview-img');
+  const img = document.getElementById('img-preview-img') as HTMLImageElement;
   if (!overlay || !img) return;
   img.src = src;
   overlay.style.display = 'flex';

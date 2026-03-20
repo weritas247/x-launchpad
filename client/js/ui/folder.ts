@@ -26,7 +26,7 @@ export function createFolder(name) {
   const closeBtn = el.querySelector('.folder-close-btn');
 
   header.addEventListener('click', (e) => {
-    if (e.target.closest('.folder-close-btn')) return;
+    if ((e.target as HTMLElement).closest('.folder-close-btn')) return;
     el.classList.toggle('open');
     el.querySelector('.folder-icon').innerHTML = getFolderIcon(el.classList.contains('open'));
   });
@@ -77,7 +77,7 @@ export function createFolder(name) {
     }
   });
   el.addEventListener('dragleave', (e) => {
-    if (!el.contains(e.relatedTarget)) el.classList.remove('drag-over');
+    if (!el.contains(e.relatedTarget as Node)) el.classList.remove('drag-over');
   });
   el.addEventListener('drop', (e) => {
     const srcId = e.dataTransfer.getData('text/sidebar-session');
@@ -114,7 +114,7 @@ export function initFolderDnD() {
     }
   });
   sessionListEl.addEventListener('dragleave', (e) => {
-    if (!sessionListEl.contains(e.relatedTarget)) sessionListEl.classList.remove('drag-over-root');
+    if (!sessionListEl.contains(e.relatedTarget as Node)) sessionListEl.classList.remove('drag-over-root');
   });
   sessionListEl.addEventListener('drop', (e) => {
     const srcId = e.dataTransfer.getData('text/sidebar-session');
