@@ -115,7 +115,7 @@ const list = Array.from(sessions.values()).map((s) => ({
 
 - [ ] **Step 5: 빌드 확인**
 
-Run: `cd /Users/redpug/Dev/claude-web-terminal && npm run build`
+Run: `cd /Users/redpug/Dev/x-launchpad && npm run build`
 Expected: 컴파일 성공
 
 - [ ] **Step 6: Commit**
@@ -261,7 +261,7 @@ const sess = createSession(s.id, s.name, s.cwd, cmd, undefined, s.planId);
 
 - [ ] **Step 5: 빌드 확인**
 
-Run: `cd /Users/redpug/Dev/claude-web-terminal && npm run build`
+Run: `cd /Users/redpug/Dev/x-launchpad && npm run build`
 Expected: 컴파일 성공
 
 - [ ] **Step 6: Commit**
@@ -426,7 +426,7 @@ ctx.wsSend(
 
 - [ ] **Step 4: 빌드 확인**
 
-Run: `cd /Users/redpug/Dev/claude-web-terminal && npm run build`
+Run: `cd /Users/redpug/Dev/x-launchpad && npm run build`
 Expected: 컴파일 성공
 
 - [ ] **Step 5: Commit**

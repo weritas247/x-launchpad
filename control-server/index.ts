@@ -15,6 +15,7 @@ const CONTROL_PORT = parseInt(process.env.CONTROL_PORT || '3001');
 const CONTROL_HOST = process.env.CONTROL_HOST || '127.0.0.1';
 const APP_PORT = parseInt(process.env.PORT || '3000');
 const AUTO_START = process.env.AUTO_START === '1';
+const SKIP_PORT_SWITCHER = process.env.SKIP_PORT_SWITCHER === '1';
 
 const app = express();
 const server = http.createServer(app);
@@ -214,7 +215,9 @@ async function main(): Promise<void> {
   server.listen(CONTROL_PORT, CONTROL_HOST, async () => {
     console.log(`[control] Control Server → http://${CONTROL_HOST}:${CONTROL_PORT}`);
 
-    if (AUTO_START) {
+    if (SKIP_PORT_SWITCHER) {
+      console.log('[control] SKIP_PORT_SWITCHER=1, port-switcher 비활성');
+    } else if (AUTO_START) {
       console.log('[control] AUTO_START=1, X-Launchpad 시작...');
       await portSwitcher.release();
       await pm.start();

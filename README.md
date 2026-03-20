@@ -24,8 +24,8 @@ Browser-based multi-session terminal for running Claude CLI through the web. Bui
 ```bash
 # Requirements: Node.js >= 20, native build tools for node-pty
 
-git clone https://github.com/weritas247/claude-web-terminal.git
-cd claude-web-terminal
+git clone https://github.com/weritas247/x-launchpad.git
+cd x-launchpad
 npm install
 npm run dev
 ```

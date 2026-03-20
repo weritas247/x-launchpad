@@ -25,15 +25,32 @@ function formatBytes(b) {
   return (b / 1024 / 1024).toFixed(0) + 'MB';
 }
 
+let controlRetries = 0;
+const MAX_CONTROL_RETRIES = 3;
+
 function connectControlWS() {
+  if (controlRetries >= MAX_CONTROL_RETRIES) {
+    console.log('[control] Control server unavailable, giving up');
+    if (floatingBtn) floatingBtn.style.display = 'none';
+    return;
+  }
   controlWs = new WebSocket(`ws://127.0.0.1:${CONTROL_PORT}/ws`);
+  controlWs.onopen = () => { controlRetries = 0; };
   controlWs.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'status') {
       updatePanel(msg);
     }
   };
-  controlWs.onclose = () => setTimeout(connectControlWS, 5000);
+  controlWs.onclose = () => {
+    controlRetries++;
+    if (controlRetries < MAX_CONTROL_RETRIES) {
+      setTimeout(connectControlWS, 5000);
+    } else {
+      console.log('[control] Control server unavailable, giving up');
+      if (floatingBtn) floatingBtn.style.display = 'none';
+    }
+  };
   controlWs.onerror = () => controlWs.close();
 }
 
