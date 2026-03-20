@@ -267,6 +267,10 @@ export function attachTerminal(sessionId, name) {
     const buf = term.buffer.active;
     const viewportTop = buf.viewportY;
     const maxScroll = buf.baseY;
+    // Snap to bottom when within 3 lines — fixes mouse wheel not reaching true bottom
+    if (maxScroll - viewportTop <= 3 && maxScroll - viewportTop > 0) {
+      term.scrollToBottom();
+    }
     _userAtBottom = viewportTop >= maxScroll;
   });
 
