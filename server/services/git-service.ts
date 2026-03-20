@@ -37,6 +37,41 @@ export interface BranchEntry {
   isRemote: boolean;
 }
 
+export interface CommitDetail {
+  hash: string;
+  parents: string[];
+  authorName: string;
+  authorEmail: string;
+  committerName: string;
+  committerEmail: string;
+  authorDate: string;
+  committerDate: string;
+  subject: string;
+  body: string;
+}
+
+export function getCommitDetail(cwd: string, hash: string): CommitDetail {
+  const fmt = '%H%x00%P%x00%an%x00%ae%x00%cn%x00%ce%x00%aI%x00%cI%x00%s%x00%b';
+  const raw = execFileSync('git', ['show', '--no-patch', `--format=${fmt}`, hash], {
+    cwd,
+    encoding: 'utf-8',
+    timeout: 5000,
+  }).trim();
+  const parts = raw.split('\x00');
+  return {
+    hash: parts[0] || hash,
+    parents: parts[1] ? parts[1].trim().split(' ').filter(Boolean) : [],
+    authorName: parts[2] || '',
+    authorEmail: parts[3] || '',
+    committerName: parts[4] || '',
+    committerEmail: parts[5] || '',
+    authorDate: parts[6] || '',
+    committerDate: parts[7] || '',
+    subject: parts[8] || '',
+    body: parts[9] || '',
+  };
+}
+
 export function getGitLog(
   cwd: string,
   maxCount = 50,

@@ -107,9 +107,11 @@ const handlers: Record<string, WsHandler> = {
     }
     try {
       const files = gitService.getFileList(session.cwd, hash);
+      let detail: ReturnType<typeof gitService.getCommitDetail> | undefined;
+      try { detail = gitService.getCommitDetail(session.cwd, hash); } catch {}
       ctx.wsSend(
         ctx.ws,
-        JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files })
+        JSON.stringify({ type: 'git_file_list_data', sessionId: id, hash, files, detail })
       );
     } catch (e) {
       ctx.wsSend(
@@ -356,6 +358,77 @@ const handlers: Record<string, WsHandler> = {
     const { id, session } = r;
     const result = gitService.gitPush(session.cwd);
     ctx.wsSend(ctx.ws, JSON.stringify({ type: 'git_push_ack', sessionId: id, ...result }));
+  },
+
+  // PTY-based commit operations (hash validated, run in terminal)
+  git_pty_op(ctx, parsed) {
+    const r = getSession(ctx, parsed);
+    if (!r) return;
+    const { id, session } = r;
+    const op = parsed.op as string;
+    const hash = parsed.hash as string;
+
+    if (!hash || !/^[0-9a-f]{4,40}$/i.test(hash)) {
+      ctx.wsSend(ctx.ws, JSON.stringify({ type: 'git_pty_op_ack', sessionId: id, error: 'Invalid hash' }));
+      return;
+    }
+
+    const ALLOWED_OPS: Record<string, (h: string, extra?: string) => string> = {
+      cherry_pick:       (h) => `git cherry-pick ${h}`,
+      revert:            (h) => `git revert --no-edit ${h}`,
+      reset_soft:        (h) => `git reset --soft ${h}`,
+      reset_mixed:       (h) => `git reset ${h}`,
+      reset_hard:        (h) => `git reset --hard ${h}`,
+      merge:             (h) => `git merge ${h}`,
+      rebase:            (h) => `git rebase ${h}`,
+      checkout_detached: (h) => `git checkout ${h}`,
+    };
+
+    const builder = ALLOWED_OPS[op];
+    if (!builder) {
+      ctx.wsSend(ctx.ws, JSON.stringify({ type: 'git_pty_op_ack', sessionId: id, error: 'Unknown op' }));
+      return;
+    }
+
+    const cmd = builder(hash);
+    session.pty.write(cmd + '\r');
+    ctx.wsSend(ctx.ws, JSON.stringify({ type: 'git_pty_op_ack', sessionId: id, op, hash }));
+  },
+
+  git_tag_create(ctx, parsed) {
+    const r = getSession(ctx, parsed);
+    if (!r) return;
+    const { id, session } = r;
+    const hash = parsed.hash as string;
+    const name = parsed.name as string;
+    if (!hash || !/^[0-9a-f]{4,40}$/i.test(hash)) {
+      ctx.wsSend(ctx.ws, JSON.stringify({ type: 'git_tag_create_ack', sessionId: id, error: 'Invalid hash' }));
+      return;
+    }
+    if (!name || !/^[a-zA-Z0-9][a-zA-Z0-9_./-]*$/.test(name)) {
+      ctx.wsSend(ctx.ws, JSON.stringify({ type: 'git_tag_create_ack', sessionId: id, error: 'Invalid tag name' }));
+      return;
+    }
+    session.pty.write(`git tag ${name} ${hash}\r`);
+    ctx.wsSend(ctx.ws, JSON.stringify({ type: 'git_tag_create_ack', sessionId: id, name, hash }));
+  },
+
+  git_branch_create(ctx, parsed) {
+    const r = getSession(ctx, parsed);
+    if (!r) return;
+    const { id, session } = r;
+    const hash = parsed.hash as string;
+    const name = parsed.name as string;
+    if (!hash || !/^[0-9a-f]{4,40}$/i.test(hash)) {
+      ctx.wsSend(ctx.ws, JSON.stringify({ type: 'git_branch_create_ack', sessionId: id, error: 'Invalid hash' }));
+      return;
+    }
+    if (!name || !/^[a-zA-Z0-9][a-zA-Z0-9/_.\\-]*$/.test(name)) {
+      ctx.wsSend(ctx.ws, JSON.stringify({ type: 'git_branch_create_ack', sessionId: id, error: 'Invalid branch name' }));
+      return;
+    }
+    session.pty.write(`git checkout -b ${name} ${hash}\r`);
+    ctx.wsSend(ctx.ws, JSON.stringify({ type: 'git_branch_create_ack', sessionId: id, name, hash }));
   },
 };
 
