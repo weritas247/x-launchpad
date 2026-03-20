@@ -917,6 +917,10 @@ export function searchInFiles(
     const args = ['-rn', '-I', '--max-count=5'];
     if (!opts?.caseSensitive) args.push('-i');
     if (!opts?.useRegex) args.push('-F'); // fixed string (literal)
+    // Exclude common large directories
+    for (const dir of ['node_modules', '.git', 'dist', '.next', 'build', 'coverage', '.cache', 'vendor']) {
+      args.push(`--exclude-dir=${dir}`);
+    }
     // Include patterns
     if (opts?.include) {
       for (const pat of opts.include
@@ -926,16 +930,16 @@ export function searchInFiles(
         args.push(`--include=${pat}`);
       }
     } else {
-      args.push(
-        '--include=*.{js,ts,jsx,tsx,json,css,html,md,py,go,rs,rb,sh,yml,yaml,toml,txt,cfg,conf,env}'
-      );
+      for (const ext of ['js','ts','jsx','tsx','json','css','html','md','py','go','rs','rb','sh','yml','yaml','toml','txt','cfg','conf','env']) {
+        args.push(`--include=*.${ext}`);
+      }
     }
-    args.push(query, '.');
+    args.push('--', query, '.');
     const raw = execFileSync('grep', args, {
       cwd,
       encoding: 'utf-8',
       timeout: 5000,
-      maxBuffer: 1024 * 512,
+      maxBuffer: 1024 * 1024 * 2,
     }).trim();
 
     if (!raw) return [];
