@@ -160,13 +160,24 @@ export function syncSessionList(sessions, isReconnect = false) {
   const newIds = [];
   sessions.forEach((s) => {
     if (!sessionMeta.has(s.id)) {
-      sessionMeta.set(s.id, { name: s.name, createdAt: s.createdAt });
+      sessionMeta.set(s.id, { name: s.name, createdAt: s.createdAt, cwd: s.cwd || null, ai: s.ai || null });
       attachTerminal(s.id, s.name);
       newIds.push(s.id);
+    } else {
+      // Update existing meta with latest server data
+      const meta = sessionMeta.get(s.id);
+      if (s.cwd) meta.cwd = s.cwd;
+      if (s.ai !== undefined) meta.ai = s.ai || null;
     }
   });
   if (newIds.length > 0) {
     wsSend({ type: 'session_subscribe', sessionIds: newIds });
+    // Apply cwd/ai info from server to tab UI for restored sessions
+    sessions.forEach((s) => {
+      if (newIds.includes(s.id) && (s.cwd || s.ai)) {
+        updateSessionInfo(s.id, s.cwd, s.ai);
+      }
+    });
     setTimeout(() => {
       newIds.forEach((id) => {
         const e = terminalMap.get(id);
@@ -220,7 +231,10 @@ export function syncSessionList(sessions, isReconnect = false) {
 
 export function attachTerminal(sessionId, name) {
   if (terminalMap.has(sessionId)) return;
-  sessionMeta.set(sessionId, { name, createdAt: Date.now() });
+  // Preserve existing meta (cwd/ai) if already set by syncSessionList
+  if (!sessionMeta.has(sessionId)) {
+    sessionMeta.set(sessionId, { name, createdAt: Date.now() });
+  }
 
   const div = document.createElement('div');
   div.className = 'term-pane';
@@ -433,7 +447,7 @@ export function updateSessionInfo(sessionId, cwd, ai) {
   const metaObj = sessionMeta.get(sessionId);
   if (metaObj) {
     metaObj.cwd = cwd;
-    if (ai) metaObj.ai = ai;
+    metaObj.ai = ai || null;
   }
 
   if (S.layoutTree !== null) {

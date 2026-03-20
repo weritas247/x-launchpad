@@ -568,6 +568,7 @@ function broadcastSessionList(exclude?: WebSocket) {
     name: s.name,
     createdAt: s.createdAt,
     cwd: s.cwd,
+    ai: s.ai || null,
   }));
   const msg = JSON.stringify({ type: 'session_list', sessions: list });
   wss.clients.forEach((client) => {
@@ -698,6 +699,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     name: s.name,
     createdAt: s.createdAt,
     cwd: s.cwd,
+    ai: s.ai || null,
   }));
   wsSend(ws, JSON.stringify({ type: 'session_list', sessions: list }));
   wsSend(ws, JSON.stringify({ type: 'settings', settings: currentSettings }));

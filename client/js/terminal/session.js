@@ -1,7 +1,7 @@
 import { S, terminalMap, sessionMeta, hdrCount, sessionEmpty, emptyState } from '../core/state.js';
 import { requestBranch } from '../sidebar/git-graph.js';
 import { collectPaneIds, teardownSplitLayout } from './split-pane.js';
-import { renderPanel as renderInputPanel } from '../sidebar/prompt-history.js';
+import { onSessionChange as inputPanelSessionChange } from '../sidebar/prompt-history.js';
 import { deactivateAllFileTabs } from '../editor/file-viewer.js';
 
 // Lazy-loaded callbacks to avoid circular imports
@@ -51,7 +51,7 @@ export function activateSession(id) {
     requestBranch(id);
   }
   updateStatusBar();
-  renderInputPanel();
+  inputPanelSessionChange();
   if (_onSessionChangeSidePanels) _onSessionChangeSidePanels();
 }
 
