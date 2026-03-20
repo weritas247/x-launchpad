@@ -4,8 +4,7 @@
 
 import { S } from './state';
 import { normalizeKey, KB_DEFS } from './constants';
-
-const actionMap = new Map(); // action name → callback
+import { registerCommand, executeCommand, getCommand } from './command-registry';
 
 // ─── SHORTCUT OVERLAY ────────────────────────────────
 let overlayEl = null;
@@ -35,8 +34,8 @@ function showShortcutOverlay(combo, action) {
   overlayTimer = setTimeout(() => el.classList.remove('visible'), 800);
 }
 
-export function registerAction(name, fn) {
-  actionMap.set(name, fn);
+export function registerAction(name: string, fn: () => void) {
+  registerCommand({ id: name, label: name, category: '', execute: fn });
 }
 
 export function buildCombo(e) {
@@ -71,12 +70,12 @@ export function tryKeybinding(e) {
   const action = matchCombo(combo);
   if (!action) return false;
 
-  const fn = actionMap.get(action);
-  if (fn) {
+  const cmd = getCommand(action);
+  if (cmd) {
     e.preventDefault();
     e._kbHandled = true;
     showShortcutOverlay(combo, action);
-    fn();
+    executeCommand(action);
     return true;
   }
   return false;
