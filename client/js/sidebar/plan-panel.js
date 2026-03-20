@@ -735,7 +735,7 @@ export function initPlanPanel() {
   }
 
   // Load count on init
-  loadPlans().then(() => updateCount());
+  loadPlans().then(() => { updateCount(); updateAiTasksBadge(); });
 
   // Statusbar click
   sbPlan?.addEventListener('click', openPlanModal);
@@ -1401,7 +1401,9 @@ function renderAiDashboard() {
   }
 }
 
-export function openAiDashboard() {
+export async function openAiDashboard() {
+  await loadPlans();
+  updateAiTasksBadge();
   renderAiDashboard();
   aiDashOverlay.classList.add('open');
 }
