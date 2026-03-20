@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join, resolve, sep } from 'path';
 
 /** Check if fullPath is safely within cwd (prevents path traversal via startsWith prefix attack) */
-function isPathWithin(fullPath: string, cwd: string): boolean {
+export function isPathWithin(fullPath: string, cwd: string): boolean {
   const resolvedCwd = resolve(cwd);
   const resolvedPath = resolve(fullPath);
   return resolvedPath === resolvedCwd || resolvedPath.startsWith(resolvedCwd + sep);
