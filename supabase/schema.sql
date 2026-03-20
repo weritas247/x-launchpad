@@ -69,5 +69,8 @@ create index if not exists idx_plan_logs_plan_id on public.plan_logs(plan_id);
 alter table public.plan_logs disable row level security;
 
 ALTER TABLE plans ADD COLUMN use_worktree
-  boolean DEFAULT false; 
+  boolean DEFAULT false;
+
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS use_headless
+  boolean DEFAULT false;
 

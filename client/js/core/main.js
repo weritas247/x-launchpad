@@ -101,6 +101,10 @@ import {
   onAiSessionCreated,
   onAiSessionReady,
   onAiPromptSent,
+  onHeadlessStarted,
+  onHeadlessDone,
+  onHeadlessFailed,
+  onHeadlessSync,
   updateAiTasksBadge,
 } from '../sidebar/plan-panel.js';
 import { initControlPanel } from '../terminal/control-panel.js';
@@ -191,6 +195,14 @@ function handleMessage(msg) {
   } else if (msg.type === 'ai_prompt_sent') {
     onAiPromptSent(msg.sessionId);
     // output and scrollback are now handled by per-session data WebSocket in terminal.js
+  } else if (msg.type === 'headless_started') {
+    onHeadlessStarted(msg);
+  } else if (msg.type === 'headless_done') {
+    onHeadlessDone(msg);
+  } else if (msg.type === 'headless_failed') {
+    onHeadlessFailed(msg);
+  } else if (msg.type === 'headless_sync') {
+    onHeadlessSync(msg.jobs);
   } else if (msg.type === 'git_graph_data') {
     handleGitGraphData(msg);
   } else if (msg.type === 'git_file_list_data') {

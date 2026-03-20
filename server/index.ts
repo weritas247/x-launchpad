@@ -49,7 +49,7 @@ import {
   tmuxGetPanePid,
   tmuxListSessions,
 } from './tmux';
-import { isAuthEnabled, isRegistrationAllowed, verifyToken, authMiddleware } from './auth';
+import { isAuthEnabled, isRegistrationAllowed, verifyToken, getTokenPayload, authMiddleware } from './auth';
 import {
   dispatch,
   shouldLogMessage,
@@ -58,6 +58,7 @@ import {
 } from './handlers';
 import { env } from './env';
 import { createPlansRouter } from './routes/plans';
+import { getRunningJobs } from './handlers/headless';
 import { createAuthRouter } from './routes/auth';
 
 // ─── Server setup ────────────────────────────────────────────────
@@ -700,6 +701,19 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   }));
   wsSend(ws, JSON.stringify({ type: 'session_list', sessions: list }));
   wsSend(ws, JSON.stringify({ type: 'settings', settings: currentSettings }));
+
+  // Send running headless jobs for reconnect sync
+  if (isAuthEnabled()) {
+    const url = new URL(req.url || '', `http://${req.headers.host}`);
+    const token = url.searchParams.get('token') || '';
+    const tokenPayload = getTokenPayload(token);
+    if (tokenPayload) {
+      const jobs = getRunningJobs(tokenPayload.userId);
+      if (jobs.length > 0) {
+        wsSend(ws, JSON.stringify({ type: 'headless_sync', jobs }));
+      }
+    }
+  }
 
   ws.on('message', (message: Buffer | string) => {
     const data = message.toString();

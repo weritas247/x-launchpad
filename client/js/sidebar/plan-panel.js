@@ -64,6 +64,7 @@ async function loadPlans() {
         status: p.status || 'todo',
         ai_done: p.ai_done || false,
         use_worktree: p.use_worktree || false,
+        use_headless: p.use_headless || false,
         created: new Date(p.created_at).getTime(),
         updated: new Date(p.updated_at).getTime(),
       }));
@@ -145,6 +146,7 @@ async function createPlan() {
     status: 'todo',
     ai_done: false,
     use_worktree: false,
+    use_headless: false,
     created: Date.now(),
     updated: Date.now(),
   };
@@ -356,6 +358,7 @@ function renderBoard() {
           })
           .join('');
         const wtChecked = p.use_worktree ? ' checked' : '';
+        const hlChecked = p.use_headless ? ' checked' : '';
         return `<div class="plan-board-card" draggable="true" data-id="${p.id}" data-cat="${p.category || 'other'}">
         <div class="plan-board-card-title">${title}</div>
         <div class="plan-board-card-preview">${preview || 'No content'}</div>
@@ -363,6 +366,7 @@ function renderBoard() {
           <span class="plan-board-card-footer-left">
             <span class="plan-board-card-cat">${catLabel}</span>
             <label class="plan-board-card-wt" title="워크트리 모드 (-w)"><input type="checkbox" class="plan-wt-check" data-id="${p.id}"${wtChecked}><span class="plan-wt-icon">🌿</span></label>
+            <label class="plan-board-card-hl" title="헤드리스 모드 (-p)"><input type="checkbox" class="plan-headless-check" data-id="${p.id}"${hlChecked}><span class="plan-headless-icon">⚡</span></label>
           </span>
           <span class="plan-board-card-footer-right">
             ${aiBadge}${aiSessions}
@@ -796,6 +800,8 @@ export function initPlanPanel() {
       if (badge) {
         e.stopPropagation();
         const sid = badge.dataset.sessionId;
+        // headless 세션은 탭 전환 안 함
+        if (sid && headlessJobs.has(sid)) return;
         if (sid) activateSession(sid);
         return;
       }
@@ -822,12 +828,31 @@ export function initPlanPanel() {
     }
   });
 
+  // Headless checkbox toggle
+  boardEl?.addEventListener('change', async (e) => {
+    const cb = e.target.closest('.plan-headless-check');
+    if (!cb) return;
+    const planId = cb.dataset.id;
+    const plan = plans.find((p) => p.id === planId);
+    if (!plan) return;
+    plan.use_headless = cb.checked;
+    try {
+      await apiFetch(`/api/plans/${planId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: plan.title, content: plan.content, category: plan.category, use_headless: plan.use_headless }),
+      });
+    } catch (err) {
+      console.error('[plan] headless toggle failed:', err);
+    }
+  });
+
   // Board card click → editor
   boardEl?.addEventListener('click', (e) => {
     const card = e.target.closest('.plan-board-card');
     if (!card) return;
-    // skip if clicking worktree checkbox
-    if (e.target.closest('.plan-board-card-wt') || e.target.closest('.plan-wt-check')) return;
+    // skip if clicking worktree or headless checkbox
+    if (e.target.closest('.plan-board-card-wt') || e.target.closest('.plan-wt-check') || e.target.closest('.plan-board-card-hl') || e.target.closest('.plan-headless-check')) return;
     // skip if clicking AI session badge
     if (e.target.closest('.plan-board-card-ai-session')) return;
     // toggle: click same card again → close detail
@@ -938,6 +963,8 @@ export function initPlanPanel() {
 // ─── AI Assignment ──────────────────────────────────
 // Map: sessionId → { planId, ai, prompt }  — pending AI sessions waiting for AI readiness
 const pendingAiSessions = new Map();
+// Map: sessionId → { planId, ai, status } — headless 작업 추적
+const headlessJobs = new Map();
 
 let _pendingAiAssign = null;
 
@@ -966,10 +993,31 @@ async function assignAiToplan(planId, aiType) {
   const meta = S.activeSessionId ? sessionMeta.get(S.activeSessionId) : null;
   const cwd = meta?.cwd || undefined;
 
-  // Create AI session
+  if (plan.use_headless && aiType === 'claude') {
+    // Headless mode: POST to server, no terminal session
+    try {
+      const res = await apiFetch(`/api/plans/${planId}/headless`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          useWorktree: plan.use_worktree,
+          category: plan.category,
+          cwd,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error);
+      // headless_started WebSocket event will handle UI updates
+    } catch (err) {
+      console.error('[plan] headless start failed:', err);
+    }
+    return;
+  }
+
+  // Interactive mode (existing flow)
   const reg = AI_REGISTRY[aiType] || {};
   let cmd = reg.cmd || aiType;
-  // Append -w flag for worktree mode (Claude only) with branch prefix based on category
   if (plan.use_worktree && aiType === 'claude') {
     const prefix = plan.category === 'bug' ? 'fix' : 'feat';
     const randomWord = Math.random().toString(36).slice(2, 8);
@@ -982,8 +1030,6 @@ async function assignAiToplan(planId, aiType) {
     cwd,
     planId,
   });
-
-  // Store pending: will be resolved when session_created comes back
   _pendingAiAssign = { planId, aiType, prompt };
 }
 
@@ -1037,6 +1083,98 @@ export function onAiPromptSent(sessionId) {
   updateAiTasksBadge();
 }
 
+// Called from main.js when headless_started arrives
+export function onHeadlessStarted({ planId, sessionId }) {
+  const plan = plans.find((p) => p.id === planId);
+  if (!plan) return;
+
+  // ai_sessions에 추가 (mode: headless)
+  if (!plan.ai_sessions) plan.ai_sessions = [];
+  plan.ai_sessions.push({ sessionId, ai: 'claude', mode: 'headless' });
+
+  // headless 추적
+  headlessJobs.set(sessionId, { planId, ai: 'claude', status: 'running' });
+
+  // DOING으로 이동
+  if (plan.status !== 'doing') {
+    plan.status = 'doing';
+    apiFetch(`/api/plans/${planId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'doing' }),
+    }).catch((err) => console.error('[plan] status change failed:', err));
+  }
+
+  renderBoard();
+  updateCount();
+  updateAiTasksBadge();
+}
+
+// Called from main.js when headless_done arrives
+export function onHeadlessDone({ planId, sessionId, result }) {
+  headlessJobs.delete(sessionId);
+
+  const plan = plans.find((p) => p.id === planId);
+  if (plan) {
+    plan.ai_done = true;
+    plan.status = 'done';
+    plan.content = (plan.content || '') + '\n\n---\n**AI 결과 (headless):**\n' + result;
+    if (currentView === 'board') renderBoard();
+    else renderList();
+  }
+
+  updateCount();
+  updateAiTasksBadge();
+  if (toastContainer) {
+    const toast = document.createElement('div');
+    toast.className = 'plan-toast';
+    toast.innerHTML = `
+      <div class="plan-toast-title">${escHtml(plan?.title || 'Untitled')}</div>
+      <div class="plan-toast-status">⚡ Headless AI 완료</div>
+    `;
+    toast.addEventListener('click', () => {
+      openPlanModal().then(() => selectPlan(planId));
+      toast.remove();
+    });
+    toastContainer.appendChild(toast);
+    setTimeout(() => {
+      toast.classList.add('fade-out');
+      setTimeout(() => toast.remove(), 300);
+    }, 5000);
+  }
+}
+
+// Called from main.js when headless_failed arrives
+export function onHeadlessFailed({ sessionId, error }) {
+  headlessJobs.delete(sessionId);
+
+  renderBoard();
+  updateCount();
+  updateAiTasksBadge();
+  if (toastContainer) {
+    const toast = document.createElement('div');
+    toast.className = 'plan-toast';
+    toast.innerHTML = `
+      <div class="plan-toast-title">Headless AI 실패</div>
+      <div class="plan-toast-status">${escHtml(error)}</div>
+    `;
+    toastContainer.appendChild(toast);
+    setTimeout(() => {
+      toast.classList.add('fade-out');
+      setTimeout(() => toast.remove(), 300);
+    }, 5000);
+  }
+}
+
+// Called from main.js on reconnect — sync running headless jobs
+export function onHeadlessSync(jobs) {
+  headlessJobs.clear();
+  for (const j of jobs) {
+    headlessJobs.set(j.sessionId, { planId: j.planId, ai: 'claude', status: 'running' });
+  }
+  updateAiTasksBadge();
+}
+
 // ─── AI Tasks Dashboard ─────────────────────────────
 const aiDashOverlay = document.getElementById('ai-dash-overlay');
 const aiDashBody = document.getElementById('ai-dash-body');
@@ -1069,6 +1207,17 @@ function getActiveAiTasks() {
       pending: true,
     });
   }
+  // Include running headless jobs
+  for (const [sessionId, info] of headlessJobs) {
+    tasks.push({
+      planId: info.planId,
+      planTitle: plans.find((p) => p.id === info.planId)?.title || 'Untitled',
+      planStatus: 'doing',
+      sessionId,
+      ai: info.ai,
+      mode: 'headless',
+    });
+  }
   return tasks;
 }
 
@@ -1091,14 +1240,17 @@ function renderAiDashboard() {
       const reg = AI_REGISTRY[t.ai] || {};
       const icon = reg.icon || 'icons/codex.png';
       const label = reg.label || t.ai;
-      const statusCls = t.pending ? ' pending' : '';
+      const isHeadless = t.mode === 'headless';
+      const statusCls = t.pending ? ' pending' : isHeadless ? ' headless' : '';
       const statusText = t.pending
         ? '대기중…'
-        : t.planStatus === 'done'
-          ? '✅ 완료'
-          : t.planStatus === 'doing'
-            ? '작업중'
-            : t.planStatus || '—';
+        : isHeadless
+          ? '⚡ 실행중'
+          : t.planStatus === 'done'
+            ? '✅ 완료'
+            : t.planStatus === 'doing'
+              ? '작업중'
+              : t.planStatus || '—';
       const sid = t.sessionId || '';
       return `<div class="ai-dash-card" data-session-id="${escHtml(sid)}">
       <img class="ai-dash-card-icon" src="${escHtml(icon)}" alt="${escHtml(label)}">
@@ -1107,7 +1259,9 @@ function renderAiDashboard() {
         <div class="ai-dash-card-meta">${escHtml(label)} · ${escHtml(sid.slice(-8))}</div>
       </div>
       <span class="ai-dash-card-status${statusCls}">${statusText}</span>
-      ${sid ? `<button class="ai-dash-card-go" data-sid="${escHtml(sid)}">이동 →</button>` : ''}
+      ${isHeadless
+        ? `<button class="ai-dash-card-cancel" data-plan-id="${escHtml(t.planId)}" data-sid="${escHtml(sid)}">취소</button>`
+        : sid ? `<button class="ai-dash-card-go" data-sid="${escHtml(sid)}">이동 →</button>` : ''}
     </div>`;
     })
     .join('');
@@ -1129,6 +1283,14 @@ aiDashOverlay?.addEventListener('click', (e) => {
   if (e.target === aiDashOverlay) closeAiDashboard();
 });
 aiDashBody?.addEventListener('click', (e) => {
+  const cancelBtn = e.target.closest('.ai-dash-card-cancel');
+  if (cancelBtn) {
+    const planId = cancelBtn.dataset.planId;
+    const sid = cancelBtn.dataset.sid;
+    apiFetch(`/api/plans/${planId}/headless/${sid}`, { method: 'DELETE' })
+      .catch((err) => console.error('[plan] headless cancel failed:', err));
+    return;
+  }
   const goBtn = e.target.closest('.ai-dash-card-go');
   if (goBtn) {
     const sid = goBtn.dataset.sid;

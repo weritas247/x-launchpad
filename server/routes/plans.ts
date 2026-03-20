@@ -10,6 +10,7 @@ import express from 'express';
 import { WebSocket, WebSocketServer } from 'ws';
 import * as userDb from '../supabase';
 import { extractToken, getTokenPayload } from '../auth';
+import { startHeadless, cancelHeadless } from '../handlers/headless';
 
 /** Helper: extract and verify JWT payload, returning 401 if invalid */
 function requireAuth(req: express.Request, res: express.Response) {
@@ -100,6 +101,45 @@ export function createPlansRouter(wss: WebSocketServer): Router {
     } catch (e) {
       res.status(500).json({ ok: false, error: String(e) });
     }
+  });
+
+  // ─── Headless AI ─────────────────────────────────────────────────
+
+  router.post('/:id/headless', async (req, res) => {
+    const payload = requireAuth(req, res);
+    if (!payload) return;
+    const planId = req.params.id;
+    const { prompt, useWorktree, category, cwd } = req.body || {};
+    if (!prompt) return res.status(400).json({ ok: false, error: 'Missing prompt' });
+    try {
+      const result = await startHeadless(wss, payload.userId, planId, prompt, {
+        useWorktree,
+        category,
+        cwd,
+      });
+      res.json({ ok: true, sessionId: result.sessionId });
+    } catch (e: any) {
+      const status = e.message === 'Too many concurrent headless jobs' ? 429 : 500;
+      res.status(status).json({ ok: false, error: String(e) });
+    }
+  });
+
+  router.delete('/:id/headless/:sessionId', async (req, res) => {
+    const payload = requireAuth(req, res);
+    if (!payload) return;
+    const ok = cancelHeadless(req.params.sessionId);
+    if (ok) {
+      const msg = JSON.stringify({
+        type: 'headless_failed',
+        planId: req.params.id,
+        sessionId: req.params.sessionId,
+        error: 'Cancelled by user',
+      });
+      wss.clients.forEach((c) => {
+        if (c.readyState === WebSocket.OPEN) c.send(msg);
+      });
+    }
+    res.json({ ok });
   });
 
   // ─── Plan Logs ──────────────────────────────────────────────────
