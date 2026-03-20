@@ -345,6 +345,8 @@ export const KB_DEFS = [
   { key: 'focusSourceControl', label: 'Focus Source Control' },
   { key: 'planModal', label: 'Plan Notes' },
   { key: 'toggleFileEdit', label: 'Toggle File Edit' },
+  { key: 'openPalette', label: 'Quick Open' },
+  { key: 'openCommandPalette', label: 'Command Palette' },
 ];
 
 /** IME(한글 등) 활성 시에도 물리 키 기준으로 단축키가 동작하도록 e.code 사용 */

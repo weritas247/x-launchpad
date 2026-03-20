@@ -62,6 +62,8 @@ export const DEFAULT_SETTINGS = {
     toggleInputPanel: 'Meta+i',
     planModal: 'Ctrl+p',
     toggleFileEdit: 'Ctrl+e',
+    openPalette: 'Meta+p',
+    openCommandPalette: 'Meta+Shift+p',
   },
   notifications: {
     global: {
