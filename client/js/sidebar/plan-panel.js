@@ -65,6 +65,7 @@ async function loadPlans() {
         ai_done: p.ai_done || false,
         use_worktree: p.use_worktree || false,
         use_headless: p.use_headless || false,
+        ai_sessions: p.ai_sessions || [],
         created: new Date(p.created_at).getTime(),
         updated: new Date(p.updated_at).getTime(),
       }));
@@ -1066,9 +1067,15 @@ export function onAiPromptSent(sessionId) {
   const plan = plans.find((p) => p.id === planId);
   if (!plan) return;
 
-  // Add AI session badge
+  // Add AI session badge + persist to DB
   if (!plan.ai_sessions) plan.ai_sessions = [];
-  plan.ai_sessions.push({ sessionId, ai: aiType });
+  const entry = { sessionId, ai: aiType, ts: Date.now() };
+  plan.ai_sessions.push(entry);
+  apiFetch(`/api/plans/${planId}/ai-sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  }).catch((err) => console.error('[plan] ai-session save failed:', err));
 
   // Move to DOING
   if (plan.status !== 'doing') {
@@ -1090,9 +1097,15 @@ export function onHeadlessStarted({ planId, sessionId }) {
   const plan = plans.find((p) => p.id === planId);
   if (!plan) return;
 
-  // ai_sessions에 추가 (mode: headless)
+  // ai_sessions에 추가 (mode: headless) + persist to DB
   if (!plan.ai_sessions) plan.ai_sessions = [];
-  plan.ai_sessions.push({ sessionId, ai: 'claude', mode: 'headless' });
+  const entry = { sessionId, ai: 'claude', mode: 'headless', ts: Date.now() };
+  plan.ai_sessions.push(entry);
+  apiFetch(`/api/plans/${planId}/ai-sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  }).catch((err) => console.error('[plan] ai-session save failed:', err));
 
   // headless 추적
   headlessJobs.set(sessionId, { planId, ai: 'claude', status: 'running' });
@@ -1258,6 +1271,10 @@ function renderAiDashCard(t) {
               ? '작업중'
               : t.planStatus || '—';
   const sid = t.sessionId || '';
+  const timeStr = t.ts ? formatDate(t.ts) : '';
+  const sidLink = sid
+    ? `<span class="ai-dash-card-sid" data-sid="${escHtml(sid)}" title="세션 탭으로 이동">${escHtml(sid.slice(-8))}</span>`
+    : '';
   const actionBtn = t.status === 'done' || t.status === 'failed'
     ? ''
     : isHeadless
@@ -1267,7 +1284,7 @@ function renderAiDashCard(t) {
     <img class="ai-dash-card-icon" src="${escHtml(icon)}" alt="${escHtml(label)}">
     <div class="ai-dash-card-info">
       <div class="ai-dash-card-plan">${escHtml(t.planTitle)}</div>
-      <div class="ai-dash-card-meta">${escHtml(label)} · ${escHtml(sid.slice(-8))}</div>
+      <div class="ai-dash-card-meta">${escHtml(label)} · ${sidLink}${timeStr ? ` · ${timeStr}` : ''}</div>
     </div>
     <span class="ai-dash-card-status${statusCls}">${statusText}</span>
     ${actionBtn}
@@ -1341,6 +1358,16 @@ aiDashBody?.addEventListener('click', (e) => {
   const goBtn = e.target.closest('.ai-dash-card-go');
   if (goBtn) {
     const sid = goBtn.dataset.sid;
+    if (sid) {
+      activateSession(sid);
+      closeAiDashboard();
+    }
+    return;
+  }
+  // Session ID click → activate that session tab
+  const sidEl = e.target.closest('.ai-dash-card-sid');
+  if (sidEl) {
+    const sid = sidEl.dataset.sid;
     if (sid) {
       activateSession(sid);
       closeAiDashboard();

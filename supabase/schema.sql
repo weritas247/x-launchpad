@@ -74,3 +74,6 @@ ALTER TABLE plans ADD COLUMN use_worktree
 ALTER TABLE plans ADD COLUMN IF NOT EXISTS use_headless
   boolean DEFAULT false;
 
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS ai_sessions
+  jsonb DEFAULT '[]'::jsonb;
+

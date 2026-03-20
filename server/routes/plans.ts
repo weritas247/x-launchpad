@@ -103,6 +103,26 @@ export function createPlansRouter(wss: WebSocketServer): Router {
     }
   });
 
+  // ─── AI Sessions (persist to DB) ────────────────────────────────
+
+  router.post('/:id/ai-sessions', async (req, res) => {
+    const payload = requireAuth(req, res);
+    if (!payload) return;
+    const { sessionId, ai, mode, ts } = req.body || {};
+    if (!sessionId || !ai) return res.status(400).json({ ok: false, error: 'Missing sessionId or ai' });
+    try {
+      const plan = await userDb.addPlanAiSession(payload.userId, req.params.id, {
+        sessionId,
+        ai,
+        mode,
+        ts: ts || Date.now(),
+      });
+      res.json({ ok: true, plan });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String(e) });
+    }
+  });
+
   // ─── Headless AI ─────────────────────────────────────────────────
 
   router.post('/:id/headless', async (req, res) => {

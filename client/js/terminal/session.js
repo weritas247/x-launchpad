@@ -45,6 +45,7 @@ export function activateSession(id) {
   const entry = terminalMap.get(id);
   if (entry) {
     entry.fitAddon.fit();
+    entry.term.scrollToBottom();
     entry.term.focus();
     const meta = sessionMeta.get(id);
     requestBranch(id);

@@ -50,12 +50,6 @@ import {
   handleClaudePrompts,
 } from '../sidebar/prompt-history.js';
 import {
-  handleClaudeUsageData,
-  startUsagePolling,
-  onSessionChangeUsage,
-  onAiChangeUsage,
-} from '../sidebar/claude-usage.js';
-import {
   initActivityBar,
   getActivePanel,
   switchPanel,
@@ -155,6 +149,7 @@ function handleMessage(msg) {
         const e = terminalMap.get(msg.sessionId);
         if (e) {
           e.fitAddon.fit();
+          e.term.scrollToBottom();
           wsSend({
             type: 'resize',
             sessionId: msg.sessionId,
@@ -166,18 +161,19 @@ function handleMessage(msg) {
     }
   } else if (msg.type === 'session_attached') {
     activateSession(msg.sessionId);
-    onSessionChangeUsage();
+
     setTimeout(() => {
       const e = terminalMap.get(msg.sessionId);
       if (e) {
         e.fitAddon.fit();
+        e.term.scrollToBottom();
         wsSend({ type: 'resize', sessionId: msg.sessionId, cols: e.term.cols, rows: e.term.rows });
       }
     }, 50);
   } else if (msg.type === 'session_info') {
     updateSessionInfo(msg.sessionId, msg.cwd, msg.ai);
     tabStatusOnAiChange(msg.sessionId, msg.ai);
-    onAiChangeUsage(msg.sessionId, msg.ai);
+
     if (msg.ai) onAiSessionReady(msg.sessionId, msg.ai);
     if (msg.sessionId === S.activeSessionId) {
       updateProjectName(msg.cwd);
@@ -219,8 +215,6 @@ function handleMessage(msg) {
     handleGitPullAck(msg);
   } else if (msg.type === 'git_graph_search_data') {
     handleGitGraphSearchData(msg);
-  } else if (msg.type === 'claude_usage_data') {
-    handleClaudeUsageData(msg);
   } else if (msg.type === 'claude_prompts_data') {
     handleClaudePrompts(msg);
   } else if (msg.type === 'file_tree_data') {
@@ -432,7 +426,10 @@ function navigateSplitPane(dir) {
 }
 
 window.addEventListener('resize', () => {
-  terminalMap.forEach(({ fitAddon }) => fitAddon.fit());
+  terminalMap.forEach(({ fitAddon, term }) => {
+    fitAddon.fit();
+    term.scrollToBottom();
+  });
 });
 
 tabAddBtn.addEventListener('click', newSession);
@@ -513,5 +510,4 @@ document.getElementById('explorer-refresh')?.addEventListener('click', requestFi
 
 loadSettings().then(() => {
   connect(handleMessage);
-  startUsagePolling();
 });

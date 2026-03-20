@@ -172,6 +172,7 @@ export function syncSessionList(sessions, isReconnect = false) {
         const e = terminalMap.get(id);
         if (e) {
           e.fitAddon.fit();
+          e.term.scrollToBottom();
           wsSend({ type: 'resize', sessionId: id, cols: e.term.cols, rows: e.term.rows });
         }
       });
@@ -186,6 +187,7 @@ export function syncSessionList(sessions, isReconnect = false) {
       const e = terminalMap.get(firstId);
       if (e) {
         e.fitAddon.fit();
+        e.term.scrollToBottom();
         wsSend({ type: 'resize', sessionId: firstId, cols: e.term.cols, rows: e.term.rows });
       }
     }, 50);
@@ -257,6 +259,17 @@ export function attachTerminal(sessionId, name) {
 
   fitAddon.fit();
 
+  // ─── Scroll-to-bottom tracking ────
+  // Track whether user is viewing the bottom of the terminal.
+  // Only auto-scroll on new data if user hasn't scrolled up manually.
+  let _userAtBottom = true;
+  term.onScroll(() => {
+    const buf = term.buffer.active;
+    const viewportTop = buf.viewportY;
+    const maxScroll = buf.baseY;
+    _userAtBottom = viewportTop >= maxScroll;
+  });
+
   // Let app-level keybindings override xterm — execute action immediately
   term.attachCustomKeyEventHandler((e) => xtermKeyHandler(e));
 
@@ -273,6 +286,7 @@ export function attachTerminal(sessionId, name) {
       streamWrite(sessionId, term, event.data);
       aiNotifyCheck(sessionId, event.data);
       tabStatusCheck(sessionId, event.data);
+      if (_userAtBottom) term.scrollToBottom();
     };
     dataWs.onclose = () => {
       // Reconnect after 2s if session still exists

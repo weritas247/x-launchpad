@@ -72,6 +72,13 @@ export async function getUserById(id: number): Promise<Omit<UserRow, 'password_h
   return data as Omit<UserRow, 'password_hash'> | null;
 }
 
+export interface AiSessionEntry {
+  sessionId: string;
+  ai: string;
+  mode?: string;
+  ts: number;
+}
+
 export interface PlanRow {
   id: string;
   user_id: number;
@@ -82,6 +89,7 @@ export interface PlanRow {
   ai_done: boolean;
   use_worktree: boolean;
   use_headless: boolean;
+  ai_sessions: AiSessionEntry[];
   created_at: string;
   updated_at: string;
 }
@@ -156,6 +164,26 @@ export async function updatePlanStatus(
   const { data, error } = await supabase
     .from('plans')
     .update({ status, ai_done: false, updated_at: new Date().toISOString() })
+    .eq('id', planId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as PlanRow;
+}
+
+export async function addPlanAiSession(
+  userId: number,
+  planId: string,
+  session: AiSessionEntry
+): Promise<PlanRow> {
+  // Get current plan to append to existing ai_sessions
+  const plan = await getPlan(userId, planId);
+  const current: AiSessionEntry[] = (plan?.ai_sessions as AiSessionEntry[]) || [];
+  current.push(session);
+  const { data, error } = await supabase
+    .from('plans')
+    .update({ ai_sessions: current, updated_at: new Date().toISOString() })
     .eq('id', planId)
     .eq('user_id', userId)
     .select()

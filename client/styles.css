@@ -8389,6 +8389,16 @@ body::after {
     color: var(--text-ghost);
     margin-top: 2px;
 }
+.ai-dash-card-sid {
+    color: var(--accent);
+    text-decoration: none;
+    cursor: pointer;
+    font-family: monospace;
+}
+.ai-dash-card-sid:hover {
+    text-decoration: underline;
+    opacity: 0.8;
+}
 
 .ai-dash-card-status {
     font-size: 9px;

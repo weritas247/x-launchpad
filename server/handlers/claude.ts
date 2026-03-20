@@ -3,17 +3,9 @@
  */
 
 import { WsHandler, getSession } from './types';
-import { getClaudeUsage, getClaudePrompts } from '../services/claude-service';
+import { getClaudePrompts } from '../services/claude-service';
 
 const handlers: Record<string, WsHandler> = {
-  claude_usage(ctx, parsed) {
-    const r = getSession(ctx, parsed);
-    if (!r) return;
-    const { id, session } = r;
-    const usage = getClaudeUsage(session.cwd);
-    ctx.wsSend(ctx.ws, JSON.stringify({ type: 'claude_usage_data', sessionId: id, usage }));
-  },
-
   claude_prompts(ctx, parsed) {
     const r = getSession(ctx, parsed);
     if (!r) return;
