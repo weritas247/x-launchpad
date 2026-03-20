@@ -201,8 +201,8 @@ const handlers: Record<string, WsHandler> = {
     const r = getSession(ctx, parsed);
     if (!r) return;
     const { id, session } = r;
-    session.pty.write('git pull\r');
-    ctx.wsSend(ctx.ws, JSON.stringify({ type: 'git_pull_ack', sessionId: id }));
+    const result = gitService.gitPull(session.cwd);
+    ctx.wsSend(ctx.ws, JSON.stringify({ type: 'git_pull_ack', sessionId: id, ...result }));
   },
 
   git_status(ctx, parsed) {

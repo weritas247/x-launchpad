@@ -474,12 +474,12 @@ function doPull() {
   pullBtn.classList.add('pulling');
   pullBtn.textContent = '⬇ Pulling...';
   wsSend({ type: 'git_pull', sessionId: S.activeSessionId });
-  // Fallback: auto-complete after 5s even without ack
+  // Fallback: auto-complete after 30s even without ack
   pullTimer = setTimeout(() => {
     if (pullBtn.classList.contains('pulling')) {
       finishPull(false);
     }
-  }, 5000);
+  }, 30000);
 }
 
 function finishPull(isError) {
@@ -495,10 +495,8 @@ function finishPull(isError) {
     pullBtn.classList.add('pull-ok');
     pullBtn.textContent = '⬇ Done';
     if (isOpen && S.activeSessionId) {
-      setTimeout(() => {
-        wsSend({ type: 'git_graph', sessionId: S.activeSessionId });
-        wsSend({ type: 'git_branch_list', sessionId: S.activeSessionId });
-      }, 1500);
+      wsSend({ type: 'git_graph', sessionId: S.activeSessionId });
+      wsSend({ type: 'git_branch_list', sessionId: S.activeSessionId });
     }
   }
   setTimeout(resetPullBtn, 3000);

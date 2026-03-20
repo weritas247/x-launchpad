@@ -540,6 +540,15 @@ export function generateCommitMessage(cwd: string): string {
   }
 }
 
+export function gitPull(cwd: string): { ok: boolean; error?: string } {
+  try {
+    execFileSync('git', ['pull'], { cwd, encoding: 'utf-8', timeout: 30000 });
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.stderr || e.message || String(e) };
+  }
+}
+
 export function gitPush(cwd: string): { ok: boolean; error?: string } {
   try {
     execFileSync('git', ['push'], { cwd, encoding: 'utf-8', timeout: 30000 });
