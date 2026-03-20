@@ -79,7 +79,10 @@ async function broadcastState(): Promise<void> {
 setInterval(broadcastState, 1000);
 
 pm.on('state', () => broadcastState());
-pm.on('log', (line: string) => broadcast({ type: 'log', line }));
+pm.on('log', (line: string) => {
+  broadcast({ type: 'log', line });
+  process.stdout.write(line.endsWith('\n') ? line : line + '\n');
+});
 pm.on('started', async () => {
   broadcast({ type: 'started' });
   await portSwitcher.release();
