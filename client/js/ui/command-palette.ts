@@ -2,6 +2,7 @@ import { S, sessionMeta } from '../core/state';
 import { getCommands, executeCommand, getRecentCommands, getCommand } from '../core/command-registry';
 import { THEMES } from '../core/constants';
 import { applyTheme } from './themes';
+import { getExplorerTree } from '../sidebar/explorer';
 
 type PaletteMode = 'quick-open' | 'command' | 'theme';
 
@@ -175,26 +176,55 @@ function buildQuickOpenItems(query: string): PaletteItem[] {
     });
   });
 
+  // Open file tabs
+  const openFilePaths = new Set<string>();
   const fileTabs = document.querySelectorAll('.tab[data-file-path]');
   fileTabs.forEach((tab) => {
     const filePath = (tab as HTMLElement).dataset.filePath!;
+    openFilePaths.add(filePath);
     const fileName = filePath.split('/').pop() || filePath;
     const match = query ? fuzzyMatch(query, fileName) : { score: 0, positions: [] };
     if (!match && query) return;
     items.push({
       id: `file:${filePath}`,
       label: fileName,
-      category: 'File',
+      category: '열린 파일',
       meta: filePath,
       icon: '📄',
       matchPositions: match?.positions || [],
-      score: match?.score || 0,
+      score: (match?.score || 0) + 50, // boost open files above project files
       execute: () => {
         const clickEvt = new MouseEvent('click');
         tab.dispatchEvent(clickEvt);
       },
     });
   });
+
+  // Project files from explorer tree (only when searching)
+  if (query) {
+    const tree = getExplorerTree();
+    const flatFiles = flattenTree(tree);
+    for (const file of flatFiles) {
+      if (openFilePaths.has(file.path)) continue; // skip already-open files
+      const match = fuzzyMatch(query, file.name);
+      if (!match) continue;
+      items.push({
+        id: `project:${file.path}`,
+        label: file.name,
+        category: '프로젝트 파일',
+        meta: file.path,
+        icon: '📄',
+        matchPositions: match.positions,
+        score: match.score,
+        execute: () => {
+          if (!S.activeSessionId) return;
+          import('../core/websocket').then(({ wsSend }) => {
+            wsSend({ type: 'file_read', sessionId: S.activeSessionId, filePath: file.path });
+          });
+        },
+      });
+    }
+  }
 
   if (query) {
     items.sort((a, b) => b.score - a.score);
@@ -234,6 +264,22 @@ function buildThemeItems(query: string): PaletteItem[] {
     })
     .filter(Boolean)
     .sort((a, b) => (b as any).score - (a as any).score) as PaletteItem[];
+}
+
+function flattenTree(tree: any[]): Array<{ name: string; path: string }> {
+  const result: Array<{ name: string; path: string }> = [];
+  function walk(entries: any[]) {
+    for (const entry of entries) {
+      if (entry.type === 'file') {
+        result.push({ name: entry.name, path: entry.path });
+      }
+      if (entry.children) {
+        walk(entry.children);
+      }
+    }
+  }
+  walk(tree);
+  return result;
 }
 
 function formatShortcut(combo: string): string {

@@ -6,7 +6,15 @@ import { confirmModal } from '../ui/confirm-modal';
 import { openFileTab } from '../editor/file-viewer';
 import { getFileIcon, getFolderIcon } from '../ui/file-icons';
 
-let explorerTree = [];
+let explorerTree: any[] = [];
+
+export function getExplorerTree(): any[] {
+  return explorerTree;
+}
+
+export function getExplorerDir(): string {
+  return currentDir;
+}
 const expandedDirs = new Set();
 let currentDir = '';
 let gitStatusMap = {}; // { relativePath: status }
