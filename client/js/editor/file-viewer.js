@@ -2,6 +2,7 @@
 import { S, terminalMap, tabBar, tabAddBtn, termWrapper, escHtml } from '../core/state.js';
 import { wsSend } from '../core/websocket.js';
 import { registerAction } from '../core/keyboard.js';
+import { createEditor, setReadOnly, getContent, destroyEditor } from './file-editor.js';
 
 // Map<filePath, { tabEl, paneEl, contentEl, headerEl, editorView, filePath, originalContent, isEditing }>
 const fileTabs = new Map();
@@ -125,7 +126,7 @@ function updateFileContent(filePath, content, opts = {}) {
 
   // Destroy any existing editor before replacing content
   if (entry.editorView) {
-    window.FileEditor.destroyEditor(entry.editorView);
+    destroyEditor(entry.editorView);
     entry.editorView = null;
   }
 
@@ -179,7 +180,7 @@ function updateFileContent(filePath, content, opts = {}) {
   };
 
   // Create CodeMirror editor (read-only by default)
-  const editorView = window.FileEditor.createEditor(contentEl, text, filePath, {
+  const editorView = createEditor(contentEl, text, filePath, {
     readOnly: true,
     onSave,
     onChange,
@@ -216,7 +217,7 @@ function renderEditingHeader(entry) {
   `;
   actionsEl.querySelector('.file-pane-save-btn').addEventListener('click', () => {
     if (entry.editorView) {
-      const currentContent = window.FileEditor.getContent(entry.editorView);
+      const currentContent = getContent(entry.editorView);
       wsSend({ type: 'file_save', sessionId: S.activeSessionId, filePath: entry.filePath, content: currentContent });
     }
   });
@@ -228,7 +229,7 @@ function renderEditingHeader(entry) {
 function enterEditMode(filePath) {
   const entry = fileTabs.get(filePath);
   if (!entry || !entry.editorView) return;
-  window.FileEditor.setReadOnly(entry.editorView, false);
+  setReadOnly(entry.editorView, false);
   entry.isEditing = true;
   renderEditingHeader(entry);
   entry.editorView.focus();
@@ -239,7 +240,7 @@ function exitEditMode(filePath) {
   if (!entry || !entry.editorView) return;
 
   // Restore original content if changed
-  const currentContent = window.FileEditor.getContent(entry.editorView);
+  const currentContent = getContent(entry.editorView);
   if (currentContent !== entry.originalContent) {
     // Use the view's dispatch to replace all content
     const view = entry.editorView;
@@ -248,7 +249,7 @@ function exitEditMode(filePath) {
     });
   }
 
-  window.FileEditor.setReadOnly(entry.editorView, true);
+  setReadOnly(entry.editorView, true);
   entry.isEditing = false;
   renderReadonlyHeader(entry);
 
@@ -283,7 +284,7 @@ export function closeFileTab(filePath) {
 
   // Confirm if unsaved changes exist
   if (entry.isEditing && entry.editorView) {
-    const current = window.FileEditor.getContent(entry.editorView);
+    const current = getContent(entry.editorView);
     if (current !== entry.originalContent) {
       if (!confirm('Unsaved changes. Close anyway?')) return;
     }
@@ -291,7 +292,7 @@ export function closeFileTab(filePath) {
 
   // Destroy CodeMirror editor if present
   if (entry.editorView) {
-    window.FileEditor.destroyEditor(entry.editorView);
+    destroyEditor(entry.editorView);
     entry.editorView = null;
   }
 
@@ -349,7 +350,7 @@ export function handleFileSaveResult(filePath, success, error) {
   if (!entry) return;
   if (success) {
     if (entry.editorView) {
-      entry.originalContent = window.FileEditor.getContent(entry.editorView);
+      entry.originalContent = getContent(entry.editorView);
     }
     entry.tabEl.classList.remove('unsaved');
     const dot = entry.tabEl.querySelector('.tab-unsaved-dot');

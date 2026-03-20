@@ -195,5 +195,7 @@ function destroyEditor(view) {
   view.destroy();
 }
 
+export { createEditor, setReadOnly, getContent, destroyEditor };
+
 // Expose on window for non-module scripts
 window.FileEditor = { createEditor, setReadOnly, getContent, destroyEditor };
