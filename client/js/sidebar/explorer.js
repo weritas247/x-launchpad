@@ -4,6 +4,7 @@ import { wsSend, apiFetch } from '../core/websocket.js';
 import { showToast } from '../ui/toast.js';
 import { confirmModal } from '../ui/confirm-modal.js';
 import { openFileTab } from '../editor/file-viewer.js';
+import { getFileIcon, getFolderIcon } from '../ui/file-icons.js';
 
 let explorerTree = [];
 const expandedDirs = new Set();
@@ -196,7 +197,7 @@ function renderTreeLevel(parent, entries, depth) {
       const dirHasChanges = hasDirChanges(entry.path);
       item.innerHTML =
         `<span class="explorer-arrow">${isExpanded ? '▾' : '▸'}</span>` +
-        `<span class="explorer-icon">📁</span>` +
+        `<span class="explorer-icon">${getFolderIcon(isExpanded)}</span>` +
         `<span class="explorer-name">${escHtml(entry.name)}</span>` +
         (dirHasChanges ? `<span class="explorer-git-dot"></span>` : '');
       item.addEventListener('click', () => {
@@ -234,34 +235,7 @@ function renderTreeLevel(parent, entries, depth) {
   }
 }
 
-function getFileIcon(name) {
-  const ext = name.split('.').pop()?.toLowerCase();
-  const iconMap = {
-    js: '📜',
-    ts: '📘',
-    jsx: '⚛',
-    tsx: '⚛',
-    json: '{}',
-    md: '📝',
-    css: '🎨',
-    html: '🌐',
-    py: '🐍',
-    rs: '🦀',
-    go: '🐹',
-    rb: '💎',
-    sh: '$_',
-    yml: '⚙',
-    yaml: '⚙',
-    toml: '⚙',
-    png: '🖼',
-    jpg: '🖼',
-    gif: '🖼',
-    svg: '🖼',
-    webp: '🖼',
-    lock: '🔒',
-  };
-  return iconMap[ext] || '📄';
-}
+// getFileIcon is now imported from '../ui/file-icons.js'
 
 function getGitClass(status) {
   const map = {

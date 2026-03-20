@@ -1,4 +1,5 @@
 import { S, terminalMap, folderMap, escHtml } from '../core/state.js';
+import { getFolderIcon } from './file-icons.js';
 
 export function createFolder(name) {
   const id = 'folder-' + ++S.folderCounter;
@@ -10,7 +11,7 @@ export function createFolder(name) {
   el.innerHTML = `
     <div class="folder-header">
       <span class="folder-arrow">▶</span>
-      <span class="folder-icon">📁</span>
+      <span class="folder-icon">${getFolderIcon(true)}</span>
       <span class="folder-name">${escHtml(folderName)}</span>
       <span class="folder-count"></span>
       <button class="folder-close-btn" title="Delete folder">✕</button>
@@ -27,7 +28,7 @@ export function createFolder(name) {
   header.addEventListener('click', (e) => {
     if (e.target.closest('.folder-close-btn')) return;
     el.classList.toggle('open');
-    el.querySelector('.folder-icon').textContent = el.classList.contains('open') ? '📂' : '📁';
+    el.querySelector('.folder-icon').innerHTML = getFolderIcon(el.classList.contains('open'));
   });
 
   nameEl.addEventListener('dblclick', (e) => {
@@ -88,7 +89,7 @@ export function createFolder(name) {
     if (entry) {
       children.appendChild(entry.sidebarEl);
       el.classList.add('open');
-      el.querySelector('.folder-icon').textContent = '📂';
+      el.querySelector('.folder-icon').innerHTML = getFolderIcon(true);
       updateFolderCount(countEl, children);
     }
   });
