@@ -104,6 +104,7 @@ import {
   syncAiSessionsFromList,
 } from '../sidebar/plan-panel';
 import { initControlPanel } from '../terminal/control-panel';
+import { initCommandPalette, openPalette, closePalette, isPaletteOpen } from '../ui/command-palette';
 // Side-effect imports — modules with self-initializing code
 import '../ui/scroll-float'
 import '../ui/mobile'
@@ -297,6 +298,12 @@ registerAction('toggleInputPanel', () => toggleInputPanel());
 registerAction('planModal', () => {
   isPlanModalOpen() ? closePlanModal() : openPlanModal();
 });
+registerAction('openPalette', () => {
+  isPaletteOpen() ? closePalette() : openPalette('quick-open');
+});
+registerAction('openCommandPalette', () => {
+  isPaletteOpen() ? closePalette() : openPalette('command');
+});
 
 document.addEventListener('keydown', (e) => {
   if (!S.settings) return;
@@ -305,6 +312,10 @@ document.addEventListener('keydown', (e) => {
   if (isGitGraphOpen() && handleGitGraphKeydown(e)) return;
 
   if (e.key === 'Escape') {
+    if (isPaletteOpen()) {
+      closePalette();
+      return;
+    }
     const picker = document.getElementById('session-picker');
     if (picker.style.display !== 'none') {
       hideSessionPicker();
@@ -320,6 +331,7 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
+  if (isPaletteOpen()) return;
   if (isPlanModalOpen()) return;
   if (settingsOverlay.classList.contains('open')) return;
 
@@ -503,6 +515,7 @@ initSourceControl();
 initSearch();
 initPlanPanel();
 initControlPanel();
+initCommandPalette();
 
 // Wire up file viewer's lazy dependency
 setActivateSessionFn(activateSession);
