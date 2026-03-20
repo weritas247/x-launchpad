@@ -940,7 +940,8 @@ async function assignAiToplan(planId, aiType) {
   // Build the prompt from plan content
   const title = plan.title || 'Untitled';
   const content = plan.content || '';
-  let prompt = `다음 이슈를 처리해주세요:\n\n제목: ${title}\n\n${content}`;
+  const catLabel = CATEGORIES[plan.category] || '기타';
+  let prompt = `다음 이슈를 처리해주세요:\n\n유형: ${catLabel}\n제목: ${title}\n\n${content}`;
 
   // Fetch attached images and include URLs
   try {
