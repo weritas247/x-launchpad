@@ -6,8 +6,6 @@
     <title>X-LAUNCHPAD</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="stylesheet" href="fonts/fonts.css" />
-    <link rel="stylesheet" href="/vendor/xterm/css/xterm.css" />
-    <link rel="stylesheet" href="vendor/highlightjs/styles/vs2015.min.css" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -1422,10 +1420,6 @@
     <!-- Custom CSS injection point -->
     <style id="custom-css-tag"></style>
 
-    <script src="/vendor/xterm/lib/xterm.js"></script>
-    <script src="/vendor/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
-    <script src="/vendor/xterm-addon-webgl/lib/xterm-addon-webgl.js"></script>
-    <script src="vendor/highlightjs/highlight.min.js"></script>
     <!-- Control Panel Floating Button -->
     <button id="control-floating-btn" class="control-floating-btn" title="Control Panel">⚡</button>
     <div id="control-panel" class="control-panel">
@@ -1446,11 +1440,7 @@
       </div>
     </div>
 
-    <script type="module" src="js/editor/file-editor.js"></script>
-    <script type="module" src="js/editor/markdown-preview.js"></script>
-    <script type="module" src="js/ui/scroll-float.js"></script>
-    <script type="module" src="js/ui/mobile.js"></script>
-    <script type="module" src="js/core/main.js"></script>
+    <script type="module" src="js/core/main.ts"></script>
     <div class="plan-toast-container" id="plan-toast-container"></div>
     <div class="plan-lightbox" id="plan-lightbox" style="display: none">
       <div class="plan-lightbox-backdrop"></div>

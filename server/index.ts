@@ -119,18 +119,21 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// Vendor libraries (served without auth)
-app.use('/vendor/xterm', express.static(path.join(PROJECT_ROOT, 'node_modules/xterm')));
-app.use('/vendor/xterm-addon-fit', express.static(path.join(PROJECT_ROOT, 'node_modules/xterm-addon-fit')));
-app.use('/vendor/xterm-addon-webgl', express.static(path.join(PROJECT_ROOT, 'node_modules/xterm-addon-webgl')));
-
 app.use(authMiddleware);
-app.use(express.static(path.join(PROJECT_ROOT, 'client')));
+// Production: serve built client files; Development: Vite handles client
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(PROJECT_ROOT, 'dist/client')));
+} else {
+  // In dev, Vite serves client files. Express only handles API/WS.
+  // Keep client static for any non-Vite direct access (fallback)
+  app.use(express.static(path.join(PROJECT_ROOT, 'client')));
+}
 
 // Auth endpoints (extracted to routes/auth.ts)
 app.use('/api/auth', createAuthRouter());
 app.get('/login', (_req, res) => {
-  res.sendFile(path.join(PROJECT_ROOT, 'client/login.html'));
+  const clientDir = process.env.NODE_ENV === 'production' ? 'dist/client' : 'client/public';
+  res.sendFile(path.join(PROJECT_ROOT, clientDir, 'login.html'));
 });
 
 // Settings endpoints
