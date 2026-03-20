@@ -9130,3 +9130,101 @@ body::after {
   cursor: pointer;
 }
 .btn-sm:hover { background: rgba(255,255,255,0.1); }
+
+/* ── Command Palette ── */
+#command-palette-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.5);
+  justify-content: center;
+  padding-top: 15vh;
+}
+#command-palette-overlay.open {
+  display: flex;
+}
+#command-palette-modal {
+  width: 520px;
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+  background: var(--palette-bg, var(--bg-deep));
+  border: 1px solid var(--palette-border, var(--border-lit));
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  align-self: flex-start;
+}
+#command-palette-input-wrapper {
+  padding: 8px;
+  border-bottom: 1px solid var(--palette-separator, var(--border));
+}
+#command-palette-input {
+  width: 100%;
+  background: var(--palette-input-bg, var(--bg-surface));
+  border: 1px solid var(--palette-border, var(--border));
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: var(--text-bright);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+#command-palette-input:focus {
+  border-color: var(--accent);
+}
+#command-palette-list {
+  overflow-y: auto;
+  flex: 1;
+}
+.cp-section-label {
+  padding: 4px 14px;
+  color: var(--palette-category, var(--text-ghost));
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.cp-item {
+  padding: 6px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  color: var(--text-main);
+  font-size: 13px;
+}
+.cp-item:hover,
+.cp-item.active {
+  background: var(--palette-hover, var(--bg-hover));
+  border-left: 2px solid var(--accent);
+  padding-left: 12px;
+}
+.cp-item-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cp-item-category {
+  color: var(--accent);
+  font-size: 11px;
+  min-width: 50px;
+}
+.cp-item-shortcut {
+  color: var(--text-ghost);
+  font-size: 11px;
+  background: var(--bg-surface);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.cp-match {
+  color: var(--accent);
+  font-weight: bold;
+}
+#command-palette-footer {
+  padding: 4px 14px;
+  color: var(--text-ghost);
+  font-size: 11px;
+  border-top: 1px solid var(--palette-separator, var(--border));
+}
