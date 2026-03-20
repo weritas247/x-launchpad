@@ -80,6 +80,7 @@ export interface PlanRow {
   category: string;
   status: string;
   ai_done: boolean;
+  use_worktree: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -117,7 +118,7 @@ export async function createPlan(
 export async function updatePlan(
   userId: number,
   planId: string,
-  updates: { title?: string; content?: string; category?: string; status?: string }
+  updates: { title?: string; content?: string; category?: string; status?: string; use_worktree?: boolean }
 ): Promise<PlanRow> {
   const { data, error } = await supabase
     .from('plans')

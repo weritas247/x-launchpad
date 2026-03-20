@@ -63,6 +63,7 @@ async function loadPlans() {
         category: p.category || 'other',
         status: p.status || 'todo',
         ai_done: p.ai_done || false,
+        use_worktree: p.use_worktree || false,
         created: new Date(p.created_at).getTime(),
         updated: new Date(p.updated_at).getTime(),
       }));
@@ -143,6 +144,7 @@ async function createPlan() {
     category: cat,
     status: 'todo',
     ai_done: false,
+    use_worktree: false,
     created: Date.now(),
     updated: Date.now(),
   };
@@ -353,11 +355,13 @@ function renderBoard() {
             return `<span class="plan-board-card-ai-session" data-session-id="${escHtml(s.sessionId)}" title="${escHtml(reg.label || s.ai)} session">${icon}${escHtml(s.sessionId.slice(-6))}</span>`;
           })
           .join('');
+        const wtChecked = p.use_worktree ? ' checked' : '';
         return `<div class="plan-board-card" draggable="true" data-id="${p.id}" data-cat="${p.category || 'other'}">
         <div class="plan-board-card-title">${title}</div>
         <div class="plan-board-card-preview">${preview || 'No content'}</div>
         <div class="plan-board-card-footer">
           <span class="plan-board-card-cat">${catLabel}</span>
+          <label class="plan-board-card-wt" title="워크트리 모드 (-w)"><input type="checkbox" class="plan-wt-check" data-id="${p.id}"${wtChecked}><span class="plan-wt-icon">🌿</span></label>
           <span>${aiBadge}${aiSessions}</span>
           <span class="plan-board-card-date">${date}</span>
         </div>
@@ -787,10 +791,31 @@ export function initPlanPanel() {
     true
   );
 
+  // Worktree checkbox toggle
+  boardEl?.addEventListener('change', async (e) => {
+    const cb = e.target.closest('.plan-wt-check');
+    if (!cb) return;
+    const planId = cb.dataset.id;
+    const plan = plans.find((p) => p.id === planId);
+    if (!plan) return;
+    plan.use_worktree = cb.checked;
+    try {
+      await apiFetch(`/api/plans/${planId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: plan.title, content: plan.content, category: plan.category, use_worktree: plan.use_worktree }),
+      });
+    } catch (err) {
+      console.error('[plan] worktree toggle failed:', err);
+    }
+  });
+
   // Board card click → editor
   boardEl?.addEventListener('click', (e) => {
     const card = e.target.closest('.plan-board-card');
     if (!card) return;
+    // skip if clicking worktree checkbox
+    if (e.target.closest('.plan-board-card-wt') || e.target.closest('.plan-wt-check')) return;
     // skip if clicking AI session badge
     if (e.target.closest('.plan-board-card-ai-session')) return;
     // toggle: click same card again → close detail
@@ -930,7 +955,11 @@ async function assignAiToplan(planId, aiType) {
 
   // Create AI session
   const reg = AI_REGISTRY[aiType] || {};
-  const cmd = reg.cmd || aiType;
+  let cmd = reg.cmd || aiType;
+  // Append -w flag for worktree mode (Claude only)
+  if (plan.use_worktree && aiType === 'claude') {
+    cmd += ' -w';
+  }
   wsSend({
     type: 'session_create',
     name: `${aiType}:${title.slice(0, 20)}`,
