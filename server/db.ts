@@ -2,7 +2,9 @@
 import Database from 'better-sqlite3';
 import * as path from 'path';
 
-const DB_PATH = path.join(__dirname, '../../data.db');
+// Electron ASAR 내부에는 쓰기 불가 — userData 경로 사용
+const DB_DIR = process.env.ELECTRON_USER_DATA || path.join(__dirname, '../..');
+const DB_PATH = path.join(DB_DIR, 'data.db');
 const db = new Database(DB_PATH);
 
 // Enable WAL mode for concurrent read/write safety

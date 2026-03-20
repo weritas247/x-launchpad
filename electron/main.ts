@@ -46,7 +46,9 @@ async function startServer(port: number): Promise<void> {
   // ASAR 내부에는 쓰기 불가 — userData 경로를 사용
   process.env.ELECTRON_USER_DATA = app.getPath('userData');
   // 서버 모듈 동적 임포트 — 환경변수 설정 후
-  await import('../dist/server/index.js');
+  // __dirname 기반 동적 경로 — TypeScript가 따라가지 않도록
+  const serverEntry = path.join(__dirname, '..', 'server', 'index.js');
+  await import(serverEntry);
   // 서버가 실제로 리스닝할 때까지 대기
   await waitForServer(port);
 }
@@ -81,8 +83,16 @@ app.whenReady().then(async () => {
   // 앱 전역 보안 정책 (1회)
   applyGlobalSecurityPolicy();
 
-  serverPort = await findFreePort();
-  await startServer(serverPort);
+  try {
+    serverPort = await findFreePort();
+    console.log(`[electron] Starting server on port ${serverPort}`);
+    await startServer(serverPort);
+    console.log(`[electron] Server started successfully`);
+  } catch (err) {
+    console.error('[electron] Failed to start server:', err);
+    app.quit();
+    return;
+  }
 
   // 외부 URL 요청 차단
   session.defaultSession.webRequest.onBeforeRequest(
