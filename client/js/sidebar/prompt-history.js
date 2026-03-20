@@ -243,6 +243,13 @@ function escAttr(s) {
   return escHtml(s).replace(/"/g, '&quot;');
 }
 
+/** Hide the panel (e.g. when switching to a file tab) */
+export function hideInputPanel() {
+  panel.classList.add('hidden');
+  stopClaudePoll();
+  fitActiveTerminal();
+}
+
 /** Call when active session changes to refresh the panel */
 export function onSessionChange() {
   if (S.activeSessionId && isClaudeSession(S.activeSessionId)) {

@@ -4,6 +4,7 @@ import { wsSend } from '../core/websocket.js';
 import { registerAction } from '../core/keyboard.js';
 import { createEditor, setReadOnly, getContent, destroyEditor } from './file-editor.js';
 import { getFileIcon } from '../ui/file-icons.js';
+import { hideInputPanel } from '../sidebar/prompt-history.js';
 
 function isMarkdownFile(filePath) {
   return /\.(md|markdown)$/i.test(filePath);
@@ -208,7 +209,7 @@ function updateFileContent(filePath, content, opts = {}) {
   if (isMarkdownFile(filePath) && window.MarkdownPreview) {
     // Hide CodeMirror
     const cmEl = contentEl.querySelector('.cm-editor');
-    if (cmEl) cmEl.style.display = 'none';
+    if (cmEl) cmEl.classList.add('cm-hidden');
 
     // Create preview element
     const previewEl = document.createElement('div');
@@ -278,7 +279,7 @@ function switchToSource(filePath) {
 
   // Show CodeMirror
   const cmEl = entry.contentEl.querySelector('.cm-editor');
-  if (cmEl) cmEl.style.display = '';
+  if (cmEl) cmEl.classList.remove('cm-hidden');
 
   entry.isPreview = false;
   renderReadonlyHeader(entry);
@@ -290,7 +291,7 @@ function switchToPreview(filePath) {
 
   // Hide CodeMirror
   const cmEl = entry.contentEl.querySelector('.cm-editor');
-  if (cmEl) cmEl.style.display = 'none';
+  if (cmEl) cmEl.classList.add('cm-hidden');
 
   // Create preview
   const previewEl = document.createElement('div');
@@ -336,7 +337,7 @@ function enterEditMode(filePath) {
       entry.previewEl = null;
     }
     const cmEl = entry.contentEl.querySelector('.cm-editor');
-    if (cmEl) cmEl.style.display = '';
+    if (cmEl) cmEl.classList.remove('cm-hidden');
     entry.isPreview = false;
   }
 
@@ -387,6 +388,9 @@ export function activateFileTab(filePath) {
     tabEl.classList.toggle('active', isActive);
     paneEl.classList.toggle('active', isActive);
   });
+
+  // Hide Claude Prompts sidebar when viewing files
+  hideInputPanel();
 }
 
 export function closeFileTab(filePath) {

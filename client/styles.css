@@ -1742,6 +1742,10 @@ body::after {
     height: 100%;
 }
 
+.file-pane-content .cm-editor.cm-hidden {
+    display: none !important;
+}
+
 .file-pane-content .cm-scroller {
     overflow: auto;
     font-family: var(--font-mono);
