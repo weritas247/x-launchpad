@@ -115,6 +115,9 @@ export function closeSession(id) {
         entry.dataWs.close();
       } catch {}
     }
+    if (entry.webglAddon) {
+      try { entry.webglAddon.dispose(); } catch {}
+    }
     entry.term.dispose();
     entry.tabEl.remove();
     terminalMap.delete(id);
@@ -259,14 +262,17 @@ export function attachTerminal(sessionId, name) {
   term.open(div);
 
   // WebGL renderer for GPU-accelerated rendering (falls back to DOM renderer on failure)
+  let webglAddon = null;
   if (typeof WebglAddon !== 'undefined') {
     try {
-      const webglAddon = new WebglAddon.WebglAddon();
+      webglAddon = new WebglAddon.WebglAddon();
       webglAddon.onContextLoss(() => {
         webglAddon.dispose();
+        webglAddon = null;
       });
       term.loadAddon(webglAddon);
     } catch (e) {
+      webglAddon = null;
       console.warn('[webgl] Failed to load WebGL renderer, using DOM renderer:', e.message);
     }
   }
@@ -369,7 +375,7 @@ export function attachTerminal(sessionId, name) {
   const sidebarEl = createSidebarItem(sessionId, name);
   const tabEl = createTab(sessionId, name);
 
-  terminalMap.set(sessionId, { term, fitAddon, div, tabEl, sidebarEl, dataWs });
+  terminalMap.set(sessionId, { term, fitAddon, webglAddon, div, tabEl, sidebarEl, dataWs });
   hideEmptyState();
   updateStatusBar();
 }
