@@ -1,4 +1,4 @@
-import { S, terminalMap, sessionMeta, tabAddBtn, settingsOverlay } from './state.js';
+import { S, terminalMap, sessionMeta, tabBar, tabAddBtn, settingsOverlay } from './state.js';
 import { THEMES } from './constants.js';
 import { connect, wsSend, setOnInputSend, requestScrollback } from './websocket.js';
 import { initThemeSwatches } from '../ui/themes.js';
@@ -89,7 +89,7 @@ import {
   handleReplaceAck,
   onSearchSessionChange,
 } from '../sidebar/search.js';
-import { setActivateSessionFn, handleFileSaveResult, getActiveFilePath, closeFileTab } from '../editor/file-viewer.js';
+import { setActivateSessionFn, handleFileSaveResult, getActiveFilePath, closeFileTab, activateFileTab } from '../editor/file-viewer.js';
 import {
   initPlanPanel,
   handlePlanFileData,
@@ -319,15 +319,23 @@ document.addEventListener('keydown', (e) => {
   // Centralized keybinding handling
   if (tryKeybinding(e)) return;
 
-  // Cmd+1~9: switch to Nth tab
+  // Cmd+1~9: switch to Nth tab (terminal + file tabs in DOM order)
   if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey) {
     const combo = buildCombo(e);
     const n = parseInt(combo.replace('Meta+', ''));
     if (n >= 1 && n <= 9) {
-      const ids = Array.from(terminalMap.keys());
-      if (ids[n - 1]) {
+      const tabs = [...tabBar.querySelectorAll('.tab')];
+      const target = tabs[n - 1];
+      if (target) {
         e.preventDefault();
-        activateSession(ids[n - 1]);
+        const sessionId = target.dataset.sessionId;
+        const filePath = target.dataset.filePath;
+        if (sessionId) {
+          activateSession(sessionId);
+          wsSend({ type: 'session_attach', sessionId });
+        } else if (filePath) {
+          activateFileTab(filePath);
+        }
       }
     }
   }
@@ -352,12 +360,19 @@ function clearActiveTerminal() {
 }
 
 function switchTabBy(dir) {
-  const ids = Array.from(terminalMap.keys());
-  if (ids.length < 2) return;
-  const idx = ids.indexOf(S.activeSessionId);
-  const next = ids[(idx + dir + ids.length) % ids.length];
-  activateSession(next);
-  wsSend({ type: 'session_attach', sessionId: next });
+  const tabs = [...tabBar.querySelectorAll('.tab')];
+  if (tabs.length < 2) return;
+  const activeIdx = tabs.findIndex((t) => t.classList.contains('active'));
+  const nextIdx = (activeIdx + dir + tabs.length) % tabs.length;
+  const target = tabs[nextIdx];
+  const sessionId = target.dataset.sessionId;
+  const filePath = target.dataset.filePath;
+  if (sessionId) {
+    activateSession(sessionId);
+    wsSend({ type: 'session_attach', sessionId });
+  } else if (filePath) {
+    activateFileTab(filePath);
+  }
 }
 
 function navigateSplitPane(dir) {
