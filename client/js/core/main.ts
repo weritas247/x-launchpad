@@ -1,3 +1,4 @@
+import 'highlight.js/styles/vs2015.css';
 import { S, terminalMap, sessionMeta, tabBar, tabAddBtn, settingsOverlay } from './state';
 import { THEMES } from './constants';
 import { connect, wsSend, setOnInputSend, requestScrollback } from './websocket';
