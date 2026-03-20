@@ -1,9 +1,9 @@
 import { BrowserWindow, app } from 'electron';
 
-export function applySecurityPolicy(win: BrowserWindow): void {
+/** 윈도우별 보안 정책 적용 */
+export function applySecurityPolicy(win: BrowserWindow, serverPort: number): void {
   // 1. DevTools 완전 차단 (프로덕션)
   win.webContents.on('before-input-event', (_event, input) => {
-    // Cmd+Shift+I, Cmd+Option+I, F12 차단
     if (
       (input.control || input.meta) &&
       input.shift &&
@@ -26,10 +26,10 @@ export function applySecurityPolicy(win: BrowserWindow): void {
     return { action: 'deny' };
   });
 
-  // 3. 네비게이션 차단 (외부 URL로 이동 방지)
+  // 3. 네비게이션 차단 (외부 URL로 이동 방지 — 호스트+포트 모두 검증)
   win.webContents.on('will-navigate', (event, url) => {
     const parsed = new URL(url);
-    if (parsed.hostname !== '127.0.0.1') {
+    if (parsed.hostname !== '127.0.0.1' || parsed.port !== String(serverPort)) {
       event.preventDefault();
     }
   });
@@ -52,8 +52,10 @@ export function applySecurityPolicy(win: BrowserWindow): void {
       });
     }
   );
+}
 
-  // 5. 원격 콘텐츠 로드 차단
+/** 앱 전역 보안 정책 — app.whenReady() 후 1회만 호출 */
+export function applyGlobalSecurityPolicy(): void {
   app.on('web-contents-created', (_event, contents) => {
     contents.on('will-attach-webview', (event) => {
       event.preventDefault();

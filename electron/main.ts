@@ -1,7 +1,7 @@
 import { app, BrowserWindow, session } from 'electron';
 import * as path from 'path';
 import * as net from 'net';
-import { applySecurityPolicy } from './security';
+import { applySecurityPolicy, applyGlobalSecurityPolicy } from './security';
 
 let mainWindow: BrowserWindow | null = null;
 let serverPort: number = 0;
@@ -18,12 +18,37 @@ function findFreePort(): Promise<number> {
   });
 }
 
+/** 서버가 실제로 리스닝할 때까지 대기 */
+function waitForServer(port: number, timeout = 10000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const check = () => {
+      const sock = net.createConnection({ host: '127.0.0.1', port }, () => {
+        sock.destroy();
+        resolve();
+      });
+      sock.on('error', () => {
+        if (Date.now() - start > timeout) {
+          reject(new Error(`Server did not start within ${timeout}ms`));
+        } else {
+          setTimeout(check, 100);
+        }
+      });
+    };
+    check();
+  });
+}
+
 async function startServer(port: number): Promise<void> {
   process.env.PORT = String(port);
   process.env.NODE_ENV = 'production';
   process.env.ELECTRON = '1';
+  // ASAR 내부에는 쓰기 불가 — userData 경로를 사용
+  process.env.ELECTRON_USER_DATA = app.getPath('userData');
   // 서버 모듈 동적 임포트 — 환경변수 설정 후
   await import('../dist/server/index.js');
+  // 서버가 실제로 리스닝할 때까지 대기
+  await waitForServer(port);
 }
 
 function createWindow(): void {
@@ -43,7 +68,7 @@ function createWindow(): void {
     },
   });
 
-  applySecurityPolicy(mainWindow);
+  applySecurityPolicy(mainWindow, serverPort);
 
   mainWindow.loadURL(`http://127.0.0.1:${serverPort}`);
 
@@ -53,6 +78,9 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
+  // 앱 전역 보안 정책 (1회)
+  applyGlobalSecurityPolicy();
+
   serverPort = await findFreePort();
   await startServer(serverPort);
 

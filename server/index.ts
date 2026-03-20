@@ -89,8 +89,12 @@ server.on('upgrade', (req, socket, head) => {
 
 const PORT = env.PORT;
 const PROJECT_ROOT = path.resolve(__dirname, __dirname.endsWith('dist/server') ? '../..' : '..');
-const SETTINGS_PATH = path.join(PROJECT_ROOT, 'settings.json');
-const SESSIONS_PATH = path.join(PROJECT_ROOT, 'sessions.json');
+// Electron ASAR 내부에는 쓰기 불가 — userData 경로 사용
+const DATA_DIR = env.ELECTRON && process.env.ELECTRON_USER_DATA
+  ? process.env.ELECTRON_USER_DATA
+  : PROJECT_ROOT;
+const SETTINGS_PATH = path.join(DATA_DIR, 'settings.json');
+const SESSIONS_PATH = path.join(DATA_DIR, 'sessions.json');
 
 // ─── Settings ────────────────────────────────────────────────────
 let currentSettings = loadSettings(SETTINGS_PATH);

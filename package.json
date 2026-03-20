@@ -30,8 +30,9 @@
     "test:watch": "jest --watch",
     "build:electron": "tsc -p electron/tsconfig.json",
     "electron:dev": "npm run build && npm run build:electron && electron .",
-    "electron:build": "npm run build && npm run build:electron && node scripts/obfuscate.js && electron-builder",
-    "electron:build:mac": "npm run build && npm run build:electron && node scripts/obfuscate.js && electron-builder --mac"
+    "electron:clean-maps": "find dist -name '*.map' -delete 2>/dev/null || true",
+    "electron:build": "npm run build && npm run build:electron && npm run electron:clean-maps && node scripts/obfuscate.js && electron-builder",
+    "electron:build:mac": "npm run build && npm run build:electron && npm run electron:clean-maps && node scripts/obfuscate.js && electron-builder --mac"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

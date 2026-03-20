@@ -2,10 +2,13 @@ const JavaScriptObfuscator = require('javascript-obfuscator');
 const fs = require('fs');
 const path = require('path');
 
-const TARGETS = [
+const ELECTRON_TARGETS = [
   'dist/electron/main.js',
   'dist/electron/preload.js',
   'dist/electron/security.js',
+];
+
+const SERVER_TARGETS = [
   'dist/server/index.js',
 ];
 
@@ -40,7 +43,15 @@ const OPTIONS = {
   unicodeEscapeSequence: false,
 };
 
-for (const file of TARGETS) {
+// 서버 사이드용 옵션 — debugProtection 비활성화 (Node.js에서 프로세스 행 방지)
+const SERVER_OPTIONS = {
+  ...OPTIONS,
+  debugProtection: false,
+  debugProtectionInterval: 0,
+  selfDefending: false,
+};
+
+for (const file of ELECTRON_TARGETS) {
   const filePath = path.resolve(__dirname, '..', file);
   if (!fs.existsSync(filePath)) {
     console.warn(`[obfuscate] skip (not found): ${file}`);
@@ -49,6 +60,18 @@ for (const file of TARGETS) {
   console.log(`[obfuscate] ${file}`);
   const code = fs.readFileSync(filePath, 'utf8');
   const result = JavaScriptObfuscator.obfuscate(code, OPTIONS);
+  fs.writeFileSync(filePath, result.getObfuscatedCode());
+}
+
+for (const file of SERVER_TARGETS) {
+  const filePath = path.resolve(__dirname, '..', file);
+  if (!fs.existsSync(filePath)) {
+    console.warn(`[obfuscate] skip (not found): ${file}`);
+    continue;
+  }
+  console.log(`[obfuscate] server: ${file}`);
+  const code = fs.readFileSync(filePath, 'utf8');
+  const result = JavaScriptObfuscator.obfuscate(code, SERVER_OPTIONS);
   fs.writeFileSync(filePath, result.getObfuscatedCode());
 }
 
