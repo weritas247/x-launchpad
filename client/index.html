@@ -1440,7 +1440,21 @@
       </div>
     </div>
 
-    <script type="module" src="js/core/main.ts"></script>
+    <script type="module">
+      // Auth guard — check before loading app
+      const token = new URLSearchParams(location.search).get('token') || localStorage.getItem('x-launchpad-token') || '';
+      const url = token ? '/api/auth/check?token=' + encodeURIComponent(token) : '/api/auth/check';
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!data.ok) { location.href = '/login.html'; throw new Error('redirect'); }
+        if (token) localStorage.setItem('x-launchpad-token', token);
+      } catch (e) {
+        if (e.message === 'redirect') throw e;
+        // auth disabled or server down — continue
+      }
+      await import('./js/core/main.ts');
+    </script>
     <div class="plan-toast-container" id="plan-toast-container"></div>
     <div class="plan-lightbox" id="plan-lightbox" style="display: none">
       <div class="plan-lightbox-backdrop"></div>

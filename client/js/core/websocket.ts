@@ -185,8 +185,8 @@ export function connect(messageHandler) {
   const urlParams = new URLSearchParams(location.search);
   const token = urlParams.get('token') || localStorage.getItem('x-launchpad-token') || '';
   const wsUrl = token
-    ? `${proto}//${location.host}?token=${encodeURIComponent(token)}`
-    : `${proto}//${location.host}`;
+    ? `${proto}//${location.host}/ws?token=${encodeURIComponent(token)}`
+    : `${proto}//${location.host}/ws`;
   S.ws = new WebSocket(wsUrl);
 
   S.ws.onopen = () => {

@@ -78,10 +78,12 @@ server.on('upgrade', (req, socket, head) => {
     wssData.handleUpgrade(req, socket, head, (ws) => {
       wssData.emit('connection', ws, req);
     });
-  } else {
+  } else if (url.pathname === '/ws' || url.pathname === '/') {
     wss.handleUpgrade(req, socket, head, (ws) => {
       wss.emit('connection', ws, req);
     });
+  } else {
+    socket.destroy();
   }
 });
 
@@ -126,6 +128,7 @@ if (process.env.NODE_ENV === 'production') {
 } else {
   // In dev, Vite serves client files. Express only handles API/WS.
   // Keep client static for any non-Vite direct access (fallback)
+  app.use(express.static(path.join(PROJECT_ROOT, 'client/public')));
   app.use(express.static(path.join(PROJECT_ROOT, 'client')));
 }
 
