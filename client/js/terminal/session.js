@@ -67,7 +67,7 @@ export function updateStatusBar() {
   const sepEl = document.getElementById('sb-project-sep');
   if (cwd) {
     const parts = cwd.replace(/\/$/, '').split('/');
-    nameEl.textContent = parts[parts.length - 1] || '~';
+    nameEl.textContent = '💻 ' + (parts[parts.length - 1] || '~');
     el.style.display = '';
     sepEl.style.display = '';
   } else {

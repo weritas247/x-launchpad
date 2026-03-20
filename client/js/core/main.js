@@ -440,7 +440,7 @@ function updateProjectName(cwd) {
     return;
   }
   const parts = cwd.replace(/\/$/, '').split('/');
-  nameEl.textContent = parts[parts.length - 1] || '~';
+  nameEl.textContent = '💻 ' + (parts[parts.length - 1] || '~');
   el.style.display = '';
   sepEl.style.display = '';
 }
