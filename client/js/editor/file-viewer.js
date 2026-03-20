@@ -3,6 +3,11 @@ import { S, terminalMap, tabBar, tabAddBtn, termWrapper, escHtml } from '../core
 import { wsSend } from '../core/websocket.js';
 import { registerAction } from '../core/keyboard.js';
 import { createEditor, setReadOnly, getContent, destroyEditor } from './file-editor.js';
+import { getFileIcon } from '../ui/file-icons.js';
+
+function isMarkdownFile(filePath) {
+  return /\.(md|markdown)$/i.test(filePath);
+}
 
 // Map<filePath, { tabEl, paneEl, contentEl, headerEl, editorView, filePath, originalContent, isEditing }>
 const fileTabs = new Map();
@@ -97,6 +102,8 @@ export function openFileTab(filePath, content, opts = {}) {
     filePath,
     originalContent: null,
     isEditing: false,
+    isPreview: false,
+    previewEl: null,
   };
   fileTabs.set(filePath, entry);
   previewFilePath = filePath;
@@ -161,6 +168,12 @@ function updateFileContent(filePath, content, opts = {}) {
   // Clear the content element for CodeMirror
   contentEl.innerHTML = '';
 
+  // Destroy any existing preview
+  if (entry.previewEl) {
+    entry.previewEl.remove();
+    entry.previewEl = null;
+  }
+
   const onSave = (saveContent) => {
     wsSend({ type: 'file_save', sessionId: S.activeSessionId, filePath, content: saveContent });
   };
@@ -190,6 +203,26 @@ function updateFileContent(filePath, content, opts = {}) {
   entry.originalContent = text;
   entry.isEditing = false;
 
+  // Markdown files: show preview by default, hide CodeMirror
+  // Guard: graceful degradation if MarkdownPreview module hasn't loaded yet
+  if (isMarkdownFile(filePath) && window.MarkdownPreview) {
+    // Hide CodeMirror
+    const cmEl = contentEl.querySelector('.cm-editor');
+    if (cmEl) cmEl.style.display = 'none';
+
+    // Create preview element
+    const previewEl = document.createElement('div');
+    previewEl.className = 'md-preview-container';
+    contentEl.appendChild(previewEl);
+    window.MarkdownPreview.renderPreview(previewEl, text);
+
+    entry.isPreview = true;
+    entry.previewEl = previewEl;
+  } else {
+    entry.isPreview = false;
+    entry.previewEl = null;
+  }
+
   // Reset header to read-only state
   renderReadonlyHeader(entry);
 }
@@ -197,13 +230,79 @@ function updateFileContent(filePath, content, opts = {}) {
 function renderReadonlyHeader(entry) {
   const actionsEl = entry.headerEl.querySelector('.file-pane-actions');
   if (!actionsEl) return;
-  actionsEl.innerHTML = `
-    <span class="file-pane-status">READ ONLY</span>
-    <button class="file-pane-edit-btn">Edit</button>
-  `;
+
+  const isMd = isMarkdownFile(entry.filePath);
+
+  if (isMd && entry.isPreview) {
+    // Preview mode: show Source + Edit
+    actionsEl.innerHTML = `
+      <span class="file-pane-status">READ ONLY</span>
+      <button class="file-pane-toggle-btn">Source</button>
+      <button class="file-pane-edit-btn">Edit</button>
+    `;
+    actionsEl.querySelector('.file-pane-toggle-btn').addEventListener('click', () => {
+      switchToSource(entry.filePath);
+    });
+  } else if (isMd && !entry.isPreview) {
+    // Source mode: show Preview + Edit
+    actionsEl.innerHTML = `
+      <span class="file-pane-status">READ ONLY</span>
+      <button class="file-pane-toggle-btn">Preview</button>
+      <button class="file-pane-edit-btn">Edit</button>
+    `;
+    actionsEl.querySelector('.file-pane-toggle-btn').addEventListener('click', () => {
+      switchToPreview(entry.filePath);
+    });
+  } else {
+    // Non-md: original behavior
+    actionsEl.innerHTML = `
+      <span class="file-pane-status">READ ONLY</span>
+      <button class="file-pane-edit-btn">Edit</button>
+    `;
+  }
+
   actionsEl.querySelector('.file-pane-edit-btn').addEventListener('click', () => {
     enterEditMode(entry.filePath);
   });
+}
+
+function switchToSource(filePath) {
+  const entry = fileTabs.get(filePath);
+  if (!entry) return;
+
+  // Remove preview
+  if (entry.previewEl) {
+    entry.previewEl.remove();
+    entry.previewEl = null;
+  }
+
+  // Show CodeMirror
+  const cmEl = entry.contentEl.querySelector('.cm-editor');
+  if (cmEl) cmEl.style.display = '';
+
+  entry.isPreview = false;
+  renderReadonlyHeader(entry);
+}
+
+function switchToPreview(filePath) {
+  const entry = fileTabs.get(filePath);
+  if (!entry || !window.MarkdownPreview) return;
+
+  // Hide CodeMirror
+  const cmEl = entry.contentEl.querySelector('.cm-editor');
+  if (cmEl) cmEl.style.display = 'none';
+
+  // Create preview
+  const previewEl = document.createElement('div');
+  previewEl.className = 'md-preview-container';
+  entry.contentEl.appendChild(previewEl);
+
+  const text = entry.originalContent || '';
+  window.MarkdownPreview.renderPreview(previewEl, text);
+
+  entry.isPreview = true;
+  entry.previewEl = previewEl;
+  renderReadonlyHeader(entry);
 }
 
 function renderEditingHeader(entry) {
@@ -229,6 +328,18 @@ function renderEditingHeader(entry) {
 function enterEditMode(filePath) {
   const entry = fileTabs.get(filePath);
   if (!entry || !entry.editorView) return;
+
+  // If in preview mode, switch to source first
+  if (entry.isPreview) {
+    if (entry.previewEl) {
+      entry.previewEl.remove();
+      entry.previewEl = null;
+    }
+    const cmEl = entry.contentEl.querySelector('.cm-editor');
+    if (cmEl) cmEl.style.display = '';
+    entry.isPreview = false;
+  }
+
   setReadOnly(entry.editorView, false);
   entry.isEditing = true;
   renderEditingHeader(entry);
@@ -296,6 +407,12 @@ export function closeFileTab(filePath) {
     entry.editorView = null;
   }
 
+  // Clean up preview if present
+  if (entry.previewEl) {
+    entry.previewEl.remove();
+    entry.previewEl = null;
+  }
+
   entry.tabEl.remove();
   entry.paneEl.remove();
   fileTabs.delete(filePath);
@@ -361,34 +478,7 @@ export function handleFileSaveResult(filePath, success, error) {
   }
 }
 
-function getFileIcon(name) {
-  const ext = name.split('.').pop()?.toLowerCase();
-  const iconMap = {
-    js: '📜',
-    ts: '📘',
-    jsx: '⚛',
-    tsx: '⚛',
-    json: '{}',
-    md: '📝',
-    css: '🎨',
-    html: '🌐',
-    py: '🐍',
-    rs: '🦀',
-    go: '🐹',
-    rb: '💎',
-    sh: '$_',
-    yml: '⚙',
-    yaml: '⚙',
-    toml: '⚙',
-    png: '🖼',
-    jpg: '🖼',
-    gif: '🖼',
-    svg: '🖼',
-    webp: '🖼',
-    lock: '🔒',
-  };
-  return iconMap[ext] || '📄';
-}
+// getFileIcon is now imported from '../ui/file-icons.js'
 
 // Register the toggleFileEdit action (keybinding assigned in main.js)
 registerAction('toggleFileEdit', () => {
