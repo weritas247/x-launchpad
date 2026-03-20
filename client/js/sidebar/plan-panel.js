@@ -74,6 +74,7 @@ async function loadPlans() {
         content: p.content || '',
         category: p.category || 'other',
         status: p.status || 'todo',
+        ticket_id: p.ticket_id || null,
         ai_done: p.ai_done || false,
         use_worktree: p.use_worktree || false,
         use_headless: p.use_headless || false,
@@ -92,7 +93,9 @@ async function loadPlans() {
 
 async function apiCreatePlan(plan) {
   try {
-    await apiFetch('/api/plans', {
+    const meta = S.activeSessionId ? sessionMeta.get(S.activeSessionId) : null;
+    const cwd = meta?.cwd || undefined;
+    const res = await apiFetch('/api/plans', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -100,8 +103,15 @@ async function apiCreatePlan(plan) {
         title: plan.title,
         content: plan.content,
         category: plan.category,
+        cwd,
       }),
     });
+    const data = await res.json();
+    if (data.ok && data.plan?.ticket_id) {
+      plan.ticket_id = data.plan.ticket_id;
+      if (currentView === 'board') renderBoard();
+      else renderList();
+    }
   } catch (e) {
     console.error('[plan] create failed:', e);
   }
@@ -337,9 +347,11 @@ function renderList() {
       const active = p.id === activeId ? ' active' : '';
       const catLabel = CATEGORIES[p.category] || '기타';
       const statusLabel = STATUS_LABELS[p.status || 'todo'] || 'TODO';
+      const ticketLabel = p.ticket_id ? `<span class="plan-item-ticket">${escHtml(p.ticket_id)}</span>` : '';
       return `<div class="plan-item${active}" data-id="${p.id}">
       <span class="plan-item-cat" data-cat="${p.category || 'other'}">${catLabel}</span>
       <span class="plan-item-status">${statusLabel}</span>
+      ${ticketLabel}
       <div class="plan-item-title">${title}</div>
       <div class="plan-item-preview">${preview || 'No content'}</div>
       <div class="plan-item-date">${date}</div>
@@ -372,7 +384,9 @@ function renderBoard() {
           .join('');
         const wtChecked = p.use_worktree ? ' checked' : '';
         const hlChecked = p.use_headless ? ' checked' : '';
+        const ticketBadge = p.ticket_id ? `<span class="plan-board-card-ticket">${escHtml(p.ticket_id)}</span>` : '';
         return `<div class="plan-board-card" draggable="true" data-id="${p.id}" data-cat="${p.category || 'other'}">
+        ${ticketBadge}
         <div class="plan-board-card-title">${title}</div>
         <div class="plan-board-card-preview">${preview || 'No content'}</div>
         <div class="plan-board-card-footer">
@@ -991,7 +1005,8 @@ async function assignAiToplan(planId, aiType) {
   const title = plan.title || 'Untitled';
   const content = plan.content || '';
   const catLabel = CATEGORIES[plan.category] || '기타';
-  let prompt = `다음 이슈를 처리해주세요:\n\n유형: ${catLabel}\n제목: ${title}\n\n${content}`;
+  const ticketLabel = plan.ticket_id ? `\n티켓: ${plan.ticket_id}` : '';
+  let prompt = `다음 이슈를 처리해주세요:\n${ticketLabel}\n유형: ${catLabel}\n제목: ${title}\n\n${content}`;
 
   // Fetch attached images and include URLs
   try {

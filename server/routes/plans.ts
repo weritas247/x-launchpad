@@ -42,7 +42,7 @@ export function createPlansRouter(wss: WebSocketServer): Router {
   router.post('/', async (req, res) => {
     const payload = requireAuth(req, res);
     if (!payload) return;
-    const { id, title, content, category, status } = req.body || {};
+    const { id, title, content, category, status, cwd } = req.body || {};
     if (!id) return res.status(400).json({ ok: false, error: 'Missing id' });
     try {
       const plan = await userDb.createPlan(payload.userId, {
@@ -51,6 +51,7 @@ export function createPlansRouter(wss: WebSocketServer): Router {
         content: content || '',
         category: category || 'other',
         status: status || 'todo',
+        cwd: cwd || '',
       });
       res.json({ ok: true, plan });
     } catch (e) {

@@ -86,6 +86,7 @@ export interface PlanRow {
   content: string;
   category: string;
   status: string;
+  ticket_id: string | null;
   ai_done: boolean;
   use_worktree: boolean;
   use_headless: boolean;
@@ -115,10 +116,48 @@ export async function getPlan(userId: number, planId: string): Promise<PlanRow |
   return data as PlanRow | null;
 }
 
+/** Generate a ticket ID prefix from a project name: remove vowels, take first 2 consonants, uppercase */
+function generateTicketPrefix(projectName: string): string {
+  if (!projectName) return 'XX';
+  const consonants = projectName.replace(/[aeiouAEIOU\W\d_-]/g, '');
+  const prefix = consonants.slice(0, 2).toUpperCase();
+  return prefix.length >= 2 ? prefix : (prefix + 'X').slice(0, 2);
+}
+
+/** Generate a unique ticket ID: [PREFIX]-[fix/feat]-[0001] */
+async function generateTicketId(userId: number, category: string, projectName: string): Promise<string> {
+  const prefix = generateTicketPrefix(projectName);
+  const type = category === 'bug' ? 'fix' : 'feat';
+
+  // Find max existing ticket number for this user
+  const { data } = await supabase
+    .from('plans')
+    .select('ticket_id')
+    .eq('user_id', userId)
+    .not('ticket_id', 'is', null);
+
+  let maxNum = 0;
+  if (data) {
+    for (const row of data) {
+      const match = (row.ticket_id as string)?.match(/-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+  }
+
+  const nextNum = String(maxNum + 1).padStart(4, '0');
+  return `${prefix}-${type}-${nextNum}`;
+}
+
 export async function createPlan(
   userId: number,
-  plan: { id: string; title: string; content: string; category: string; status?: string }
+  plan: { id: string; title: string; content: string; category: string; status?: string; cwd?: string }
 ): Promise<PlanRow> {
+  const projectName = plan.cwd ? plan.cwd.replace(/\/$/, '').split('/').pop() || '' : '';
+  const ticketId = await generateTicketId(userId, plan.category, projectName);
+
   const { data, error } = await supabase
     .from('plans')
     .insert({
@@ -128,6 +167,7 @@ export async function createPlan(
       content: plan.content,
       category: plan.category,
       status: plan.status || 'todo',
+      ticket_id: ticketId,
     })
     .select()
     .single();

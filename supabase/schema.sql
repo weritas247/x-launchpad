@@ -77,3 +77,6 @@ ALTER TABLE plans ADD COLUMN IF NOT EXISTS use_headless
 ALTER TABLE plans ADD COLUMN IF NOT EXISTS ai_sessions
   jsonb DEFAULT '[]'::jsonb;
 
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS ticket_id
+  text UNIQUE;
+
