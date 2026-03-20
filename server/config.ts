@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS = {
     inputPanelFontSize: 11,
     fileViewerFontSize: 13,
     gitGraphFontSize: 12,
+    kanbanFontSize: 12,
     lineHeight: 1.25,
     cursorStyle: 'block',
     cursorBlink: true,

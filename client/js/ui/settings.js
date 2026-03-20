@@ -103,6 +103,7 @@ export function applySectionFontSizes(ap) {
   root.style.setProperty('--input-panel-font-size', (ap.inputPanelFontSize ?? 11) + 'px');
   root.style.setProperty('--file-viewer-font-size', (ap.fileViewerFontSize ?? 13) + 'px');
   root.style.setProperty('--git-graph-font-size', (ap.gitGraphFontSize ?? 12) + 'px');
+  root.style.setProperty('--kanban-font-size', (ap.kanbanFontSize ?? 12) + 'px');
 }
 
 export function openSettings() {
@@ -253,6 +254,7 @@ function populateForm(s) {
   setRangeValue('s-inputPanelFontSize', ap.inputPanelFontSize ?? 11, 'px');
   setRangeValue('s-fileViewerFontSize', ap.fileViewerFontSize ?? 13, 'px');
   setRangeValue('s-gitGraphFontSize', ap.gitGraphFontSize ?? 12, 'px');
+  setRangeValue('s-kanbanFontSize', ap.kanbanFontSize ?? 12, 'px');
 
   document.getElementById('s-scrollback').value = te.scrollback;
   setSelectValue('s-bellStyle', te.bellStyle);
@@ -336,6 +338,8 @@ function readForm() {
     parseInt(document.getElementById('s-fileViewerFontSize')?.value) || 13;
   s.appearance.gitGraphFontSize =
     parseInt(document.getElementById('s-gitGraphFontSize')?.value) || 12;
+  s.appearance.kanbanFontSize =
+    parseInt(document.getElementById('s-kanbanFontSize')?.value) || 12;
 
   s.terminal.scrollback = parseInt(document.getElementById('s-scrollback').value);
   s.terminal.bellStyle = document.getElementById('s-bellStyle').value;
