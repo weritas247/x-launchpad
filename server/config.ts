@@ -63,7 +63,7 @@ export const DEFAULT_SETTINGS = {
     planModal: 'Ctrl+p',
     toggleFileEdit: 'Ctrl+e',
     openPalette: 'Meta+p',
-    openCommandPalette: 'Meta+Shift+p',
+    openCommandPalette: 'Shift+Meta+p',
   },
   notifications: {
     global: {
