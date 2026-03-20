@@ -787,7 +787,8 @@ async function startServer() {
   } catch (err) {
     console.error('[supabase] Failed to initialize user count:', err);
   }
-  server.listen(PORT, '0.0.0.0', () => {
+  const HOST = env.ELECTRON ? '127.0.0.1' : '0.0.0.0';
+  server.listen(PORT, HOST, () => {
     console.log(`X-Launchpad → http://localhost:${PORT}`);
     const nets = os.networkInterfaces();
     for (const name of Object.keys(nets)) {

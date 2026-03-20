@@ -24,6 +24,9 @@ interface EnvConfig {
   ENABLE_TMUX: boolean;
   SHELL: string;
   HOME: string;
+
+  // Electron
+  ELECTRON: boolean;
 }
 
 function getEnv(): EnvConfig {
@@ -46,6 +49,8 @@ function getEnv(): EnvConfig {
     ENABLE_TMUX: env.ENABLE_TMUX === '1',
     SHELL: env.SHELL || '/bin/bash',
     HOME: env.HOME || '/',
+
+    ELECTRON: env.ELECTRON === '1',
   };
 }
 
