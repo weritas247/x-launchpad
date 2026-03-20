@@ -6,7 +6,7 @@
 
 ## Context
 
-현재 클라이언트는 바닐라 JS 33개 파일(~11,000 LOC), `type="module"` ES import/export, vendor 폴더 글로벌 스크립트 로딩 방식. 바이브 코딩 워크플로우에서 AI 코드 생성 정확도를 높이기 위해 TypeScript 전환이 필요.
+현재 클라이언트는 바닐라 JS 37개 파일(소스 33 + 번들/엔트리 4, ~11,000 LOC), `type="module"` ES import/export, vendor 글로벌 스크립트 로딩 방식. xterm은 `vendor/` 폴더가 아닌 Express의 `express.static`으로 `node_modules/`에서 서빙 중. 바이브 코딩 워크플로우에서 AI 코드 생성 정확도를 높이기 위해 TypeScript 전환이 필요.
 
 ## Decisions
 
@@ -24,7 +24,14 @@
 
 - `root: 'client/'`
 - `build.outDir: '../dist/client'`
-- `server.proxy`: `/ws` → `ws://localhost:3000`, API 요청 → `http://localhost:3000`
+- `publicDir: 'public'` 또는 static assets(`icons/`, `fonts/`, `favicon.svg`)를 Vite가 처리하도록 설정
+- `server.proxy`:
+  ```ts
+  proxy: {
+    '/ws': { target: 'ws://localhost:3000', ws: true },
+    '/api': { target: 'http://localhost:3000' }
+  }
+  ```
 
 ### `client/tsconfig.json` (new)
 
@@ -67,10 +74,16 @@
 
 - `vite` (devDep)
 - `concurrently` (devDep)
+- `@types/dompurify` (devDep) — markdown-preview.ts에서 사용
 
 ### Removable Dependencies
 
 - `esbuild` (devDep) — CodeMirror/marked 번들링에만 사용, Vite가 대체
+
+### Script Updates
+
+- `format`: `client/**/*.{js,css,html}` → `client/**/*.{ts,css,html}`
+- `typecheck`: `tsc --noEmit` → `tsc --noEmit && tsc --noEmit -p client/tsconfig.json` (서버 + 클라이언트)
 
 ## 2. Vendor Removal & npm Import
 
@@ -92,7 +105,7 @@ import { WebglAddon } from 'xterm-addon-webgl'
 import 'xterm/css/xterm.css'
 ```
 
-- `vendor/xterm/`, `vendor/xterm-addon-fit/`, `vendor/xterm-addon-webgl/` 삭제
+- xterm은 실제로 `vendor/` 폴더에 없고 Express static route로 `node_modules/`에서 서빙 → 해당 Express static route 3개 제거 (`/vendor/xterm`, `/vendor/xterm-addon-fit`, `/vendor/xterm-addon-webgl`)
 - `new Terminal()`, `new FitAddon.FitAddon()` → `new FitAddon()` 등 호출 방식 변경
 
 ### highlight.js
@@ -225,15 +238,31 @@ client/js/editor/markdown-preview.js → markdown-preview.ts
 
 ## 5. Express Server Changes
 
+### Vendor static routes 제거
+
+`server/index.ts`에서 xterm 관련 `express.static` 라우트 3개 제거:
+```ts
+// 이 3줄 삭제
+app.use('/vendor/xterm', express.static(...))
+app.use('/vendor/xterm-addon-fit', express.static(...))
+app.use('/vendor/xterm-addon-webgl', express.static(...))
+```
+
 ### Development
 
-- 정적 파일 서빙 코드 제거 또는 `NODE_ENV` 분기
+- `client/` 정적 파일 서빙 코드 제거 또는 `NODE_ENV` 분기
 - Vite dev server가 프론트엔드 담당
 
 ### Production
 
 - `express.static('dist/client')` — 빌드된 파일 서빙
 - WS, API 라우트 변경 없음
+
+### Static Assets
+
+- `fonts/fonts.css`, `styles.css` → `index.html`의 `<link>` 태그 유지 (Vite가 처리)
+- `icons/`, `fonts/`, `favicon.svg` → Vite `publicDir` 설정 또는 HTML 참조를 통해 빌드에 포함
+- 컨트롤 패널 HTML 마크업 → 변경 없음
 
 ## 6. Development & Production Workflow
 
@@ -255,10 +284,17 @@ npm start       # node dist/server/index.js
 # → 브라우저: http://localhost:3000
 ```
 
+## Known Risks
+
+- **xterm HMR**: xterm Terminal 인스턴스는 canvas/WebGL 상태를 보유하여 HMR이 제대로 안 될 수 있음. 터미널 관련 변경 시 full reload 필요할 수 있음.
+- **xterm CSS**: xterm v5의 CSS가 번들러 환경에서 WebGL addon과 호환성 이슈 가능. 발생 시 CSS를 `index.html`에서 직접 로딩으로 롤백.
+- **concurrently 시작 순서**: Express가 준비되기 전에 브라우저가 열리면 WS 연결 실패. Vite의 `server.open` 비활성화 또는 Express 준비 후 열기.
+
 ## Not In Scope
 
 - strict 모드 활성화 (추후 점진적으로)
-- 서버 코드 변경 (API/WS 로직)
+- 서버 코드 변경 (API/WS 로직 — vendor static route 제거는 예외)
 - CSS 변경
 - 기존 로직/함수 시그니처 변경
 - 테스트 프레임워크 도입
+- `control-server/` 디렉토리 및 관련 스크립트 (`dev:control`, `build:control` 등)
