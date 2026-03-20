@@ -1,3 +1,7 @@
+import { Terminal } from 'xterm';
+import { FitAddon } from 'xterm-addon-fit';
+import { WebglAddon } from 'xterm-addon-webgl';
+import 'xterm/css/xterm.css';
 import {
   S,
   terminalMap,
@@ -257,24 +261,22 @@ export function attachTerminal(sessionId, name) {
     allowProposedApi: true,
   });
 
-  const fitAddon = new FitAddon.FitAddon();
+  const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
   term.open(div);
 
   // WebGL renderer for GPU-accelerated rendering (falls back to DOM renderer on failure)
   let webglAddon = null;
-  if (typeof WebglAddon !== 'undefined') {
-    try {
-      webglAddon = new WebglAddon.WebglAddon();
-      webglAddon.onContextLoss(() => {
-        webglAddon.dispose();
-        webglAddon = null;
-      });
-      term.loadAddon(webglAddon);
-    } catch (e) {
+  try {
+    webglAddon = new WebglAddon();
+    webglAddon.onContextLoss(() => {
+      webglAddon.dispose();
       webglAddon = null;
-      console.warn('[webgl] Failed to load WebGL renderer, using DOM renderer:', e.message);
-    }
+    });
+    term.loadAddon(webglAddon);
+  } catch (e) {
+    webglAddon = null;
+    console.warn('[webgl] Failed to load WebGL renderer, using DOM renderer:', e.message);
   }
 
   fitAddon.fit();
