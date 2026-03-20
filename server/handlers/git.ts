@@ -273,6 +273,31 @@ const handlers: Record<string, WsHandler> = {
     const { id, session } = r;
     const filePath = parsed.filePath as string | undefined;
     const staged = (parsed.staged as boolean) || false;
+
+    // Check if file is an image — show preview instead of binary diff
+    if (filePath) {
+      const ext = filePath.replace(/.*\./, '.').toLowerCase();
+      const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico'];
+      if (imageExts.includes(ext)) {
+        const result = gitService.readFileContent(session.cwd, filePath);
+        if (result.isImage && result.imageData && result.imageMime) {
+          ctx.wsSend(
+            ctx.ws,
+            JSON.stringify({
+              type: 'git_diff_data',
+              sessionId: id,
+              filePath,
+              staged,
+              isImage: true,
+              imageData: result.imageData,
+              imageMime: result.imageMime,
+            })
+          );
+          return;
+        }
+      }
+    }
+
     const diff = gitService.getGitDiff(session.cwd, filePath, staged);
     ctx.wsSend(
       ctx.ws,

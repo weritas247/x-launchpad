@@ -285,16 +285,13 @@ export function attachTerminal(sessionId, name) {
   // ─── Scroll-to-bottom tracking ────
   // Track whether user is viewing the bottom of the terminal.
   // Only auto-scroll on new data if user hasn't scrolled up manually.
-  let _userAtBottom = true;
+  const scrollState = { userAtBottom: true };
   term.onScroll(() => {
     const buf = term.buffer.active;
     const viewportTop = buf.viewportY;
     const maxScroll = buf.baseY;
-    // Snap to bottom when within 3 lines — fixes mouse wheel not reaching true bottom
-    if (maxScroll - viewportTop <= 3 && maxScroll - viewportTop > 0) {
-      term.scrollToBottom();
-    }
-    _userAtBottom = viewportTop >= maxScroll;
+    // 1-line tolerance handles mouse wheel not reaching exact bottom
+    scrollState.userAtBottom = maxScroll - viewportTop <= 1;
   });
 
   // Let app-level keybindings override xterm — execute action immediately
@@ -313,7 +310,7 @@ export function attachTerminal(sessionId, name) {
       streamWrite(sessionId, term, event.data);
       aiNotifyCheck(sessionId, event.data);
       tabStatusCheck(sessionId, event.data);
-      if (_userAtBottom) term.scrollToBottom();
+      if (scrollState.userAtBottom) term.scrollToBottom();
     };
     dataWs.onclose = () => {
       // Reconnect after 2s if session still exists
@@ -378,7 +375,7 @@ export function attachTerminal(sessionId, name) {
   const sidebarEl = createSidebarItem(sessionId, name);
   const tabEl = createTab(sessionId, name);
 
-  terminalMap.set(sessionId, { term, fitAddon, webglAddon, div, tabEl, sidebarEl, dataWs });
+  terminalMap.set(sessionId, { term, fitAddon, webglAddon, div, tabEl, sidebarEl, dataWs, scrollState });
   hideEmptyState();
   updateStatusBar();
 }

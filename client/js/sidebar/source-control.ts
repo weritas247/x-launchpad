@@ -358,7 +358,12 @@ export function handleGitDiffData(msg) {
   }
   if (diffLoading) diffLoading.style.display = 'none';
   if (diffContent) {
-    if (msg.diff) {
+    if (msg.isImage && msg.imageData && msg.imageMime) {
+      diffContent.innerHTML =
+        `<div class="diff-image-viewer">` +
+        `<img src="data:${escHtml(msg.imageMime)};base64,${msg.imageData}" alt="${escHtml(msg.filePath || '')}" />` +
+        `</div>`;
+    } else if (msg.diff) {
       diffContent.innerHTML = renderDiffHtml(msg.diff);
     } else {
       diffContent.innerHTML = '<div class="diff-ctx diff-meta">No changes</div>';

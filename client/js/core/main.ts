@@ -470,9 +470,9 @@ function navigateSplitPane(dir) {
 }
 
 window.addEventListener('resize', () => {
-  terminalMap.forEach(({ fitAddon, term }) => {
+  terminalMap.forEach(({ fitAddon, term, scrollState }) => {
     fitAddon.fit();
-    term.scrollToBottom();
+    if (!scrollState || scrollState.userAtBottom) term.scrollToBottom();
   });
 });
 
