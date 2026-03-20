@@ -1233,8 +1233,20 @@ function getActiveAiTasks() {
   for (const plan of plans) {
     if (!plan.ai_sessions) continue;
     for (const s of plan.ai_sessions) {
-      // headless 세션은 headlessJobs Map에서 별도 수집 — 중복 방지
-      if (s.mode === 'headless') continue;
+      if (s.mode === 'headless') {
+        // headlessJobs Map에 이미 있으면 중복 방지로 스킵 (아래에서 별도 수집)
+        if (headlessJobs.has(s.sessionId)) continue;
+        // 완료된 headless 세션은 History 탭에서 표시
+        if (plan.ai_done || plan.status === 'done') continue;
+        // 미완료 headless 세션 — DB에서 로드됨 (서버 재시작 등으로 headlessJobs에 없는 경우)
+        tasks.push({
+          planId: plan.id,
+          planTitle: plan.title || 'Untitled',
+          planStatus: plan.status,
+          ...s,
+        });
+        continue;
+      }
       tasks.push({
         planId: plan.id,
         planTitle: plan.title || 'Untitled',
@@ -1254,7 +1266,7 @@ function getActiveAiTasks() {
       pending: true,
     });
   }
-  // Include running headless jobs
+  // Include running headless jobs (in-memory tracking)
   for (const [sessionId, info] of headlessJobs) {
     tasks.push({
       planId: info.planId,
@@ -1318,9 +1330,36 @@ function renderAiDashCard(t) {
   </div>`;
 }
 
+function getCompletedHeadlessTasks() {
+  const historySessionIds = new Set(headlessHistory.map((h) => h.sessionId));
+  const tasks = [...headlessHistory].reverse().map((h) => {
+    const plan = plans.find((p) => p.id === h.planId);
+    return { ...h, planTitle: plan?.title || 'Untitled', planStatus: h.status };
+  });
+  for (const plan of plans) {
+    if (!plan.ai_sessions) continue;
+    for (const s of plan.ai_sessions) {
+      if (s.mode !== 'headless') continue;
+      if (historySessionIds.has(s.sessionId)) continue;
+      if (headlessJobs.has(s.sessionId)) continue;
+      if (plan.ai_done || plan.status === 'done') {
+        tasks.push({
+          ...s,
+          planId: plan.id,
+          planTitle: plan.title || 'Untitled',
+          planStatus: plan.status,
+          status: 'done',
+        });
+      }
+    }
+  }
+  return tasks;
+}
+
 function renderAiDashboard() {
   const tasks = getActiveAiTasks();
-  const historyCount = headlessHistory.length;
+  const historyTasks = getCompletedHeadlessTasks();
+  const historyCount = historyTasks.length;
   const activeCount = tasks.length;
 
   // 탭 헤더
@@ -1336,19 +1375,11 @@ function renderAiDashboard() {
     }
     aiDashBody.innerHTML = tabsHtml + tasks.map(renderAiDashCard).join('');
   } else {
-    if (!historyCount) {
+    if (!historyTasks.length) {
       aiDashBody.innerHTML = tabsHtml + '<div class="ai-dash-empty">완료된 작업이 없습니다</div>';
       return;
     }
-    const items = [...headlessHistory].reverse().map((h) => {
-      const plan = plans.find((p) => p.id === h.planId);
-      return renderAiDashCard({
-        ...h,
-        planTitle: plan?.title || 'Untitled',
-        planStatus: h.status,
-      });
-    });
-    aiDashBody.innerHTML = tabsHtml + items.join('');
+    aiDashBody.innerHTML = tabsHtml + historyTasks.map(renderAiDashCard).join('');
   }
 }
 
