@@ -60,7 +60,7 @@ export function createPlansRouter(wss: WebSocketServer): Router {
   router.put('/:id', async (req, res) => {
     const payload = requireAuth(req, res);
     if (!payload) return;
-    const { title, content, category, status, use_worktree } = req.body || {};
+    const { title, content, category, status, use_worktree, use_headless } = req.body || {};
     try {
       const plan = await userDb.updatePlan(payload.userId, req.params.id, {
         title,
@@ -68,6 +68,7 @@ export function createPlansRouter(wss: WebSocketServer): Router {
         category,
         status,
         use_worktree,
+        use_headless,
       });
       res.json({ ok: true, plan });
     } catch (e) {

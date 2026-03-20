@@ -81,6 +81,7 @@ export interface PlanRow {
   status: string;
   ai_done: boolean;
   use_worktree: boolean;
+  use_headless: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -93,6 +94,17 @@ export async function getPlans(userId: number): Promise<PlanRow[]> {
     .order('updated_at', { ascending: false });
   if (error) throw error;
   return (data || []) as PlanRow[];
+}
+
+export async function getPlan(userId: number, planId: string): Promise<PlanRow | null> {
+  const { data, error } = await supabase
+    .from('plans')
+    .select('*')
+    .eq('id', planId)
+    .eq('user_id', userId)
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data as PlanRow | null;
 }
 
 export async function createPlan(
@@ -118,7 +130,7 @@ export async function createPlan(
 export async function updatePlan(
   userId: number,
   planId: string,
-  updates: { title?: string; content?: string; category?: string; status?: string; use_worktree?: boolean }
+  updates: { title?: string; content?: string; category?: string; status?: string; use_worktree?: boolean; use_headless?: boolean }
 ): Promise<PlanRow> {
   const { data, error } = await supabase
     .from('plans')
@@ -217,7 +229,7 @@ export async function appendPlanLog(
   if (log.type === 'summary') {
     const { data: updated } = await supabase
       .from('plans')
-      .update({ ai_done: true })
+      .update({ ai_done: true, status: 'done' })
       .eq('id', planId)
       .select()
       .single();

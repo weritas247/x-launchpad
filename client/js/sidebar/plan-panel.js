@@ -596,9 +596,17 @@ async function loadPlanLogs(planId) {
 }
 
 // ─── Toast ───────────────────────────────────────────
-export function showPlanToast(planId, title, status) {
+export function showPlanToast(planId, title) {
+  // Update local plan data: AI completed → move to DONE
+  const plan = plans.find((p) => p.id === planId);
+  if (plan) {
+    plan.ai_done = true;
+    plan.status = 'done';
+    if (currentView === 'board') renderBoard();
+    else renderList();
+  }
   if (!toastContainer) return;
-  const statusLabel = STATUS_LABELS[status] || status;
+  const statusLabel = STATUS_LABELS['done'];
   const toast = document.createElement('div');
   toast.className = 'plan-toast';
   toast.innerHTML = `
@@ -1086,9 +1094,11 @@ function renderAiDashboard() {
       const statusCls = t.pending ? ' pending' : '';
       const statusText = t.pending
         ? '대기중…'
-        : t.planStatus === 'doing'
-          ? '작업중'
-          : t.planStatus || '—';
+        : t.planStatus === 'done'
+          ? '✅ 완료'
+          : t.planStatus === 'doing'
+            ? '작업중'
+            : t.planStatus || '—';
       const sid = t.sessionId || '';
       return `<div class="ai-dash-card" data-session-id="${escHtml(sid)}">
       <img class="ai-dash-card-icon" src="${escHtml(icon)}" alt="${escHtml(label)}">

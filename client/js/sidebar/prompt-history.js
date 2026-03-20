@@ -7,6 +7,14 @@
 import { S, terminalMap, sessionMeta, stripAnsi } from '../core/state.js';
 import { wsSend } from '../core/websocket.js';
 
+function fitActiveTerminal() {
+  const entry = terminalMap.get(S.activeSessionId);
+  if (entry?.fitAddon) {
+    // Wait for CSS transition to complete before fitting
+    setTimeout(() => entry.fitAddon.fit(), 220);
+  }
+}
+
 const panelList = document.getElementById('input-panel-list');
 const panel = document.getElementById('input-panel');
 const toggle = document.getElementById('input-panel-toggle');
@@ -25,6 +33,7 @@ let claudePollTimer = null;
 export function toggleInputPanel() {
   panel.classList.toggle('collapsed');
   toggle.textContent = panel.classList.contains('collapsed') ? '▸' : '◂';
+  fitActiveTerminal();
 }
 
 export function initInputPanel() {
@@ -242,10 +251,12 @@ export function onSessionChange() {
     toggle.textContent = '◂';
     fetchClaudePrompts(S.activeSessionId);
     startClaudePoll();
+    fitActiveTerminal();
   } else {
     // Hide panel entirely for non-Claude sessions
     panel.classList.add('hidden');
     stopClaudePoll();
+    fitActiveTerminal();
   }
   renderPanel();
 }

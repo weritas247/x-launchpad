@@ -247,7 +247,7 @@ function handleMessage(msg) {
   } else if (msg.type === 'file_op_ack') {
     handleFileOpAck(msg);
   } else if (msg.type === 'plan_ai_done') {
-    showPlanToast(msg.planId, msg.planTitle, msg.planStatus);
+    showPlanToast(msg.planId, msg.planTitle);
   }
 }
 
