@@ -103,7 +103,9 @@ import {
   updateAiTasksBadge,
 } from '../sidebar/plan-panel';
 import { initControlPanel } from '../terminal/control-panel';
-import '../ui/mobile'; // auto-initializes mobile UI
+// Side-effect imports — modules with self-initializing code
+import '../ui/scroll-float'
+import '../ui/mobile'
 
 S.currentTheme = THEMES[0];
 
