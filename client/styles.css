@@ -6675,16 +6675,42 @@ body::after {
   background: rgba(255, 255, 255, 0.03);
   border-radius: 6px;
   padding: 6px;
+  border-top: 3px solid transparent;
+}
+.plan-board-col[data-status='todo'] {
+  border-top-color: #64b5f6;
+  background: rgba(100, 181, 246, 0.04);
+}
+.plan-board-col[data-status='doing'] {
+  border-top-color: #ffb74d;
+  background: rgba(255, 183, 77, 0.04);
+}
+.plan-board-col[data-status='done'] {
+  border-top-color: #81c784;
+  background: rgba(129, 199, 132, 0.04);
+}
+.plan-board-col[data-status='on_hold'] {
+  border-top-color: #b39ddb;
+  background: rgba(179, 157, 219, 0.04);
+}
+.plan-board-col[data-status='cancelled'] {
+  border-top-color: #e57373;
+  background: rgba(229, 115, 115, 0.04);
 }
 .plan-board-col-header {
   text-align: center;
-  font-size: 11px;
+  font-size: calc(var(--kanban-font-size, 12px) - 1px);
   font-weight: 600;
   color: #888;
   text-transform: uppercase;
   padding: 6px 0;
   letter-spacing: 0.5px;
 }
+.plan-board-col[data-status='todo'] .plan-board-col-header { color: #64b5f6; }
+.plan-board-col[data-status='doing'] .plan-board-col-header { color: #ffb74d; }
+.plan-board-col[data-status='done'] .plan-board-col-header { color: #81c784; }
+.plan-board-col[data-status='on_hold'] .plan-board-col-header { color: #b39ddb; }
+.plan-board-col[data-status='cancelled'] .plan-board-col-header { color: #e57373; }
 .plan-board-col-header .plan-board-count {
   background: rgba(255, 255, 255, 0.1);
   padding: 1px 6px;
@@ -6692,6 +6718,11 @@ body::after {
   font-size: 10px;
   margin-left: 4px;
 }
+.plan-board-col[data-status='todo'] .plan-board-count { background: rgba(100, 181, 246, 0.2); color: #64b5f6; }
+.plan-board-col[data-status='doing'] .plan-board-count { background: rgba(255, 183, 77, 0.2); color: #ffb74d; }
+.plan-board-col[data-status='done'] .plan-board-count { background: rgba(129, 199, 132, 0.2); color: #81c784; }
+.plan-board-col[data-status='on_hold'] .plan-board-count { background: rgba(179, 157, 219, 0.2); color: #b39ddb; }
+.plan-board-col[data-status='cancelled'] .plan-board-count { background: rgba(229, 115, 115, 0.2); color: #e57373; }
 .plan-board-cards {
   flex: 1;
   overflow-y: auto;
@@ -6749,13 +6780,13 @@ body::after {
   border-left-color: #4caf50;
 }
 .plan-board-card[data-cat='bug'] {
-  border-left-color: #ff9800;
+  border-left-color: #ef5350;
 }
 .plan-board-card[data-cat='other'] {
   border-left-color: #2196f3;
 }
 .plan-board-card-title {
-  font-size: 12px;
+  font-size: var(--kanban-font-size, 12px);
   color: #ddd;
   margin-bottom: 2px;
   white-space: nowrap;
@@ -6763,7 +6794,7 @@ body::after {
   text-overflow: ellipsis;
 }
 .plan-board-card-preview {
-  font-size: 10px;
+  font-size: calc(var(--kanban-font-size, 12px) - 2px);
   color: #777;
   white-space: nowrap;
   overflow: hidden;
