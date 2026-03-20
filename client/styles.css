@@ -2930,13 +2930,6 @@ body::after {
     color: var(--accent);
 }
 
-#sb-claude-usage {
-    transition: color 0.15s;
-}
-
-#sb-claude-usage:hover {
-    color: var(--accent);
-}
 
 /* ═══════════════════════════════════════════════════
    SETTINGS MODAL
@@ -8157,6 +8150,36 @@ body::after {
 }
 .ai-dash-card-status.headless {
     color: #ff9800;
+}
+.ai-dash-card-status.done {
+    color: #4caf50;
+}
+.ai-dash-card-status.failed {
+    color: #ff5252;
+}
+.ai-dash-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #333;
+}
+.ai-dash-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #888;
+    padding: 6px 0;
+    font-size: 12px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+.ai-dash-tab:hover {
+    color: #ccc;
+}
+.ai-dash-tab.active {
+    color: #fff;
+    border-bottom-color: #7c3aed;
 }
 
 .plan-board-card-ai-badge {

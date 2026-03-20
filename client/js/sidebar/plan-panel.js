@@ -965,6 +965,8 @@ export function initPlanPanel() {
 const pendingAiSessions = new Map();
 // Map: sessionId → { planId, ai, status } — headless 작업 추적
 const headlessJobs = new Map();
+// 완료/실패된 headless 작업 히스토리
+const headlessHistory = [];
 
 let _pendingAiAssign = null;
 
@@ -1113,6 +1115,7 @@ export function onHeadlessStarted({ planId, sessionId }) {
 // Called from main.js when headless_done arrives
 export function onHeadlessDone({ planId, sessionId, result }) {
   headlessJobs.delete(sessionId);
+  headlessHistory.push({ planId, sessionId, ai: 'claude', status: 'done', ts: Date.now() });
 
   const plan = plans.find((p) => p.id === planId);
   if (plan) {
@@ -1146,7 +1149,9 @@ export function onHeadlessDone({ planId, sessionId, result }) {
 
 // Called from main.js when headless_failed arrives
 export function onHeadlessFailed({ sessionId, error }) {
+  const job = headlessJobs.get(sessionId);
   headlessJobs.delete(sessionId);
+  headlessHistory.push({ planId: job?.planId, sessionId, ai: 'claude', status: 'failed', error, ts: Date.now() });
 
   renderBoard();
   updateCount();
@@ -1188,6 +1193,8 @@ function getActiveAiTasks() {
   for (const plan of plans) {
     if (!plan.ai_sessions) continue;
     for (const s of plan.ai_sessions) {
+      // headless 세션은 headlessJobs Map에서 별도 수집 — 중복 방지
+      if (s.mode === 'headless') continue;
       tasks.push({
         planId: plan.id,
         planTitle: plan.title || 'Untitled',
@@ -1229,20 +1236,19 @@ export function updateAiTasksBadge() {
   sbAiTasksCount.textContent = count;
 }
 
-function renderAiDashboard() {
-  const tasks = getActiveAiTasks();
-  if (!tasks.length) {
-    aiDashBody.innerHTML = '<div class="ai-dash-empty">활성 AI 작업이 없습니다</div>';
-    return;
-  }
-  aiDashBody.innerHTML = tasks
-    .map((t) => {
-      const reg = AI_REGISTRY[t.ai] || {};
-      const icon = reg.icon || 'icons/codex.png';
-      const label = reg.label || t.ai;
-      const isHeadless = t.mode === 'headless';
-      const statusCls = t.pending ? ' pending' : isHeadless ? ' headless' : '';
-      const statusText = t.pending
+let aiDashTab = 'active'; // 'active' | 'history'
+
+function renderAiDashCard(t) {
+  const reg = AI_REGISTRY[t.ai] || {};
+  const icon = reg.icon || 'icons/codex.png';
+  const label = reg.label || t.ai;
+  const isHeadless = t.mode === 'headless';
+  const statusCls = t.pending ? ' pending' : isHeadless ? ' headless' : t.status === 'done' ? ' done' : t.status === 'failed' ? ' failed' : '';
+  const statusText = t.status === 'done'
+    ? '✅ 완료'
+    : t.status === 'failed'
+      ? '❌ 실패'
+      : t.pending
         ? '대기중…'
         : isHeadless
           ? '⚡ 실행중'
@@ -1251,20 +1257,55 @@ function renderAiDashboard() {
             : t.planStatus === 'doing'
               ? '작업중'
               : t.planStatus || '—';
-      const sid = t.sessionId || '';
-      return `<div class="ai-dash-card" data-session-id="${escHtml(sid)}">
-      <img class="ai-dash-card-icon" src="${escHtml(icon)}" alt="${escHtml(label)}">
-      <div class="ai-dash-card-info">
-        <div class="ai-dash-card-plan">${escHtml(t.planTitle)}</div>
-        <div class="ai-dash-card-meta">${escHtml(label)} · ${escHtml(sid.slice(-8))}</div>
-      </div>
-      <span class="ai-dash-card-status${statusCls}">${statusText}</span>
-      ${isHeadless
-        ? `<button class="ai-dash-card-cancel" data-plan-id="${escHtml(t.planId)}" data-sid="${escHtml(sid)}">취소</button>`
-        : sid ? `<button class="ai-dash-card-go" data-sid="${escHtml(sid)}">이동 →</button>` : ''}
-    </div>`;
-    })
-    .join('');
+  const sid = t.sessionId || '';
+  const actionBtn = t.status === 'done' || t.status === 'failed'
+    ? ''
+    : isHeadless
+      ? `<button class="ai-dash-card-cancel" data-plan-id="${escHtml(t.planId)}" data-sid="${escHtml(sid)}">취소</button>`
+      : sid ? `<button class="ai-dash-card-go" data-sid="${escHtml(sid)}">이동 →</button>` : '';
+  return `<div class="ai-dash-card" data-session-id="${escHtml(sid)}">
+    <img class="ai-dash-card-icon" src="${escHtml(icon)}" alt="${escHtml(label)}">
+    <div class="ai-dash-card-info">
+      <div class="ai-dash-card-plan">${escHtml(t.planTitle)}</div>
+      <div class="ai-dash-card-meta">${escHtml(label)} · ${escHtml(sid.slice(-8))}</div>
+    </div>
+    <span class="ai-dash-card-status${statusCls}">${statusText}</span>
+    ${actionBtn}
+  </div>`;
+}
+
+function renderAiDashboard() {
+  const tasks = getActiveAiTasks();
+  const historyCount = headlessHistory.length;
+  const activeCount = tasks.length;
+
+  // 탭 헤더
+  const tabsHtml = `<div class="ai-dash-tabs">
+    <button class="ai-dash-tab${aiDashTab === 'active' ? ' active' : ''}" data-tab="active">활성 (${activeCount})</button>
+    <button class="ai-dash-tab${aiDashTab === 'history' ? ' active' : ''}" data-tab="history">완료 (${historyCount})</button>
+  </div>`;
+
+  if (aiDashTab === 'active') {
+    if (!tasks.length) {
+      aiDashBody.innerHTML = tabsHtml + '<div class="ai-dash-empty">활성 AI 작업이 없습니다</div>';
+      return;
+    }
+    aiDashBody.innerHTML = tabsHtml + tasks.map(renderAiDashCard).join('');
+  } else {
+    if (!historyCount) {
+      aiDashBody.innerHTML = tabsHtml + '<div class="ai-dash-empty">완료된 작업이 없습니다</div>';
+      return;
+    }
+    const items = [...headlessHistory].reverse().map((h) => {
+      const plan = plans.find((p) => p.id === h.planId);
+      return renderAiDashCard({
+        ...h,
+        planTitle: plan?.title || 'Untitled',
+        planStatus: h.status,
+      });
+    });
+    aiDashBody.innerHTML = tabsHtml + items.join('');
+  }
 }
 
 export function openAiDashboard() {
@@ -1283,6 +1324,12 @@ aiDashOverlay?.addEventListener('click', (e) => {
   if (e.target === aiDashOverlay) closeAiDashboard();
 });
 aiDashBody?.addEventListener('click', (e) => {
+  const tab = e.target.closest('.ai-dash-tab');
+  if (tab) {
+    aiDashTab = tab.dataset.tab;
+    renderAiDashboard();
+    return;
+  }
   const cancelBtn = e.target.closest('.ai-dash-card-cancel');
   if (cancelBtn) {
     const planId = cancelBtn.dataset.planId;

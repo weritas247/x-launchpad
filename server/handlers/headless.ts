@@ -115,13 +115,18 @@ export async function startHeadless(
         // JSON 파싱 실패 시 raw stdout 사용
       }
 
-      // 카드 content에 append
+      // 카드 content에 append + 액티비티 로그 기록
       try {
         const plan = await userDb.getPlan(userId, planId);
         if (plan) {
           const newContent = (plan.content || '') + '\n\n---\n**AI 결과 (headless):**\n' + resultText;
           await userDb.updatePlan(userId, planId, { content: newContent });
-          await userDb.updatePlanStatus(userId, planId, 'done');
+          // appendPlanLog with type 'summary' triggers ai_done + status 'done'
+          await userDb.appendPlanLog(userId, {
+            plan_id: planId,
+            type: 'summary',
+            content: `[headless] ${resultText.slice(0, 500)}`,
+          });
         }
       } catch (err) {
         console.error('[headless] failed to update plan:', err);
