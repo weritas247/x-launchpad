@@ -829,7 +829,10 @@ export function initPlanPanel() {
         const sid = badge.dataset.sessionId;
         // headless 세션은 탭 전환 안 함
         if (sid && headlessJobs.has(sid)) return;
-        if (sid) openOrActivateSession(sid);
+        if (sid) {
+          openOrActivateSession(sid);
+          closePlanModal();
+        }
         return;
       }
     },
