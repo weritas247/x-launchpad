@@ -132,7 +132,8 @@ if (process.env.NODE_ENV === 'production') {
 // Auth endpoints (extracted to routes/auth.ts)
 app.use('/api/auth', createAuthRouter());
 app.get('/login', (_req, res) => {
-  res.sendFile(path.join(PROJECT_ROOT, 'client/login.html'));
+  const clientDir = process.env.NODE_ENV === 'production' ? 'dist/client' : 'client/public';
+  res.sendFile(path.join(PROJECT_ROOT, clientDir, 'login.html'));
 });
 
 // Settings endpoints
