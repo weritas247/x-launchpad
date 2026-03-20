@@ -473,6 +473,10 @@ body::after {
     display: none;
 }
 
+#app:has(#sidebar.collapsed) {
+    grid-template-columns: var(--activity-bar-w) 0 0 1fr;
+}
+
 .sidebar-resize {
     grid-area: resize;
     cursor: col-resize;

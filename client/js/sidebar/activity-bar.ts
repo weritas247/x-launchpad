@@ -1,6 +1,7 @@
 // ─── ACTIVITY BAR (LEFT ICON BAR) ────────────────────────────────
 import { requestFileTree } from './explorer';
 import { requestGitStatus, startScPoll, stopScPoll } from './source-control';
+import { refitAllPanes } from '../terminal/split-pane';
 
 const ICON_ORDER_KEY = 'x-launchpad-activity-order';
 
@@ -581,11 +582,15 @@ export function switchPanel(panel) {
   sidebar.classList.remove('collapsed');
 
   triggerPanelLoad(panel);
+  // Refit terminals after grid layout change
+  setTimeout(() => refitAllPanes(), 50);
 }
 
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
   sidebar.classList.toggle('collapsed');
+  // Refit terminals after grid layout change
+  setTimeout(() => refitAllPanes(), 50);
 }
 
 export { toggleSidebar as toggleSidebarExport };

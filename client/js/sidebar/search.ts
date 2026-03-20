@@ -51,6 +51,7 @@ export function initSearch() {
       debounceTimer = setTimeout(doSearch, 300);
     });
     input.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') { e.preventDefault(); return; }
       if (e.key === 'Enter') {
         clearTimeout(debounceTimer);
         doSearch();
@@ -80,6 +81,7 @@ export function initSearch() {
     });
   if (includeInput)
     includeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') { e.preventDefault(); return; }
       if (e.key === 'Enter' && lastQuery) doSearch();
     });
 
@@ -91,6 +93,11 @@ export function initSearch() {
       replaceToggle.textContent = replaceVisible ? '▾' : '▸';
     });
   }
+
+  if (replaceInput)
+    replaceInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') { e.preventDefault(); return; }
+    });
 
   // Replace in file / Replace all
   if (replaceBtn)
