@@ -506,6 +506,18 @@ function createSession(
             }
           }
         } catch {}
+        // If an AI process is detected, use its cwd instead of the shell's
+        if (newAiPid) {
+          try {
+            const { stdout: aiLsof } = await execFileAsync(
+              'lsof',
+              ['-p', String(newAiPid), '-a', '-d', 'cwd', '-Fn'],
+              { encoding: 'utf-8', timeout: 500 }
+            );
+            const aiMatch = aiLsof.match(/\nn(.+)/);
+            if (aiMatch) newCwd = aiMatch[1].trim();
+          } catch {}
+        }
         if (newCwd !== session.cwd || newAi !== session.ai || newAiPid !== session.aiPid) {
           session.cwd = newCwd;
           session.ai = newAi;
