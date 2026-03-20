@@ -12,7 +12,9 @@
       "Bash(npm run build:editor:*)",
       "WebFetch(domain:super-terminal.win)",
       "Bash(lsof:*)",
-      "Bash(tr:*)"
+      "Bash(tr:*)",
+      "Skill(hookify:hookify)",
+      "Skill(hookify:hookify:*)"
     ]
   },
   "hooks": {

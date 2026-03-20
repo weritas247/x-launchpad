@@ -4,7 +4,7 @@ import { requestGitStatus } from './source-control.js';
 
 const ICON_ORDER_KEY = 'x-launchpad-activity-order';
 
-let activePanel = 'search';
+let activePanel = 'source-control';
 const splits = []; // [{ id, primary, secondary, ratio, btnEl }]
 let activeSplitId = null; // currently shown split's id (null = single panel view)
 let splitIdCounter = 0;
@@ -32,12 +32,16 @@ function restoreIconOrder() {
     bar.querySelectorAll('.activity-btn[data-panel]').forEach((b) => {
       btnMap[b.dataset.panel] = b;
     });
-    // Reorder: append in saved order, skip unknown
+    // source-control is always first
+    if (btnMap['source-control']) bar.appendChild(btnMap['source-control']);
+    // Reorder: append in saved order, skip unknown and source-control
     for (const panel of saved) {
+      if (panel === 'source-control') continue;
       if (btnMap[panel]) bar.appendChild(btnMap[panel]);
     }
     // Append any remaining buttons not in saved order
     Object.keys(btnMap).forEach((p) => {
+      if (p === 'source-control') return;
       if (!saved.includes(p)) bar.appendChild(btnMap[p]);
     });
   } catch {}

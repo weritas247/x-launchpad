@@ -39,6 +39,7 @@ let activeCategory = 'all';
 let saveTimer = null;
 let currentView = localStorage.getItem('plan-view') || 'list';
 let ctxTargetPlanId = null;
+let collapsedCols = JSON.parse(localStorage.getItem('plan-collapsed-cols') || '[]');
 
 const STATUSES = ['todo', 'doing', 'done', 'on_hold', 'cancelled'];
 const STATUS_LABELS = {
@@ -364,6 +365,7 @@ function renderBoard() {
       })
       .join('');
   }
+  applyColCollapse();
 }
 
 function formatDate(ts) {
@@ -375,6 +377,32 @@ function formatDate(ts) {
   const diff = Math.floor((now - d) / 86400000);
   if (diff === 1) return `Yesterday ${time}`;
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`;
+}
+
+// ─── Column Collapse ─────────────────────────────────
+function toggleColCollapse(status) {
+  const idx = collapsedCols.indexOf(status);
+  if (idx >= 0) collapsedCols.splice(idx, 1);
+  else collapsedCols.push(status);
+  localStorage.setItem('plan-collapsed-cols', JSON.stringify(collapsedCols));
+  applyColCollapse();
+}
+
+function applyColCollapse() {
+  boardEl?.querySelectorAll('.plan-board-col').forEach((col) => {
+    const status = col.dataset.status;
+    col.classList.toggle('collapsed', collapsedCols.includes(status));
+  });
+}
+
+function initColCollapse() {
+  boardEl?.querySelectorAll('.plan-board-col-header').forEach((header) => {
+    header.style.cursor = 'pointer';
+    header.addEventListener('click', () => {
+      const col = header.closest('.plan-board-col');
+      if (col) toggleColCollapse(col.dataset.status);
+    });
+  });
 }
 
 // ─── Drag and Drop ───────────────────────────────────
@@ -810,7 +838,8 @@ export function initPlanPanel() {
   // Close context menu on click elsewhere
   document.addEventListener('click', () => hidePlanCtxMenu());
 
-  // Init drag and drop
+  // Init column collapse and drag and drop
+  initColCollapse();
   initBoardDragDrop();
   initBoardDivider();
 
