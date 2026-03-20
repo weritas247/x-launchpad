@@ -7,6 +7,7 @@ import { openFileTab } from '../editor/file-viewer';
 import { getFileIcon, getFolderIcon } from '../ui/file-icons';
 
 let explorerTree: any[] = [];
+let onTreeUpdate: (() => void) | null = null;
 
 export function getExplorerTree(): any[] {
   return explorerTree;
@@ -14,6 +15,10 @@ export function getExplorerTree(): any[] {
 
 export function getExplorerDir(): string {
   return currentDir;
+}
+
+export function setOnTreeUpdate(cb: (() => void) | null) {
+  onTreeUpdate = cb;
 }
 const expandedDirs = new Set();
 let currentDir = '';
@@ -171,6 +176,7 @@ export function handleFileTreeData(msg) {
   currentDir = msg.dir || '';
   gitStatusMap = msg.gitStatus || {};
   renderExplorer();
+  if (onTreeUpdate) onTreeUpdate();
 }
 
 function renderExplorer() {

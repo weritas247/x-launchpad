@@ -2,7 +2,7 @@ import { S, sessionMeta } from '../core/state';
 import { getCommands, executeCommand, getRecentCommands, getCommand } from '../core/command-registry';
 import { THEMES } from '../core/constants';
 import { applyTheme } from './themes';
-import { getExplorerTree } from '../sidebar/explorer';
+import { getExplorerTree, requestFileTree, setOnTreeUpdate } from '../sidebar/explorer';
 
 type PaletteMode = 'quick-open' | 'command' | 'theme';
 
@@ -43,6 +43,10 @@ export function initCommandPalette() {
 
   input.addEventListener('input', () => onInput());
   input.addEventListener('keydown', (e) => onKeydown(e));
+
+  setOnTreeUpdate(() => {
+    if (isPaletteOpen() && mode === 'quick-open') onInput();
+  });
 }
 
 export function openPalette(initialMode: 'quick-open' | 'command' = 'quick-open') {
@@ -51,6 +55,10 @@ export function openPalette(initialMode: 'quick-open' | 'command' = 'quick-open'
   overlay.classList.add('open');
   input.value = initialMode === 'command' ? '> ' : '';
   input.focus();
+  // Ensure file tree is loaded for quick-open search
+  if (initialMode === 'quick-open' && getExplorerTree().length === 0) {
+    requestFileTree();
+  }
   onInput();
 }
 
@@ -68,6 +76,13 @@ export function closePalette() {
 
 export function isPaletteOpen(): boolean {
   return overlay.classList.contains('open');
+}
+
+/** Called when file tree data arrives — refresh list if palette is open in quick-open mode */
+export function onFileTreeUpdated() {
+  if (isPaletteOpen() && mode === 'quick-open') {
+    onInput();
+  }
 }
 
 // ═══════════════════════════════════════════════════
