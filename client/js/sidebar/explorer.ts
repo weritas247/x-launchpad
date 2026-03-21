@@ -8,6 +8,7 @@ import { getFileIcon, getFolderIcon } from '../ui/file-icons';
 
 let explorerTree: any[] = [];
 let onTreeUpdate: (() => void) | null = null;
+let pendingRevealPath: string | null = null;
 
 export function getExplorerTree(): any[] {
   return explorerTree;
@@ -197,6 +198,12 @@ function renderExplorer() {
 
   container.innerHTML = '';
   renderTreeLevel(container, explorerTree, 0);
+
+  // Re-apply pending highlight after DOM rebuild
+  if (pendingRevealPath) {
+    const revealPath = pendingRevealPath;
+    requestAnimationFrame(() => applyRevealHighlight(revealPath, container));
+  }
 }
 
 function renderTreeLevel(parent, entries, depth) {
@@ -298,6 +305,46 @@ export function handleFileReadData(msg) {
 
 export function onExplorerSessionChange() {
   requestFileTree();
+}
+
+function applyRevealHighlight(filePath: string, container: HTMLElement) {
+  const item = container.querySelector(`.explorer-item[data-path="${CSS.escape(filePath)}"]`) as HTMLElement;
+  if (!item) return;
+
+  // Scroll to 1/3 from top
+  const containerRect = container.getBoundingClientRect();
+  const itemRect = item.getBoundingClientRect();
+  const targetOffset = containerRect.height / 3;
+  const itemRelativeTop = itemRect.top - containerRect.top + container.scrollTop;
+  container.scrollTo({ top: itemRelativeTop - targetOffset, behavior: 'smooth' });
+
+  // Remove previous highlight, re-trigger animation
+  document.querySelectorAll('.explorer-highlight').forEach(el => el.classList.remove('explorer-highlight'));
+  // Force reflow to restart animation even if same element
+  void item.offsetWidth;
+  item.classList.add('explorer-highlight');
+}
+
+export function revealFileInExplorer(filePath: string) {
+  // Expand all parent directories
+  const parts = filePath.split('/');
+  for (let i = 1; i < parts.length; i++) {
+    const dirPath = parts.slice(0, i).join('/');
+    expandedDirs.add(dirPath);
+  }
+
+  pendingRevealPath = filePath;
+  renderExplorer();
+
+  // Switch to explorer panel (triggers requestFileTree → renderExplorer → re-applies highlight)
+  import('./activity-bar').then(({ switchPanel }) => {
+    switchPanel('explorer');
+  });
+
+  // Clear pending after animation completes (3s)
+  setTimeout(() => {
+    if (pendingRevealPath === filePath) pendingRevealPath = null;
+  }, 3500);
 }
 
 export function createNewFile() {

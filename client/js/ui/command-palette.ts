@@ -2,7 +2,7 @@ import { S, sessionMeta } from '../core/state';
 import { getCommands, executeCommand, getRecentCommands, getCommand } from '../core/command-registry';
 import { THEMES } from '../core/constants';
 import { applyTheme } from './themes';
-import { getExplorerTree, requestFileTree, setOnTreeUpdate } from '../sidebar/explorer';
+import { getExplorerTree, requestFileTree, setOnTreeUpdate, revealFileInExplorer } from '../sidebar/explorer';
 
 type PaletteMode = 'quick-open' | 'command' | 'theme';
 
@@ -211,6 +211,7 @@ function buildQuickOpenItems(query: string): PaletteItem[] {
       execute: () => {
         const clickEvt = new MouseEvent('click');
         tab.dispatchEvent(clickEvt);
+        revealFileInExplorer(filePath);
       },
     });
   });
@@ -236,6 +237,7 @@ function buildQuickOpenItems(query: string): PaletteItem[] {
           import('../core/websocket').then(({ wsSend }) => {
             wsSend({ type: 'file_read', sessionId: S.activeSessionId, filePath: file.path });
           });
+          revealFileInExplorer(file.path);
         },
       });
     }

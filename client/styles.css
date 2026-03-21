@@ -5740,6 +5740,29 @@ body::after {
     background: var(--bg-hover);
 }
 
+.explorer-item.explorer-highlight {
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+    outline: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+    outline-offset: -1px;
+    border-radius: 3px;
+    animation: explorer-highlight-fade 3s ease-out forwards;
+}
+
+@keyframes explorer-highlight-fade {
+    0% {
+        background: color-mix(in srgb, var(--accent) 30%, transparent);
+        outline-color: color-mix(in srgb, var(--accent) 50%, transparent);
+    }
+    60% {
+        background: color-mix(in srgb, var(--accent) 30%, transparent);
+        outline-color: color-mix(in srgb, var(--accent) 50%, transparent);
+    }
+    100% {
+        background: transparent;
+        outline-color: transparent;
+    }
+}
+
 .explorer-arrow {
     font-size: 9px;
     color: var(--text-ghost);
