@@ -292,14 +292,22 @@ export function attachTerminal(sessionId, name) {
   // ─── Scroll-to-bottom tracking ────
   // Track whether user is viewing the bottom of the terminal.
   // Only auto-scroll on new data if user hasn't scrolled up manually.
+  //
+  // Strategy: detect user-initiated scroll via DOM events (wheel/touch/scrollbar).
+  // When user scrolls up, save their viewport position and restore it after each
+  // term.write() to prevent xterm.js from jumping to the cursor line.
   const scrollState = { userAtBottom: true };
-  term.onScroll(() => {
+
+  // Detect user scroll via wheel or touch on the terminal viewport
+  const viewport = div.querySelector('.xterm-viewport') || div;
+  const updateScrollState = () => {
     const buf = term.buffer.active;
-    const viewportTop = buf.viewportY;
-    const maxScroll = buf.baseY;
-    // 1-line tolerance handles mouse wheel not reaching exact bottom
-    scrollState.userAtBottom = maxScroll - viewportTop <= 1;
-  });
+    scrollState.userAtBottom = buf.baseY - buf.viewportY <= 1;
+  };
+  viewport.addEventListener('wheel', () => requestAnimationFrame(updateScrollState), { passive: true });
+  viewport.addEventListener('touchmove', () => requestAnimationFrame(updateScrollState), { passive: true });
+  // Also detect scrollbar drag
+  viewport.addEventListener('scroll', () => requestAnimationFrame(updateScrollState), { passive: true });
 
   // Let app-level keybindings override xterm — execute action immediately
   term.attachCustomKeyEventHandler((e) => xtermKeyHandler(e));
@@ -319,10 +327,17 @@ export function attachTerminal(sessionId, name) {
         import('../ui/loading-overlay').then(m => m.hideSessionLoading(div));
       }
       // Output from server → terminal (plain text, no framing)
+      // Save viewport position before write — xterm may auto-scroll to cursor
+      const savedLine = scrollState.userAtBottom ? -1 : term.buffer.active.viewportY;
       streamWrite(sessionId, term, event.data);
       aiNotifyCheck(sessionId, event.data);
       tabStatusCheck(sessionId, event.data);
-      if (scrollState.userAtBottom) term.scrollToBottom();
+      if (scrollState.userAtBottom) {
+        term.scrollToBottom();
+      } else if (savedLine >= 0) {
+        // Restore viewport for user who scrolled up — prevent jump to bottom
+        term.scrollToLine(savedLine);
+      }
     };
     dataWs.onclose = () => {
       // Reconnect after 2s if session still exists
