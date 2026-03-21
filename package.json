@@ -22,7 +22,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"server/**/*.ts\" \"client/**/*.{ts,css,html}\"",
     "format:check": "prettier --check \"server/**/*.ts\" \"client/**/*.{ts,css,html}\"",
-    "dev:control": "ts-node --project control-server/tsconfig.json control-server/index.ts",
+    "dev:control": "APP_PORT=5173 ts-node --project control-server/tsconfig.json control-server/index.ts",
     "build:control": "tsc -p control-server/tsconfig.json",
     "start:control": "node dist/control-server/index.js",
     "dev:all": "npm run dev:control",

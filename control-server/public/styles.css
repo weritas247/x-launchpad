@@ -33,6 +33,15 @@ body {
   box-shadow: 0 0 20px rgba(35,134,54,0.3);
   transform: scale(1.05);
 }
+.power-btn.running {
+  border-color: #f85149;
+  color: #f85149;
+  background: rgba(248,81,73,0.1);
+}
+.power-btn.running:hover {
+  background: rgba(248,81,73,0.25);
+  box-shadow: 0 0 20px rgba(248,81,73,0.3);
+}
 .power-btn.starting {
   border-color: #d29922;
   color: #d29922;

@@ -47,10 +47,16 @@ export class ProcessManager extends EventEmitter {
     this.emit('state', this.getState());
 
     const isDev = !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
-    const cmd = isDev ? 'npx' : 'node';
-    const args = isDev
-      ? ['ts-node', 'server/index.ts']
-      : ['dist/server/index.js'];
+    let cmd: string;
+    let args: string[];
+    if (isDev) {
+      cmd = 'npx';
+      args = ['concurrently', '-n', 'vite,server', '-c', 'cyan,yellow',
+        'npx vite --config vite.config.ts', 'ts-node server/index.ts'];
+    } else {
+      cmd = 'node';
+      args = ['dist/server/index.js'];
+    }
 
     this.child = spawn(cmd, args, {
       cwd: this.projectRoot,
@@ -109,6 +115,7 @@ export class ProcessManager extends EventEmitter {
   }
 
   private startReadinessPolling(): void {
+    // dev 모드: 서버(PORT=3000)가 준비되어야 vite 프록시도 동작
     const port = process.env.PORT || 3000;
     this.readinessTimer = setInterval(() => {
       const req = http.get(`http://127.0.0.1:${port}/`, (res) => {

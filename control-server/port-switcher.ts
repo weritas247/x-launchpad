@@ -1,5 +1,6 @@
 import express from 'express';
 import http from 'http';
+import net from 'net';
 import path from 'path';
 
 export class PortSwitcher {
@@ -48,6 +49,30 @@ export class PortSwitcher {
     }
     return new Promise((resolve, reject) => {
       this.miniServer = http.createServer(this.miniApp);
+
+      // WebSocket 프록시: /ws 요청을 control server로 전달
+      this.miniServer.on('upgrade', (req, socket, head) => {
+        if (req.url === '/ws') {
+          const proxySocket = net.createConnection({ host: '127.0.0.1', port: this.controlPort }, () => {
+            proxySocket.write(
+              `GET /ws HTTP/1.1\r\n` +
+              `Host: 127.0.0.1:${this.controlPort}\r\n` +
+              `Upgrade: websocket\r\n` +
+              `Connection: Upgrade\r\n` +
+              `Sec-WebSocket-Key: ${req.headers['sec-websocket-key']}\r\n` +
+              `Sec-WebSocket-Version: ${req.headers['sec-websocket-version']}\r\n` +
+              `\r\n`
+            );
+            proxySocket.pipe(socket as net.Socket);
+            (socket as net.Socket).pipe(proxySocket);
+          });
+          proxySocket.on('error', () => socket.destroy());
+          socket.on('error', () => proxySocket.destroy());
+        } else {
+          socket.destroy();
+        }
+      });
+
       this.miniServer.on('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EADDRINUSE') {
           console.log(`[port-switcher] 포트 ${this.port} 사용 중, 바인딩 스킵`);

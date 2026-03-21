@@ -13,7 +13,7 @@ import { StatsCollector } from './stats-collector';
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const CONTROL_PORT = parseInt(process.env.CONTROL_PORT || '3001');
 const CONTROL_HOST = process.env.CONTROL_HOST || '127.0.0.1';
-const APP_PORT = parseInt(process.env.PORT || '3000');
+const APP_PORT = parseInt(process.env.APP_PORT || process.env.PORT || '3000');
 const AUTO_START = process.env.AUTO_START === '1';
 const SKIP_PORT_SWITCHER = process.env.SKIP_PORT_SWITCHER === '1';
 
@@ -130,13 +130,16 @@ app.post('/api/start', async (_req, res) => {
     res.status(409).json({ error: 'Already running or starting' });
     return;
   }
-  try {
-    await portSwitcher.release();
-    await pm.start();
-    res.json({ ok: true, message: 'Starting...' });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  res.json({ ok: true, message: 'Starting...' });
+  // 응답 전송 후 비동기로 release + start (port-switcher 해제 전에 응답 완료)
+  setImmediate(async () => {
+    try {
+      await portSwitcher.release();
+      await pm.start();
+    } catch (err: any) {
+      console.error('[control] Start failed:', err.message);
+    }
+  });
 });
 
 app.post('/api/stop', async (_req, res) => {
@@ -154,14 +157,16 @@ app.post('/api/stop', async (_req, res) => {
 });
 
 app.post('/api/restart', async (_req, res) => {
-  try {
-    await pm.stop();
-    await portSwitcher.release();
-    await pm.start();
-    res.json({ ok: true, message: 'Restarting...' });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  res.json({ ok: true, message: 'Restarting...' });
+  setImmediate(async () => {
+    try {
+      await pm.stop();
+      await portSwitcher.release();
+      await pm.start();
+    } catch (err: any) {
+      console.error('[control] Restart failed:', err.message);
+    }
+  });
 });
 
 app.get('/api/logs', (req, res) => {
