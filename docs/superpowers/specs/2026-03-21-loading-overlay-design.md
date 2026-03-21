@@ -123,3 +123,5 @@ export function hideSessionLoading(paneEl: HTMLElement): void
 - **WS 재연결 중 세션 전환:** 풀스크린이 이미 표시 중이면 세션 오버레이 생략
 - **다중 패인:** 각 `.term-pane`에 독립적인 세션 오버레이
 - **세션 즉시 전환:** 이미 연결된 세션은 오버레이 불필요 — `terminalMap`에 존재 + data WS open 상태면 스킵
+- **세션 오버레이 숨김 (#2):** `session_attached` AND `dataWs.onopen` 둘 다 필요. 5초 타임아웃 fallback으로 한쪽이 실패해도 오버레이가 영구 표시되지 않도록 방지
+- **세션 복원 타이밍 (#3):** 3초 하드코딩 대신 `unbypassStream()` 호출 시점에 직접 연동하여 타이밍 불일치 방지
