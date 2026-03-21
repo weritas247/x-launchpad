@@ -32,7 +32,7 @@
     "electron:dev": "npm run build && npm run build:electron && electron .",
     "electron:clean-maps": "find dist -name '*.map' -delete 2>/dev/null || true",
     "electron:build": "npm run build && npm run build:electron && npm run electron:clean-maps && node scripts/obfuscate.js && electron-builder",
-    "electron:build:mac": "npm run build && npm run build:electron && npm run electron:clean-maps && node scripts/obfuscate.js && electron-builder --mac"
+    "electron:build:mac": "npm run build && npm run build:electron && npm run electron:clean-maps && node scripts/obfuscate.js && electron-builder --mac && codesign --sign - --force --deep release/mac-arm64/X-Launchpad.app"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

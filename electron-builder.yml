@@ -35,8 +35,7 @@ mac:
     - target: dmg
       arch:
         - arm64
-  identity: null
-  hardenedRuntime: true
+  hardenedRuntime: false
   gatekeeperAssess: false
 
 dmg:
