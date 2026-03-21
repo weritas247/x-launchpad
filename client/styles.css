@@ -1202,8 +1202,20 @@ body::after {
     color: var(--accent);
     background: var(--bg-void);
     border-color: var(--border-lit);
-    border-top: 2px solid var(--accent);
+    border-top: none;
     border-bottom-color: var(--bg-void);
+    position: relative;
+}
+
+.tab.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 4px 4px 0 0;
 }
 
 .tab-indicator {
