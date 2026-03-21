@@ -218,6 +218,21 @@ app.post('/api/reveal-in-finder', (req, res) => {
   });
 });
 
+app.get('/api/npm-scripts', (req, res) => {
+  const sessionId = req.query.sessionId as string;
+  if (!sessionId) return res.status(400).json({ ok: false, error: 'Missing sessionId' });
+  const session = sessions.get(sessionId);
+  const cwd = session?.cwd || currentSettings.shell.startDirectory || env.HOME;
+  const pkgPath = path.join(cwd, 'package.json');
+  if (!fs.existsSync(pkgPath)) return res.json({ ok: true, scripts: {} });
+  try {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    res.json({ ok: true, scripts: pkg.scripts || {} });
+  } catch {
+    res.json({ ok: true, scripts: {} });
+  }
+});
+
 app.get('/api/download', (req, res) => {
   const sessionId = req.query.sessionId as string;
   const filePath = req.query.path as string;

@@ -237,8 +237,8 @@ function hideImagePreview() {
   }, 200);
 }
 
-// Wire up close handlers once DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+// Wire up close handlers — module scripts are deferred, DOM is already ready
+function initPreviewHandlers() {
   const overlay = document.getElementById('img-preview-overlay');
   const closeBtn = document.getElementById('img-preview-close');
   if (overlay)
@@ -249,7 +249,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && overlay?.classList.contains('active')) hideImagePreview();
   });
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initPreviewHandlers);
+} else {
+  initPreviewHandlers();
+}
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
 export function setupTerminalImageHandlers(div, sessionId) {

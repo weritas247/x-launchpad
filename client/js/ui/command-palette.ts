@@ -16,6 +16,10 @@ let activeIndex = 0;
 let currentItems: PaletteItem[] = [];
 let savedTheme: any = null;
 
+// npm scripts cache
+let cachedNpmScripts: Record<string, string> = {};
+let npmScriptsCwd: string | null = null;
+
 interface PaletteItem {
   id: string;
   label: string;
@@ -59,6 +63,8 @@ export function openPalette(initialMode: 'quick-open' | 'command' = 'quick-open'
   if (initialMode === 'quick-open' && getExplorerTree().length === 0) {
     requestFileTree();
   }
+  // Fetch npm scripts for the active session's cwd
+  fetchNpmScripts();
   onInput();
 }
 
@@ -283,6 +289,52 @@ function buildThemeItems(query: string): PaletteItem[] {
     .sort((a, b) => (b as any).score - (a as any).score) as PaletteItem[];
 }
 
+function fetchNpmScripts() {
+  if (!S.activeSessionId) return;
+  const meta = sessionMeta.get(S.activeSessionId);
+  const cwd = meta?.cwd || null;
+  if (cwd === npmScriptsCwd && Object.keys(cachedNpmScripts).length > 0) return;
+  npmScriptsCwd = cwd;
+  import('../core/websocket').then(({ apiFetch }) => {
+    apiFetch(`/api/npm-scripts?sessionId=${S.activeSessionId}`)
+      .then((r: any) => r.json())
+      .then((data: any) => {
+        if (data.ok) {
+          cachedNpmScripts = data.scripts;
+          if (isPaletteOpen()) onInput();
+        }
+      })
+      .catch(() => {});
+  });
+}
+
+function buildNpmItems(query: string): PaletteItem[] {
+  const items: (PaletteItem & { score: number })[] = [];
+  for (const [name, script] of Object.entries(cachedNpmScripts)) {
+    const label = `npm run ${name}`;
+    const match = query ? fuzzyMatch(query, label) : { score: 0, positions: [] };
+    if (!match && query) continue;
+    items.push({
+      id: `npm:${name}`,
+      label,
+      category: 'npm',
+      meta: String(script).length > 40 ? String(script).slice(0, 40) + '…' : String(script),
+      icon: '📦',
+      matchPositions: match?.positions || [],
+      score: match?.score || 0,
+      execute: () => {
+        import('../core/websocket').then(({ wsSend }) => {
+          const meta = sessionMeta.get(S.activeSessionId);
+          const cwd = meta?.cwd || undefined;
+          wsSend({ type: 'session_create', name: `npm: ${name}`, cmd: `npm run ${name}`, cwd });
+        });
+      },
+    });
+  }
+  if (query) items.sort((a, b) => b.score - a.score);
+  return items;
+}
+
 function flattenTree(tree: any[]): Array<{ name: string; path: string }> {
   const result: Array<{ name: string; path: string }> = [];
   function walk(entries: any[]) {
@@ -329,7 +381,7 @@ function onInput() {
   if (mode === 'theme') {
     items = buildThemeItems(query);
   } else if (mode === 'command') {
-    items = buildCommandItems(query);
+    items = [...buildCommandItems(query), ...buildNpmItems(query)];
   } else {
     items = buildQuickOpenItems(query);
   }
