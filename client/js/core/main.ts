@@ -106,9 +106,12 @@ import {
 } from '../sidebar/plan-panel';
 import { initControlPanel } from '../terminal/control-panel';
 import { initCommandPalette, openPalette, closePalette, isPaletteOpen } from '../ui/command-palette';
+import { hideAppLoading, showSessionLoading, hideSessionLoading, isAppLoadingVisible } from '../ui/loading-overlay';
 // Side-effect imports — modules with self-initializing code
 import '../ui/scroll-float'
 import '../ui/mobile'
+
+let _initialListReceived = false;
 
 S.currentTheme = THEMES[0];
 
@@ -124,6 +127,10 @@ setInterval(() => {
 
 function handleMessage(msg) {
   if (msg.type === 'session_list') {
+    if (!_initialListReceived) {
+      _initialListReceived = true;
+      hideAppLoading();
+    }
     syncSessionList(msg.sessions, S.wsJustReconnected);
     syncAiSessionsFromList(msg.sessions);  // AI 세션 ↔ 플랜 연결 복원
     if (S.wsJustReconnected) {
@@ -150,6 +157,8 @@ function handleMessage(msg) {
       const pending = S.pendingSplitQueue.shift();
       pending.resolve(msg.sessionId);
     } else {
+      const entry = terminalMap.get(msg.sessionId);
+      if (entry && !isAppLoadingVisible()) showSessionLoading(entry.div);
       activateSession(msg.sessionId);
       wsSend({ type: 'session_attach', sessionId: msg.sessionId });
       setTimeout(() => {
@@ -168,6 +177,8 @@ function handleMessage(msg) {
     }
   } else if (msg.type === 'session_attached') {
     activateSession(msg.sessionId);
+    const entry = terminalMap.get(msg.sessionId);
+    if (entry) hideSessionLoading(entry.div);
 
     setTimeout(() => {
       const e = terminalMap.get(msg.sessionId);

@@ -212,13 +212,23 @@ export function syncSessionList(sessions, isReconnect = false) {
     }, 50);
 
     if (isInitialLoad) {
+      // Show session loading overlay for all restored sessions
+      newIds.forEach((id) => {
+        const entry = terminalMap.get(id);
+        if (entry) {
+          import('../ui/loading-overlay').then(m => m.showSessionLoading(entry.div, '세션 복원 중...'));
+        }
+      });
       // Bypass streaming for restored sessions — dump output instantly, then scroll to bottom
       newIds.forEach((id) => {
         bypassStream(id);
         setTimeout(() => {
           unbypassStream(id);
           const entry = terminalMap.get(id);
-          if (entry) entry.term.scrollToBottom();
+          if (entry) {
+            entry.term.scrollToBottom();
+            import('../ui/loading-overlay').then(m => m.hideSessionLoading(entry.div));
+          }
         }, 3000);
       });
       const badge = document.getElementById('hdr-restore-badge');
@@ -228,10 +238,7 @@ export function syncSessionList(sessions, isReconnect = false) {
           badge.style.display = 'none';
         }, 2000);
       }
-      const e = terminalMap.get(firstId);
-      if (e) {
-        e.term.write('\r\n\x1b[36m  ⟳ Restoring session...\x1b[0m\r\n\r\n');
-      }
+      // NOTE: removed old e.term.write('⟳ Restoring session...') — replaced by overlay
     }
   }
   updateStatusBar();
@@ -304,8 +311,13 @@ export function attachTerminal(sessionId, name) {
   let dataWs = null;
 
   function setupDataWsHandlers() {
+    let firstData = true;
     dataWs.onopen = () => console.log(`[data-ws] Connected: ${sessionId.slice(-6)}`);
     dataWs.onmessage = (event) => {
+      if (firstData) {
+        firstData = false;
+        import('../ui/loading-overlay').then(m => m.hideSessionLoading(div));
+      }
       // Output from server → terminal (plain text, no framing)
       streamWrite(sessionId, term, event.data);
       aiNotifyCheck(sessionId, event.data);

@@ -1,5 +1,6 @@
 import { S, connDot, connLabel } from './state';
 import { showToast } from '../ui/toast';
+import { showAppLoading, hideAppLoading } from '../ui/loading-overlay';
 
 // ─── Latency UI elements ────────────────────────────
 const _signalBars = document.querySelector('.signal-bars');
@@ -56,12 +57,14 @@ export function setWsStatus(online) {
 
 function alertDisconnect(reason) {
   _disconnectTime = Date.now();
+  showAppLoading();
   showToast(`서버 연결 끊김: ${reason}`, 'error', 10000);
   console.error(`[WS] 연결 끊김 — ${reason} (${new Date().toLocaleTimeString()})`);
 }
 
 function alertReconnect() {
   const downSec = _disconnectTime ? ((Date.now() - _disconnectTime) / 1000).toFixed(1) : '?';
+  hideAppLoading();
   showToast(`서버 재연결 성공 (${downSec}s 동안 끊김)`, 'success', 5000);
   console.log(`[WS] 재연결 성공 — ${downSec}s downtime (${new Date().toLocaleTimeString()})`);
   _disconnectTime = 0;
