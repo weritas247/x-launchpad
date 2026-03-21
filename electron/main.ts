@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, dialog, Menu } from 'electron';
+import { app, BrowserWindow, session, dialog, Menu, nativeImage } from 'electron';
 import * as path from 'path';
 import * as net from 'net';
 import * as fs from 'fs';
@@ -163,6 +163,18 @@ function createWindow(): void {
 app.whenReady().then(async () => {
   // 앱 전역 보안 정책 (1회)
   applyGlobalSecurityPolicy();
+
+  // Dock 아이콘 설정
+  if (process.platform === 'darwin' && app.dock) {
+    const iconPng = path.resolve(__dirname, '..', '..', 'build', 'icon.png');
+    if (fs.existsSync(iconPng)) {
+      const img = nativeImage.createFromPath(iconPng);
+      console.log(`[electron] dock icon: ${iconPng}, empty=${img.isEmpty()}, size=${img.getSize().width}x${img.getSize().height}`);
+      app.dock.setIcon(img);
+    } else {
+      console.log(`[electron] dock icon not found: ${iconPng}`);
+    }
+  }
 
   try {
     serverPort = await findFreePort();

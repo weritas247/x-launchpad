@@ -2,6 +2,8 @@ appId: com.xlaunchpad.app
 productName: X-Launchpad
 copyright: Copyright © 2026
 
+icon: build/icon
+
 directories:
   output: release
 
