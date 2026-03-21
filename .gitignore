@@ -13,3 +13,7 @@ pasted-image-*.png
 client/js/codemirror-bundle.js
 client/js/marked-bundle.js
 release/
+*.DS_Store
+main.js
+server/**/*.js
+!server/**/*.ts

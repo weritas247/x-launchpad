@@ -59,7 +59,11 @@ for (const file of ELECTRON_TARGETS) {
   }
   console.log(`[obfuscate] ${file}`);
   const code = fs.readFileSync(filePath, 'utf8');
-  const result = JavaScriptObfuscator.obfuscate(code, OPTIONS);
+  const result = JavaScriptObfuscator.obfuscate(code, {
+    ...OPTIONS,
+    debugProtection: false,
+    debugProtectionInterval: 0,
+  });
   fs.writeFileSync(filePath, result.getObfuscatedCode());
 }
 
@@ -85,6 +89,8 @@ if (fs.existsSync(clientDir)) {
     const code = fs.readFileSync(filePath, 'utf8');
     const result = JavaScriptObfuscator.obfuscate(code, {
       ...OPTIONS,
+      debugProtection: false,
+      debugProtectionInterval: 0,
       selfDefending: false,
     });
     fs.writeFileSync(filePath, result.getObfuscatedCode());

@@ -1,25 +1,27 @@
 import { BrowserWindow, app } from 'electron';
 
 /** 윈도우별 보안 정책 적용 */
-export function applySecurityPolicy(win: BrowserWindow, serverPort: number): void {
-  // 1. DevTools 완전 차단 (프로덕션)
-  win.webContents.on('before-input-event', (_event, input) => {
-    if (
-      (input.control || input.meta) &&
-      input.shift &&
-      input.key.toLowerCase() === 'i'
-    ) {
-      _event.preventDefault();
-    }
-    if (input.key === 'F12') {
-      _event.preventDefault();
-    }
-  });
+export function applySecurityPolicy(win: BrowserWindow, serverPort: number, devMode = false): void {
+  if (!devMode) {
+    // 1. DevTools 완전 차단 (프로덕션)
+    win.webContents.on('before-input-event', (_event, input) => {
+      if (
+        (input.control || input.meta) &&
+        input.shift &&
+        input.key.toLowerCase() === 'i'
+      ) {
+        _event.preventDefault();
+      }
+      if (input.key === 'F12') {
+        _event.preventDefault();
+      }
+    });
 
-  // devtools 열기 자체를 차단
-  win.webContents.on('devtools-opened', () => {
-    win.webContents.closeDevTools();
-  });
+    // devtools 열기 자체를 차단
+    win.webContents.on('devtools-opened', () => {
+      win.webContents.closeDevTools();
+    });
+  }
 
   // 2. 새 창 열기 차단
   win.webContents.setWindowOpenHandler(() => {

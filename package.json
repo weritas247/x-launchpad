@@ -29,10 +29,11 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "build:electron": "tsc -p electron/tsconfig.json",
-    "electron:dev": "npm run build && npm run build:electron && electron .",
+    "electron:dev": "npm run build && npm run build:electron && npm run electron:rebuild && find node_modules -name '*.node' -exec codesign --sign - --force {} \\; && ELECTRON_RUN_AS_NODE= electron . --dev",
     "electron:clean-maps": "find dist -name '*.map' -delete 2>/dev/null || true",
-    "electron:build": "npm run build && npm run build:electron && npm run electron:clean-maps && node scripts/obfuscate.js && electron-builder",
-    "electron:build:mac": "npm run build && npm run build:electron && npm run electron:clean-maps && node scripts/obfuscate.js && electron-builder --mac && codesign --sign - --force --deep release/mac-arm64/X-Launchpad.app"
+    "electron:rebuild": "npx electron-rebuild -f -w better-sqlite3,node-pty",
+    "electron:build": "npm run build && npm run build:electron && npm run electron:clean-maps && npm run electron:rebuild && node scripts/obfuscate.js && ELECTRON_RUN_AS_NODE= electron-builder",
+    "electron:build:mac": "npm run build && npm run build:electron && npm run electron:clean-maps && npm run electron:rebuild && node scripts/obfuscate.js && ELECTRON_RUN_AS_NODE= electron-builder --mac && codesign --sign - --force --deep release/mac-arm64/X-Launchpad.app"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -70,6 +71,7 @@
     "xterm-addon-webgl": "^0.16.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
     "@eslint/js": "^10.0.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.13",

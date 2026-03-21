@@ -1,18 +1,34 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { env } from './env';
 
 const supabaseUrl = env.SUPABASE_URL;
 const supabaseKey = env.SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY');
+const _supabaseConfigured = !!(supabaseUrl && supabaseKey);
+
+if (!_supabaseConfigured) {
+  console.warn('[supabase] SUPABASE_URL or SUPABASE_ANON_KEY not set — database features disabled');
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase: SupabaseClient = _supabaseConfigured
+  ? createClient(supabaseUrl, supabaseKey)
+  : null as unknown as SupabaseClient;
 
 // Service role client for Storage operations (bypasses RLS)
 const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAdmin = serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : supabase;
+const supabaseAdmin: SupabaseClient = _supabaseConfigured
+  ? (serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : supabase)
+  : null as unknown as SupabaseClient;
+
+export function isAvailable(): boolean {
+  return _supabaseConfigured;
+}
+
+function requireSupabase(): void {
+  if (!_supabaseConfigured) {
+    throw new Error('Supabase is not configured — set SUPABASE_URL and SUPABASE_ANON_KEY');
+  }
+}
 
 export interface UserRow {
   id: number;
@@ -27,6 +43,7 @@ export interface UserRow {
 let cachedUserCount = 0;
 
 export async function initUserCount(): Promise<void> {
+  if (!_supabaseConfigured) return;
   const { count, error } = await supabase.from('users').select('*', { count: 'exact', head: true });
   // PGRST205: table not found — supabase not set up yet, skip gracefully
   if (error && error.code !== 'PGRST205') throw error;
@@ -42,6 +59,7 @@ export async function createUser(
   passwordHash: string,
   name: string
 ): Promise<number> {
+  requireSupabase();
   const { data, error } = await supabase
     .from('users')
     .insert({ email, password_hash: passwordHash, name })
@@ -53,6 +71,7 @@ export async function createUser(
 }
 
 export async function getUserByEmail(email: string): Promise<UserRow | null> {
+  requireSupabase();
   const { data, error } = await supabase
     .from('users')
     .select('id, email, password_hash, name, created_at, updated_at')
@@ -63,6 +82,7 @@ export async function getUserByEmail(email: string): Promise<UserRow | null> {
 }
 
 export async function getUserById(id: number): Promise<Omit<UserRow, 'password_hash'> | null> {
+  requireSupabase();
   const { data, error } = await supabase
     .from('users')
     .select('id, email, name, created_at, updated_at')
@@ -96,6 +116,7 @@ export interface PlanRow {
 }
 
 export async function getPlans(userId: number): Promise<PlanRow[]> {
+  requireSupabase();
   const { data, error } = await supabase
     .from('plans')
     .select('*')
@@ -106,6 +127,7 @@ export async function getPlans(userId: number): Promise<PlanRow[]> {
 }
 
 export async function getPlan(userId: number, planId: string): Promise<PlanRow | null> {
+  requireSupabase();
   const { data, error } = await supabase
     .from('plans')
     .select('*')
@@ -130,6 +152,7 @@ async function generateTicketId(userId: number, category: string, projectName: s
   const type = category === 'bug' ? 'fix' : 'feat';
 
   // Find max existing ticket number for this user
+  requireSupabase();
   const { data } = await supabase
     .from('plans')
     .select('ticket_id')
@@ -155,6 +178,7 @@ export async function createPlan(
   userId: number,
   plan: { id: string; title: string; content: string; category: string; status?: string; cwd?: string }
 ): Promise<PlanRow> {
+  requireSupabase();
   const projectName = plan.cwd ? plan.cwd.replace(/\/$/, '').split('/').pop() || '' : '';
   const ticketId = await generateTicketId(userId, plan.category, projectName);
 
@@ -180,6 +204,7 @@ export async function updatePlan(
   planId: string,
   updates: { title?: string; content?: string; category?: string; status?: string; use_worktree?: boolean; use_headless?: boolean }
 ): Promise<PlanRow> {
+  requireSupabase();
   const { data, error } = await supabase
     .from('plans')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -192,6 +217,7 @@ export async function updatePlan(
 }
 
 export async function deletePlan(userId: number, planId: string): Promise<void> {
+  requireSupabase();
   const { error } = await supabase.from('plans').delete().eq('id', planId).eq('user_id', userId);
   if (error) throw error;
 }
@@ -201,6 +227,7 @@ export async function updatePlanStatus(
   planId: string,
   status: string
 ): Promise<PlanRow> {
+  requireSupabase();
   const { data, error } = await supabase
     .from('plans')
     .update({ status, ai_done: false, updated_at: new Date().toISOString() })
@@ -217,6 +244,7 @@ export async function addPlanAiSession(
   planId: string,
   session: AiSessionEntry
 ): Promise<PlanRow> {
+  requireSupabase();
   // Get current plan to append to existing ai_sessions
   const plan = await getPlan(userId, planId);
   const current: AiSessionEntry[] = (plan?.ai_sessions as AiSessionEntry[]) || [];
@@ -242,6 +270,7 @@ export interface PlanLogRow {
 }
 
 export async function getPlanLogs(userId: number, planId: string): Promise<PlanLogRow[]> {
+  requireSupabase();
   const { data: plan, error: planErr } = await supabase
     .from('plans')
     .select('id')
@@ -262,6 +291,7 @@ export async function appendPlanLog(
   userId: number,
   log: { plan_id?: string; type: string; content: string; commit_hash?: string }
 ): Promise<{ plan: PlanRow | null; log: PlanLogRow | null }> {
+  requireSupabase();
   let planId = log.plan_id;
   if (!planId) {
     const { data: doingPlans } = await supabase
@@ -313,6 +343,7 @@ export async function appendPlanLog(
 const PLAN_IMAGES_BUCKET = 'plan-images';
 
 export async function ensurePlanImagesBucket(): Promise<void> {
+  if (!_supabaseConfigured) return;
   const { error } = await supabaseAdmin.storage.createBucket(PLAN_IMAGES_BUCKET, { public: true });
   if (error && !error.message.includes('already exists')) {
     console.warn('[supabase] Failed to create plan-images bucket:', error.message);
@@ -326,6 +357,7 @@ export async function uploadPlanImage(
   buffer: Buffer,
   contentType: string
 ): Promise<{ path: string; url: string }> {
+  requireSupabase();
   // Verify plan belongs to user
   const { data: plan } = await supabase
     .from('plans')
@@ -354,6 +386,7 @@ export async function listPlanImages(
   userId: number,
   planId: string
 ): Promise<{ name: string; url: string }[]> {
+  requireSupabase();
   const { data: plan } = await supabase
     .from('plans')
     .select('id')
@@ -378,6 +411,7 @@ export async function deletePlanImage(
   planId: string,
   filename: string
 ): Promise<void> {
+  requireSupabase();
   const { data: plan } = await supabase
     .from('plans')
     .select('id')
