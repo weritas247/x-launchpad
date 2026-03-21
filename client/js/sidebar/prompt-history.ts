@@ -168,13 +168,25 @@ function renderClaudePrompts() {
     const el = document.createElement('div');
     el.className = 'input-entry claude-prompt-entry';
     const timeStr = p.timestamp ? new Date(p.timestamp).toTimeString().slice(0, 5) : '';
+    const isFoldable = p.text.length > 100;
+    const displayText = isFoldable ? escHtml(p.text.slice(0, 50)) + '…' : escHtml(p.text);
     el.innerHTML = `
       <div class="input-entry-meta">
         <span class="input-entry-num">${i + 1}</span>
         <span class="input-entry-time">${timeStr}</span>
       </div>
-      <span class="input-entry-text">${escHtml(p.text)}</span>
+      <span class="input-entry-text ${isFoldable ? 'foldable folded' : ''}">${displayText}</span>
     `;
+    if (isFoldable) {
+      const textSpan = el.querySelector('.input-entry-text') as HTMLElement;
+      textSpan.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isFolded = textSpan.classList.toggle('folded');
+        textSpan.innerHTML = isFolded
+          ? escHtml(p.text.slice(0, 50)) + '…'
+          : escHtml(p.text);
+      });
+    }
     el.addEventListener('click', () => {
       scrollToPromptInTerminal(p.text);
       navigator.clipboard.writeText(p.text).catch(() => {});
@@ -194,11 +206,23 @@ function renderInputHistory() {
     const el = document.createElement('div');
     el.className = 'input-entry';
     const timeStr = entry.time.toTimeString().slice(0, 5);
+    const isFoldable = entry.text.length > 100;
+    const displayText = isFoldable ? escHtml(entry.text.slice(0, 50)) + '…' : escHtml(entry.text);
     el.innerHTML = `
       <span class="input-entry-num">${i + 1}</span>
-      <span class="input-entry-text" title="${escAttr(entry.fullLine)}">${escHtml(entry.text)}</span>
+      <span class="input-entry-text ${isFoldable ? 'foldable folded' : ''}" title="${escAttr(entry.fullLine)}">${displayText}</span>
       <span class="input-entry-time">${timeStr}</span>
     `;
+    if (isFoldable) {
+      const textSpan = el.querySelector('.input-entry-text') as HTMLElement;
+      textSpan.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isFolded = textSpan.classList.toggle('folded');
+        textSpan.innerHTML = isFolded
+          ? escHtml(entry.text.slice(0, 50)) + '…'
+          : escHtml(entry.text);
+      });
+    }
     el.addEventListener('click', () => scrollToEntry(entry));
     panelList.appendChild(el);
   });

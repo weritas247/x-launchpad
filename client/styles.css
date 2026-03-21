@@ -1598,6 +1598,14 @@ body::after {
     gap: 2px;
 }
 
+.input-entry-text.foldable {
+    cursor: pointer;
+}
+
+.input-entry-text.foldable:hover {
+    opacity: 0.8;
+}
+
 .claude-prompt-entry .input-entry-meta {
     display: flex;
     justify-content: flex-start;
