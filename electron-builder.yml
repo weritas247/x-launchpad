@@ -27,7 +27,7 @@ files:
   - "!.git"
   - "!.claude"
 
-removePackageScripts: true
+removePackageScripts: false
 
 mac:
   category: public.app-category.developer-tools
@@ -41,5 +41,5 @@ mac:
 dmg:
   title: X-Launchpad
 
-npmRebuild: true
+npmRebuild: false
 buildDependenciesFromSource: false

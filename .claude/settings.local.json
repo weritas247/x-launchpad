@@ -14,7 +14,9 @@
       "Bash(lsof:*)",
       "Bash(tr:*)",
       "Skill(hookify:hookify)",
-      "Skill(hookify:hookify:*)"
+      "Skill(hookify:hookify:*)",
+      "Bash(xattr:*)",
+      "Bash(node -e:*)"
     ]
   },
   "hooks": {
