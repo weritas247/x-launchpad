@@ -107,6 +107,7 @@ import {
 import { initControlPanel } from '../terminal/control-panel';
 import { initCommandPalette, openPalette, closePalette, isPaletteOpen } from '../ui/command-palette';
 import { hideAppLoading, showSessionLoading, hideSessionLoading, isAppLoadingVisible } from '../ui/loading-overlay';
+import { initModalResize } from '../ui/modal-resize';
 // Side-effect imports — modules with self-initializing code
 import '../ui/scroll-float'
 import '../ui/mobile'
@@ -338,6 +339,7 @@ registerCommand({ id: 'openCommandPalette', label: 'Command Palette', category: 
 
 document.addEventListener('keydown', (e) => {
   if (!S.settings) return;
+  if (e.isComposing) return; // IME 조합 중엔 단축키 처리 안 함
 
   // Git graph modal handles its own keys (arrows, enter, escape)
   if (isGitGraphOpen() && handleGitGraphKeydown(e)) return;
@@ -547,6 +549,7 @@ initSearch();
 initPlanPanel();
 initControlPanel();
 initCommandPalette();
+initModalResize();
 
 // Wire up file viewer's lazy dependency
 setActivateSessionFn(activateSession);

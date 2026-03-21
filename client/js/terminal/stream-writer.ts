@@ -12,6 +12,18 @@ const CURSOR_VIS_RE = /\x1b\[\?25[lh]/g;
 const buffers = new Map(); // sessionId → { term, cursorHidden, restoreTimer }
 const bypassed = new Set(); // sessionIds that skip cursor management (e.g. session restore)
 
+// ─── IME composition tracking ────
+// Track whether the user is actively composing (e.g., Korean IME).
+// term.write() during composition can cancel IME by repositioning xterm's hidden textarea.
+const composingTerms = new WeakSet(); // terms with active IME composition
+
+export function trackComposition(term, div) {
+  const textarea = div.querySelector('.xterm-helper-textarea');
+  if (!textarea) return;
+  textarea.addEventListener('compositionstart', () => composingTerms.add(term));
+  textarea.addEventListener('compositionend', () => composingTerms.delete(term));
+}
+
 export function bypassStream(sessionId) {
   bypassed.add(sessionId);
 }
@@ -23,8 +35,13 @@ function scheduleCursorRestore(sessionId) {
   const buf = buffers.get(sessionId);
   if (!buf || !buf.cursorHidden) return;
   if (buf.restoreTimer) clearTimeout(buf.restoreTimer);
-  buf.restoreTimer = setTimeout(() => {
+  buf.restoreTimer = setTimeout(function doRestore() {
     buf.restoreTimer = null;
+    // Defer cursor restore while IME is composing to avoid breaking Korean/CJK input
+    if (composingTerms.has(buf.term)) {
+      buf.restoreTimer = setTimeout(doRestore, CURSOR_RESTORE_DELAY);
+      return;
+    }
     buf.cursorHidden = false;
     buf.term.write(CURSOR_SHOW);
   }, CURSOR_RESTORE_DELAY);
@@ -52,6 +69,14 @@ export function streamWrite(sessionId, term, data) {
   const cleaned = data.replace(CURSOR_VIS_RE, '');
   if (!cleaned) return;
 
+  // Skip cursor management during IME composition to avoid breaking Korean/CJK input.
+  // Extra term.write() calls for cursor visibility can reposition xterm's textarea,
+  // which cancels active IME composition on macOS.
+  if (composingTerms.has(term)) {
+    term.write(cleaned);
+    return;
+  }
+
   // Hide cursor during output burst to prevent flicker
   if (!buf.cursorHidden) {
     buf.cursorHidden = true;
@@ -73,6 +98,11 @@ export function flushStream(sessionId) {
     buf.restoreTimer = null;
   }
   if (buf.cursorHidden) {
+    // Defer if IME is composing
+    if (composingTerms.has(buf.term)) {
+      scheduleCursorRestore(sessionId);
+      return;
+    }
     buf.cursorHidden = false;
     buf.term.write(CURSOR_SHOW);
   }

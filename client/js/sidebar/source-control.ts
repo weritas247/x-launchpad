@@ -315,31 +315,28 @@ export function handleGitStatusData(msg) {
   }
 }
 
-// Track current diff overlay close handler to avoid duplicates
-let _diffCloseHandler = null;
+function closeDiffOverlay() {
+  const overlay = document.getElementById('diff-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+// Permanent listeners — registered once
+(function initDiffOverlayListeners() {
+  const overlay = document.getElementById('diff-overlay');
+  const closeBtn = document.getElementById('diff-close');
+  if (!overlay || !closeBtn) return;
+
+  closeBtn.addEventListener('click', closeDiffOverlay);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeDiffOverlay();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeDiffOverlay();
+  });
+})();
 
 function openDiffOverlay(overlay) {
-  if (_diffCloseHandler) return; // already registered
-
-  const closeBtn = document.getElementById('diff-close');
-  const closeDiff = () => {
-    overlay.classList.remove('open');
-    closeBtn.removeEventListener('click', closeDiff);
-    overlay.removeEventListener('click', onOverlayClick);
-    document.removeEventListener('keydown', onEsc);
-    _diffCloseHandler = null;
-  };
-  const onOverlayClick = (e) => {
-    if (e.target === overlay) closeDiff();
-  };
-  const onEsc = (e) => {
-    if (e.key === 'Escape') closeDiff();
-  };
-
-  closeBtn.addEventListener('click', closeDiff);
-  overlay.addEventListener('click', onOverlayClick);
-  document.addEventListener('keydown', onEsc);
-  _diffCloseHandler = closeDiff;
+  // listeners are permanent, nothing to register
 }
 
 export function handleGitDiffData(msg) {

@@ -72,6 +72,7 @@ export function matchCombo(combo) {
 export function tryKeybinding(e) {
   if (!S.settings) return false;
   if (e.type !== 'keydown') return false;
+  if (e.isComposing) return false; // IME 조합 중엔 단축키 처리 안 함
   if (e._kbHandled) return true; // already executed by xterm handler
 
   const combo = buildCombo(e);
@@ -96,6 +97,7 @@ export function tryKeybinding(e) {
  */
 export function xtermKeyHandler(e) {
   if (e.type !== 'keydown') return true;
+  if (e.isComposing) return true; // IME 조합 중 — xterm 내부 IME 처리에 맡김
   if (tryKeybinding(e)) return false; // matched → don't let xterm handle it
   return true; // not matched → let xterm handle it
 }

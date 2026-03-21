@@ -29,7 +29,7 @@ import {
   hasPendingAttachments,
   uploadAndFlush,
 } from '../ui/image-attach';
-import { destroyStream, bypassStream, unbypassStream, streamWrite } from './stream-writer';
+import { destroyStream, bypassStream, unbypassStream, streamWrite, trackComposition } from './stream-writer';
 import { aiNotifyCheck } from '../ui/notifications';
 import { tabStatusCheck } from '../ui/tab-status';
 
@@ -288,6 +288,9 @@ export function attachTerminal(sessionId, name) {
   }
 
   fitAddon.fit();
+
+  // ─── IME composition tracking (Korean/CJK input) ────
+  trackComposition(term, div);
 
   // ─── Scroll-to-bottom tracking ────
   // Track whether user is viewing the bottom of the terminal.
@@ -606,6 +609,7 @@ export function initContextMenu() {
     };
     input.addEventListener('blur', finish);
     input.addEventListener('keydown', (e) => {
+      if (e.isComposing) return;
       if (e.key === 'Enter') {
         finish();
         e.preventDefault();
