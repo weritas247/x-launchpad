@@ -25,6 +25,8 @@ const titleEl = panel.querySelector('.input-panel-title');
 export const historyMap = new Map();
 // Per-session input buffer (accumulates typed chars until Enter)
 const inputBuffers = new Map();
+// Tracks pending Enter per session — waits for compositionend before capturing
+const pendingEnter = new Map<string, number>(); // sessionId → bufferLine
 // sessionId → [ { text, timestamp } ] (Claude prompts from JSONL)
 const claudePromptsMap = new Map();
 // Polling timer for Claude prompts
@@ -119,45 +121,26 @@ export function trackInput(sessionId, data) {
 
   if (data === '\r' || data === '\n') {
     const entry = terminalMap.get(sessionId);
-    const buffered = (inputBuffers.get(sessionId) || '').trim();
-    inputBuffers.set(sessionId, '');
+    if (!entry) { inputBuffers.set(sessionId, ''); return; }
 
-    if (!entry) return;
-
-    const term = entry.term;
-    const buf = term.buffer.active;
+    const buf = entry.term.buffer.active;
     const lineIndex = buf.baseY + buf.cursorY;
 
-    // Priority 1: use inputBuffer (actual keystrokes typed by user)
-    // Priority 2: fall back to terminal buffer line (for pasted text etc.)
-    let userInput = buffered;
-    if (!userInput) {
-      const line = buf.getLine(buf.cursorY);
-      const rawText = line ? line.translateToString(true).trim() : '';
-      userInput = rawText ? extractUserInput(rawText) : '';
+    // Check if IME is composing — if so, defer until compositionend
+    const textarea = entry.div.querySelector('.xterm-helper-textarea') as HTMLElement;
+    if (textarea && textarea.dataset.composing === '1') {
+      pendingEnter.set(sessionId, lineIndex);
+      return;
     }
 
-    if (!userInput) return;
-
-    if (!historyMap.has(sessionId)) historyMap.set(sessionId, []);
-    const entries = historyMap.get(sessionId);
-    entries.push({
-      text: userInput,
-      fullLine: userInput,
-      bufferLine: lineIndex,
-      time: new Date(),
-    });
-
-    // Keep max 200 entries per session
-    if (entries.length > 200) entries.shift();
-
-    if (sessionId === S.activeSessionId && !isClaudeSession(sessionId)) renderPanel();
+    flushInput(sessionId, lineIndex);
+    return;
   } else if (data === '\x7f') {
     // Backspace
     const current = inputBuffers.get(sessionId) || '';
     inputBuffers.set(sessionId, current.slice(0, -1));
-  } else if (data.length === 1 && data.charCodeAt(0) >= 32) {
-    // Printable char
+  } else if (data.length >= 1 && data.charCodeAt(0) >= 32) {
+    // Printable char(s) — includes IME-committed multi-char strings
     inputBuffers.set(sessionId, (inputBuffers.get(sessionId) || '') + data);
   }
 }
@@ -169,6 +152,56 @@ function extractUserInput(rawLine) {
   if (match) return match[1].trim();
   // If no prompt found, return the whole line (could be a continuation)
   return stripped.length > 2 ? stripped : '';
+}
+
+function flushInput(sessionId: string, lineIndex: number) {
+  const buffered = (inputBuffers.get(sessionId) || '').trim();
+  inputBuffers.set(sessionId, '');
+
+  const entry = terminalMap.get(sessionId);
+  if (!entry) return;
+
+  // Priority 1: use inputBuffer (actual keystrokes typed by user)
+  // Priority 2: fall back to terminal buffer line (for pasted text etc.)
+  let userInput = buffered;
+  if (!userInput) {
+    const buf = entry.term.buffer.active;
+    const line = buf.getLine(buf.cursorY);
+    const rawText = line ? line.translateToString(true).trim() : '';
+    userInput = rawText ? extractUserInput(rawText) : '';
+  }
+
+  if (!userInput) return;
+
+  if (!historyMap.has(sessionId)) historyMap.set(sessionId, []);
+  const entries = historyMap.get(sessionId);
+  entries.push({
+    text: userInput,
+    fullLine: userInput,
+    bufferLine: lineIndex,
+    time: new Date(),
+  });
+
+  if (entries.length > 200) entries.shift();
+  if (sessionId === S.activeSessionId && !isClaudeSession(sessionId)) renderPanel();
+}
+
+/** Attach compositionstart/end listeners for IME-aware input tracking */
+export function trackInputComposition(sessionId: string, div: HTMLElement) {
+  const textarea = div.querySelector('.xterm-helper-textarea') as HTMLElement;
+  if (!textarea) return;
+  textarea.addEventListener('compositionstart', () => {
+    textarea.dataset.composing = '1';
+  });
+  textarea.addEventListener('compositionend', () => {
+    delete textarea.dataset.composing;
+    // If Enter was pressed during composition, flush now
+    if (pendingEnter.has(sessionId)) {
+      const lineIndex = pendingEnter.get(sessionId)!;
+      pendingEnter.delete(sessionId);
+      flushInput(sessionId, lineIndex);
+    }
+  });
 }
 
 /** Refresh the panel to show entries for the active session */

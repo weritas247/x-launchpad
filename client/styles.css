@@ -9524,19 +9524,16 @@ body::after {
   overflow-y: auto;
 }
 
-/* ─── Input History Popup ─── */
+/* ─── Input History Popup (VSCode IntelliSense style) ─── */
 #input-history-popup {
   display: none;
   position: fixed;
-  bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 480px;
-  max-height: 360px;
-  background: var(--palette-bg, var(--bg-deep));
-  border: 1px solid var(--palette-border, var(--border-lit));
-  border-radius: 6px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  width: 460px;
+  max-height: 260px;
+  background: var(--bg-surface, #252526);
+  border: 1px solid var(--border, #454545);
+  border-radius: 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
   z-index: 9998;
   flex-direction: column;
   overflow: hidden;
@@ -9544,44 +9541,52 @@ body::after {
 #input-history-popup.open {
   display: flex;
 }
-.ihp-header {
-  padding: 6px 14px;
-  color: var(--palette-category, var(--text-ghost));
-  font-size: 11px;
-  letter-spacing: 1px;
-  border-bottom: 1px solid var(--palette-separator, var(--border));
-}
 .ihp-list {
   overflow-y: auto;
   flex: 1;
-  max-height: 280px;
+  padding: 2px 0;
 }
 .ihp-item {
-  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 4px;
   cursor: pointer;
-  color: var(--text-main);
+  color: var(--text-main, #cccccc);
   font-size: 13px;
-  font-family: var(--mono);
+  font-family: var(--mono, monospace);
+  line-height: 22px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ihp-item:hover,
 .ihp-item.active {
-  background: var(--palette-hover, var(--bg-hover));
-  border-left: 2px solid var(--accent);
-  padding-left: 12px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.ihp-item:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.04);
+}
+.ihp-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--accent, #569cd6);
+  opacity: 0.8;
+}
+.ihp-item.active .ihp-icon {
+  opacity: 1;
+}
+.ihp-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ihp-empty {
-  padding: 16px 14px;
-  color: var(--text-ghost);
+  padding: 8px 10px;
+  color: var(--text-ghost, #6a6a6a);
   font-size: 12px;
-  text-align: center;
-}
-.ihp-footer {
-  padding: 4px 14px;
-  color: var(--text-ghost);
-  font-size: 11px;
-  border-top: 1px solid var(--palette-separator, var(--border));
   text-align: center;
 }

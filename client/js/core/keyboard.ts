@@ -102,7 +102,7 @@ export function xtermKeyHandler(e) {
   if (tryKeybinding(e)) return false; // matched → don't let xterm handle it
 
   // '\' key → open input history popup (no modifiers)
-  if (e.key === '\\' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+  if ((e.key === '\\' || e.key === '₩') && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
     if (!isInputHistoryOpen()) {
       e.preventDefault();
       openInputHistory();

@@ -15,7 +15,7 @@ import {
 import { AI_REGISTRY } from '../core/constants';
 import { wsSend, getAuthToken, apiFetch } from '../core/websocket';
 import { xtermKeyHandler } from '../core/keyboard';
-import { trackInput } from '../sidebar/prompt-history';
+import { trackInput, trackInputComposition } from '../sidebar/prompt-history';
 import { activateSession, updateStatusBar, showEmptyState, hideEmptyState } from './session';
 import {
   removeSplitPane,
@@ -291,6 +291,7 @@ export function attachTerminal(sessionId, name) {
 
   // ─── IME composition tracking (Korean/CJK input) ────
   trackComposition(term, div);
+  trackInputComposition(sessionId, div);
 
   // ─── Scroll-to-bottom tracking ────
   // Track whether user is viewing the bottom of the terminal.

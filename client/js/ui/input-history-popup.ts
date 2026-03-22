@@ -16,13 +16,65 @@ function ensurePopup() {
   if (popup) return;
   popup = document.createElement('div');
   popup.id = 'input-history-popup';
-  popup.innerHTML = `
-    <div class="ihp-header">RECENT INPUTS</div>
-    <div class="ihp-list" id="ihp-list"></div>
-    <div class="ihp-footer">↑↓ 이동 · Enter 선택 · Esc 닫기</div>
-  `;
+  popup.innerHTML = `<div class="ihp-list" id="ihp-list"></div>`;
   document.body.appendChild(popup);
   listEl = popup.querySelector('#ihp-list')!;
+}
+
+/** Position popup directly above or below the cursor line */
+function positionPopup() {
+  if (!popup) return;
+  const entry = terminalMap.get(S.activeSessionId);
+
+  const popupW = 460;
+  const popupH = popup.offsetHeight || 260;
+
+  if (!entry) {
+    // Fallback: center bottom
+    popup.style.left = Math.max(8, (window.innerWidth - popupW) / 2) + 'px';
+    popup.style.bottom = '40px';
+    popup.style.top = 'auto';
+    return;
+  }
+
+  const term = entry.term;
+  const buf = term.buffer.active;
+  const termRect = entry.div.getBoundingClientRect();
+
+  // Calculate cursor position from xterm internals
+  // Use core dimensions if available, otherwise estimate
+  const dims = (term as any)._core?._renderService?.dimensions;
+  const cellH = dims?.css?.cell?.height || (termRect.height / term.rows);
+  const cellW = dims?.css?.cell?.width || 9;
+
+  // Account for viewport scroll offset
+  const viewportEl = entry.div.querySelector('.xterm-viewport') as HTMLElement;
+  const scrollTop = viewportEl?.scrollTop || 0;
+  const rowsEl = entry.div.querySelector('.xterm-rows') as HTMLElement;
+  const rowsTop = rowsEl ? rowsEl.getBoundingClientRect().top : termRect.top;
+
+  const cursorTop = rowsTop + buf.cursorY * cellH;
+  const cursorBottom = cursorTop + cellH;
+  const cursorLeft = termRect.left + buf.cursorX * cellW;
+
+  // Default: below cursor. If not enough space, show above.
+  const spaceBelow = window.innerHeight - cursorBottom - 10;
+  let top: number;
+  if (spaceBelow >= popupH) {
+    top = cursorBottom + 2;
+  } else {
+    top = cursorTop - popupH - 2;
+  }
+
+  let left = cursorLeft;
+  if (left + popupW > window.innerWidth - 8) {
+    left = window.innerWidth - popupW - 8;
+  }
+  if (left < 8) left = 8;
+
+  popup.style.top = Math.max(8, top) + 'px';
+  popup.style.bottom = 'auto';
+  popup.style.left = left + 'px';
 }
 
 function getRecentInputs(): string[] {
@@ -61,7 +113,14 @@ function render() {
   items.forEach((text, i) => {
     const el = document.createElement('div');
     el.className = 'ihp-item' + (i === activeIndex ? ' active' : '');
-    el.textContent = text.length > 80 ? text.slice(0, 77) + '…' : text;
+    const icon = document.createElement('span');
+    icon.className = 'ihp-icon';
+    icon.textContent = '↵';
+    const label = document.createElement('span');
+    label.className = 'ihp-label';
+    label.textContent = text.length > 100 ? text.slice(0, 97) + '…' : text;
+    el.appendChild(icon);
+    el.appendChild(label);
     el.title = text;
     el.addEventListener('click', () => {
       selectItem(i);
@@ -110,6 +169,7 @@ export function open() {
   activeIndex = 0;
   render();
   popup!.classList.add('open');
+  positionPopup();
 
   // Keyboard navigation
   if (abortCtrl) abortCtrl.abort();
