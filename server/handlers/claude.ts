@@ -15,6 +15,7 @@ const handlers: Record<string, WsHandler> = {
     console.log(`[claude_prompts] found ${prompts.length} prompts`);
     ctx.wsSend(ctx.ws, JSON.stringify({ type: 'claude_prompts_data', sessionId: id, prompts }));
   },
+
 };
 
 export default handlers;

@@ -1,6 +1,7 @@
 // ─── ACTIVITY BAR (LEFT ICON BAR) ────────────────────────────────
 import { requestFileTree } from './explorer';
 import { requestGitStatus, startScPoll, stopScPoll } from './source-control';
+import { requestClaudeDir } from './claude-panel';
 import { refitAllPanes } from '../terminal/split-pane';
 
 const ICON_ORDER_KEY = 'x-launchpad-activity-order';
@@ -551,6 +552,9 @@ function triggerPanelLoad(panel) {
     startScPoll();
   } else if (panel === 'search') {
     document.getElementById('search-input')?.focus();
+    stopScPoll();
+  } else if (panel === 'claude') {
+    requestClaudeDir();
     stopScPoll();
   } else {
     stopScPoll();

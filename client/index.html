@@ -102,6 +102,9 @@
             <path d="M9 12h6M9 16h4" />
           </svg>
         </button>
+        <button class="activity-btn" data-panel="claude" title="Claude">
+          <img src="icons/claude.webp" alt="Claude" style="width:18px;height:18px;" />
+        </button>
       </nav>
 
       <!-- SIDEBAR -->
@@ -245,6 +248,20 @@
         </div>
 
         <!-- PLAN PANEL (moved to modal — see #plan-overlay) -->
+
+        <!-- CLAUDE PANEL -->
+        <div class="sidebar-panel" id="panel-claude">
+          <div class="sidebar-header">
+            <span class="sidebar-title-text">CLAUDE</span>
+            <div class="sidebar-header-actions">
+              <button class="btn-icon-sm" id="claude-refresh" title="Refresh">↻</button>
+            </div>
+          </div>
+          <div class="explorer-path-bar">
+            <span class="explorer-path-label" id="claude-path" title="">~/.claude</span>
+          </div>
+          <div class="explorer-tree-container" id="claude-tree"></div>
+        </div>
       </aside>
 
       <!-- SIDEBAR RESIZE HANDLE -->
@@ -570,6 +587,15 @@
       <div class="ctx-item" id="ectx-reveal">🔍 Reveal in Finder</div>
       <div class="ctx-sep"></div>
       <div class="ctx-item danger" id="ectx-delete">✕ Delete</div>
+    </div>
+
+    <!-- CLAUDE PANEL CONTEXT MENU -->
+    <div class="ctx-menu" id="claude-ctx-menu">
+      <div class="ctx-item" id="cctx-open">📄 Open</div>
+      <div class="ctx-item" id="cctx-copy-path">📋 Copy Path</div>
+      <div class="ctx-item" id="cctx-reveal">🔍 Reveal in Finder</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item danger" id="cctx-delete">✕ Delete</div>
     </div>
 
     <!-- ═══════════════════════════════════════════════════

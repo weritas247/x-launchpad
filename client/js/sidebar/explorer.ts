@@ -113,6 +113,15 @@ export function initExplorer() {
     }
     requestFileTree();
   });
+
+  // Right-click on empty space in explorer
+  treeEl?.addEventListener('contextmenu', (e) => {
+    // Only handle if clicking the container itself (not a file/folder item)
+    const target = e.target as HTMLElement;
+    if (!target.closest('.explorer-item')) {
+      showExplorerCtx(e, '', '');
+    }
+  });
 }
 
 async function uploadFile(file) {
@@ -158,6 +167,18 @@ function showExplorerCtx(e, path, type) {
   ctxTargetType = type;
   const menu = document.getElementById('explorer-ctx-menu');
   if (!menu) return;
+
+  // Hide file-specific items when right-clicking empty space
+  const isEmptyCtx = !path;
+  ['ectx-rename', 'ectx-download', 'ectx-reveal', 'ectx-delete'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isEmptyCtx ? 'none' : '';
+  });
+  // Hide separators when showing empty context (only New File / New Folder)
+  menu.querySelectorAll('.ctx-sep').forEach((sep: HTMLElement) => {
+    sep.style.display = isEmptyCtx ? 'none' : '';
+  });
+
   menu.style.display = 'block';
   menu.style.left = e.clientX + 'px';
   menu.style.top = e.clientY + 'px';

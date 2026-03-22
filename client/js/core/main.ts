@@ -104,6 +104,10 @@ import {
   updateAiTasksBadge,
   syncAiSessionsFromList,
 } from '../sidebar/plan-panel';
+import {
+  initClaudePanel,
+  requestClaudeDir,
+} from '../sidebar/claude-panel';
 import { initControlPanel } from '../terminal/control-panel';
 import { initCommandPalette, openPalette, closePalette, isPaletteOpen } from '../ui/command-palette';
 import { hideAppLoading, showSessionLoading, hideSessionLoading, isAppLoadingVisible } from '../ui/loading-overlay';
@@ -547,6 +551,7 @@ initExplorer();
 initSourceControl();
 initSearch();
 initPlanPanel();
+initClaudePanel();
 initControlPanel();
 initCommandPalette();
 initModalResize();

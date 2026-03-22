@@ -252,6 +252,61 @@ app.get('/api/download', (req, res) => {
   res.download(fullPath);
 });
 
+// ─── Claude directory tree ───
+app.get('/api/claude-dir', (_req, res) => {
+  const claudeDir = path.join(os.homedir(), '.claude');
+  const IGNORED = new Set(['.git', 'node_modules', '.DS_Store', 'Thumbs.db']);
+  function walk(dir: string, depth: number): any[] {
+    if (depth > 5) return [];
+    let entries: string[];
+    try { entries = fs.readdirSync(dir); } catch { return []; }
+    const dirs: any[] = [];
+    const files: any[] = [];
+    for (const name of entries) {
+      if (IGNORED.has(name)) continue;
+      const full = path.join(dir, name);
+      const rel = path.relative(claudeDir, full);
+      let stat;
+      try { stat = fs.statSync(full); } catch { continue; }
+      if (stat.isDirectory()) {
+        dirs.push({ name, path: rel, type: 'directory', children: walk(full, depth + 1) });
+      } else {
+        files.push({ name, path: rel, type: 'file' });
+      }
+    }
+    dirs.sort((a, b) => a.name.localeCompare(b.name));
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    return [...dirs, ...files];
+  }
+  try {
+    const tree = walk(claudeDir, 0);
+    res.json({ ok: true, dir: claudeDir, tree });
+  } catch (e) {
+    res.json({ ok: false, dir: claudeDir, tree: [], error: String(e) });
+  }
+});
+
+app.post('/api/claude-delete', express.json(), (req, res) => {
+  const filePath = req.body.filePath as string;
+  if (!filePath) return res.status(400).json({ ok: false, error: 'Missing filePath' });
+  const claudeDir = path.join(os.homedir(), '.claude');
+  const fullPath = path.resolve(claudeDir, filePath);
+  if (!fullPath.startsWith(claudeDir + path.sep)) {
+    return res.status(403).json({ ok: false, error: 'Access denied' });
+  }
+  try {
+    const stat = fs.statSync(fullPath);
+    if (stat.isDirectory()) {
+      fs.rmSync(fullPath, { recursive: true });
+    } else {
+      fs.unlinkSync(fullPath);
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
 app.post(
   '/api/upload',
   express.raw({ type: 'application/octet-stream', limit: '50mb' }),

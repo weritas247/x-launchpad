@@ -9451,3 +9451,9 @@ body::after {
   font-size: 11px;
   border-top: 1px solid var(--palette-separator, var(--border));
 }
+
+/* ─── Claude Panel ─── */
+#panel-claude .explorer-tree-container {
+  flex: 1;
+  overflow-y: auto;
+}
