@@ -9561,7 +9561,9 @@ body::after {
   text-overflow: ellipsis;
 }
 .ihp-item.active {
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--accent, #569cd6) 35%, transparent);
+  border-left: 2px solid var(--accent, #569cd6);
+  padding-left: 2px;
 }
 .ihp-item:hover:not(.active) {
   background: rgba(255, 255, 255, 0.04);

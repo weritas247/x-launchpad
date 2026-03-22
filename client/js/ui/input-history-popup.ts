@@ -198,37 +198,33 @@ export function isOpen(): boolean {
   return popup?.classList.contains('open') ?? false;
 }
 
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') {
-    e.preventDefault();
-    e.stopPropagation();
-    close();
-    return;
-  }
-  if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    e.stopPropagation();
+/** Called from xterm key handler and document keydown */
+export function handleKey(key: string) {
+  if (key === 'Escape') { close(); return; }
+  if (key === 'ArrowDown') {
     activeIndex = (activeIndex + 1) % Math.max(1, items.length);
     updateActive();
     return;
   }
-  if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    e.stopPropagation();
+  if (key === 'ArrowUp') {
     activeIndex = (activeIndex - 1 + items.length) % Math.max(1, items.length);
     updateActive();
     return;
   }
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    e.stopPropagation();
+  if (key === 'Enter') {
     if (items.length > 0) selectItem(activeIndex);
     return;
   }
+  // Ignore modifier keys
+  if (['Shift', 'Control', 'Alt', 'Meta'].includes(key)) return;
   // Any other key closes the popup
+  close();
+}
+
+function onKeydown(e: KeyboardEvent) {
   e.preventDefault();
   e.stopPropagation();
-  close();
+  handleKey(e.key);
 }
 
 function onClickOutside(e: MouseEvent) {

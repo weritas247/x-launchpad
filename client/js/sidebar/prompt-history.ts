@@ -161,23 +161,15 @@ function flushInput(sessionId: string, lineIndex: number) {
   const entry = terminalMap.get(sessionId);
   if (!entry) return;
 
-  // Priority 1: use inputBuffer (actual keystrokes typed by user)
-  // Priority 2: fall back to terminal buffer line (for pasted text etc.)
-  let userInput = buffered;
-  if (!userInput) {
-    const buf = entry.term.buffer.active;
-    const line = buf.getLine(buf.cursorY);
-    const rawText = line ? line.translateToString(true).trim() : '';
-    userInput = rawText ? extractUserInput(rawText) : '';
-  }
-
-  if (!userInput) return;
+  // Only use inputBuffer (actual keystrokes/pastes by user)
+  // No terminal buffer fallback — it picks up output text
+  if (!buffered) return;
 
   if (!historyMap.has(sessionId)) historyMap.set(sessionId, []);
   const entries = historyMap.get(sessionId);
   entries.push({
-    text: userInput,
-    fullLine: userInput,
+    text: buffered,
+    fullLine: buffered,
     bufferLine: lineIndex,
     time: new Date(),
   });

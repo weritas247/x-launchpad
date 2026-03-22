@@ -5,7 +5,7 @@
 import { S } from './state';
 import { normalizeKey, KB_DEFS } from './constants';
 import { registerCommand, executeCommand, getCommand } from './command-registry';
-import { open as openInputHistory, isOpen as isInputHistoryOpen } from '../ui/input-history-popup';
+import { open as openInputHistory, close as closeInputHistory, isOpen as isInputHistoryOpen, handleKey as inputHistoryHandleKey } from '../ui/input-history-popup';
 
 // ─── SHORTCUT OVERLAY ────────────────────────────────
 let overlayEl = null;
@@ -99,15 +99,21 @@ export function tryKeybinding(e) {
 export function xtermKeyHandler(e) {
   if (e.type !== 'keydown') return true;
   if (e.isComposing) return true; // IME 조합 중 — xterm 내부 IME 처리에 맡김
+
+  // Input history popup is open — handle all keys here (xterm eats them otherwise)
+  if (isInputHistoryOpen()) {
+    e.preventDefault();
+    inputHistoryHandleKey(e.key);
+    return false;
+  }
+
   if (tryKeybinding(e)) return false; // matched → don't let xterm handle it
 
   // '\' key → open input history popup (no modifiers)
   if ((e.key === '\\' || e.key === '₩') && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
-    if (!isInputHistoryOpen()) {
-      e.preventDefault();
-      openInputHistory();
-      return false;
-    }
+    e.preventDefault();
+    openInputHistory();
+    return false;
   }
 
   return true; // not matched → let xterm handle it
