@@ -1836,6 +1836,11 @@ body::after {
 
 .file-pane-path {
     color: var(--text-ghost);
+    cursor: pointer;
+}
+.file-pane-path:hover {
+    text-decoration: underline;
+    color: var(--accent);
 }
 
 .file-pane-content {

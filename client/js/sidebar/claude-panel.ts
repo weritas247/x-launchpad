@@ -32,9 +32,7 @@ export function initClaudePanel() {
       }
       renderClaudePanel();
     } else {
-      import('../editor/file-viewer').then(m => {
-        m.openFileTab(ctxTargetPath, claudeDir);
-      });
+      openClaudeFile(ctxTargetPath);
     }
   });
 
@@ -47,9 +45,13 @@ export function initClaudePanel() {
   });
 
   document.getElementById('cctx-reveal')?.addEventListener('click', () => {
-    if (!ctxTargetPath || !S.activeSessionId) return;
+    if (!ctxTargetPath) return;
     const fullPath = claudeDir + '/' + ctxTargetPath;
-    wsSend({ type: 'file_reveal', sessionId: S.activeSessionId, filePath: fullPath });
+    apiFetch('/api/reveal-in-finder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: fullPath }),
+    }).catch(() => {});
   });
 
   document.getElementById('cctx-delete')?.addEventListener('click', async () => {

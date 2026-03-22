@@ -207,12 +207,20 @@ app.post('/api/delete-image', (req, res) => {
 
 // ─── FILE OPERATIONS ─────────────────────────────────────────────
 app.post('/api/reveal-in-finder', (req, res) => {
+  const directPath = req.body?.path as string;
   const sessionId = req.body?.sessionId as string;
-  if (!sessionId) return res.status(400).json({ ok: false });
-  const session = sessions.get(sessionId);
-  const dir = session?.cwd || currentSettings.shell.startDirectory || env.HOME;
-  if (!fs.existsSync(dir)) return res.status(404).json({ ok: false });
-  execFile('open', [dir], (err) => {
+  let target: string;
+  if (directPath) {
+    target = directPath;
+  } else if (sessionId) {
+    const session = sessions.get(sessionId);
+    target = session?.cwd || currentSettings.shell.startDirectory || env.HOME!;
+  } else {
+    return res.status(400).json({ ok: false });
+  }
+  if (!fs.existsSync(target)) return res.status(404).json({ ok: false });
+  const isFile = fs.statSync(target).isFile();
+  execFile('open', isFile ? ['-R', target] : [target], (err) => {
     if (err) return res.status(500).json({ ok: false, error: String(err) });
     res.json({ ok: true });
   });
@@ -283,6 +291,27 @@ app.get('/api/claude-dir', (_req, res) => {
     res.json({ ok: true, dir: claudeDir, tree });
   } catch (e) {
     res.json({ ok: false, dir: claudeDir, tree: [], error: String(e) });
+  }
+});
+
+app.get('/api/claude-read', (req, res) => {
+  const filePath = req.query.path as string;
+  if (!filePath) return res.status(400).json({ ok: false, error: 'Missing path' });
+  const claudeDir = path.join(os.homedir(), '.claude');
+  const fullPath = path.resolve(claudeDir, filePath);
+  if (!fullPath.startsWith(claudeDir + path.sep) && fullPath !== claudeDir) {
+    return res.status(403).json({ ok: false, error: 'Access denied' });
+  }
+  try {
+    const stat = fs.statSync(fullPath);
+    if (stat.isDirectory()) return res.status(400).json({ ok: false, error: 'Is a directory' });
+    if (stat.size > 512 * 1024) return res.status(413).json({ ok: false, error: 'File too large (>512KB)' });
+    const buf = fs.readFileSync(fullPath);
+    const isBinary = buf.slice(0, 8000).some((b: number) => b === 0);
+    if (isBinary) return res.json({ ok: true, filePath, binary: true });
+    res.json({ ok: true, filePath, content: buf.toString('utf-8') });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
   }
 });
 

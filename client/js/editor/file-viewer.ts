@@ -80,12 +80,22 @@ export function openFileTab(filePath, content, opts: any = {}) {
   const pathParts = filePath.split('/');
   const shortPath = pathParts.length > 3 ? '…/' + pathParts.slice(-3).join('/') : filePath;
   headerEl.innerHTML = `
-    <span class="file-pane-path">${escHtml(shortPath)}</span>
+    <span class="file-pane-path" title="Click to copy full path">${escHtml(shortPath)}</span>
     <div class="file-pane-actions">
       <span class="file-pane-status">READ ONLY</span>
       <button class="file-pane-edit-btn">Edit</button>
     </div>
   `;
+  headerEl.querySelector('.file-pane-path')?.addEventListener('click', () => {
+    navigator.clipboard.writeText(filePath).then(() => {
+      const pathEl = headerEl.querySelector('.file-pane-path');
+      if (pathEl) {
+        const orig = pathEl.textContent;
+        pathEl.textContent = 'Copied!';
+        setTimeout(() => { pathEl.textContent = orig; }, 1000);
+      }
+    });
+  });
   paneEl.appendChild(headerEl);
 
   // Content area
