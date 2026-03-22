@@ -35,6 +35,7 @@
     --statusbar-font-size: 11px;
     --tabbar-font-size: 12px;
     --input-panel-font-size: 11px;
+    --input-panel-w: 260px;
     --file-viewer-font-size: 13px;
     --git-graph-font-size: 12px;
 }
@@ -1542,7 +1543,7 @@ body::after {
     position: relative;
     display: flex;
     flex-shrink: 0;
-    width: 260px;
+    width: var(--input-panel-w);
     border-left: 1px solid var(--border);
     transition: width 0.2s ease;
 }
@@ -1551,8 +1552,34 @@ body::after {
     display: none !important;
 }
 
+.input-panel-resize:has(+ .input-panel.hidden),
+.input-panel-resize:has(+ .input-panel.collapsed) {
+    display: none;
+}
+
 .input-panel.collapsed {
     width: 24px;
+}
+
+.input-panel-resize {
+    width: 3px;
+    cursor: col-resize;
+    background: transparent;
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+.input-panel-resize:hover,
+.input-panel-resize.dragging {
+    background: var(--accent);
+    opacity: 0.5;
+}
+
+.input-panel-resize::after {
+    content: '';
+    position: absolute;
+    inset: -2px -4px -2px -4px;
 }
 
 .input-panel-toggle {
@@ -7739,6 +7766,10 @@ body::after {
     }
 
     /* ── Input Panel as Bottom Sheet ── */
+    .input-panel-resize {
+        display: none !important;
+    }
+
     .input-panel {
         display: none !important;
     }

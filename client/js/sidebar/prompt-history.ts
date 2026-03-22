@@ -46,6 +46,38 @@ export function initInputPanel() {
     }
     renderPanel();
   });
+
+  initInputPanelResize();
+}
+
+function initInputPanelResize() {
+  const handle = document.getElementById('input-panel-resize');
+  if (!handle) return;
+  let startX = 0, startW = 0;
+
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--input-panel-w')) || 260;
+    handle.classList.add('dragging');
+    panel.style.transition = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  function onMove(e: MouseEvent) {
+    const delta = startX - e.clientX;
+    const newW = Math.max(150, Math.min(600, startW + delta));
+    document.documentElement.style.setProperty('--input-panel-w', newW + 'px');
+  }
+
+  function onUp() {
+    handle.classList.remove('dragging');
+    panel.style.transition = '';
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    fitActiveTerminal();
+  }
 }
 
 function isClaudeSession(sessionId) {
