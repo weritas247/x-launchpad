@@ -162,6 +162,7 @@
           <div class="sidebar-header">
             <span class="sidebar-title-text">EXPLORER</span>
             <div class="sidebar-header-actions">
+              <button class="btn-icon-sm" id="explorer-reveal-active" title="Reveal active file">⊙</button>
               <button class="btn-icon-sm" id="explorer-upload" title="Upload file">↑</button>
               <button class="btn-icon-sm" id="explorer-refresh" title="Refresh">↻</button>
             </div>
@@ -247,8 +248,13 @@
           <div class="sidebar-header">
             <span class="sidebar-title-text">CLAUDE</span>
             <div class="sidebar-header-actions">
+              <button class="btn-icon-sm" id="claude-reveal-active" title="Reveal active file">⊙</button>
               <button class="btn-icon-sm" id="claude-refresh" title="Refresh">↻</button>
             </div>
+          </div>
+          <div class="claude-tab-bar">
+            <button class="claude-tab active" data-claude-tab="home">~/.claude</button>
+            <button class="claude-tab" data-claude-tab="project">Project</button>
           </div>
           <div class="explorer-path-bar">
             <span class="explorer-path-label" id="claude-path" title="">~/.claude</span>

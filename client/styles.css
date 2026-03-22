@@ -5787,6 +5787,39 @@ body::after {
     border-color: var(--accent);
 }
 
+/* ═══ CLAUDE TAB BAR ═══ */
+.claude-tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    padding: 0 8px;
+    gap: 0;
+}
+
+.claude-tab {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-ghost);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.claude-tab:hover {
+    color: var(--text-secondary);
+}
+
+.claude-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
 /* ═══ EXPLORER PANEL ═══ */
 .explorer-path-bar {
     padding: 6px 12px;
@@ -5859,6 +5892,17 @@ body::after {
     width: 12px;
     text-align: center;
     flex-shrink: 0;
+    display: inline-block;
+    transition: transform 0.15s ease;
+}
+
+.explorer-arrow.expanded {
+    transform: rotate(90deg);
+}
+
+.explorer-children {
+    overflow: hidden;
+    transition: height 0.15s ease;
 }
 
 .explorer-icon {

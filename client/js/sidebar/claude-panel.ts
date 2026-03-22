@@ -8,6 +8,7 @@ import { confirmModal } from '../ui/confirm-modal';
 let claudeTree: any[] = [];
 let claudeDir = '';
 const expandedDirs = new Set<string>();
+let pendingRevealPath: string | null = null;
 
 let ctxTargetPath = '';
 let ctxTargetType = ''; // 'file' | 'directory'
@@ -135,24 +136,51 @@ function renderTreeLevel(parent: HTMLElement, entries: any[], depth: number) {
     if (entry.type === 'directory') {
       const isExpanded = expandedDirs.has(entry.path);
       item.innerHTML =
-        `<span class="explorer-arrow">${isExpanded ? '▾' : '▸'}</span>` +
+        `<span class="explorer-arrow${isExpanded ? ' expanded' : ''}">▸</span>` +
         `<span class="explorer-icon">${getFolderIcon(isExpanded)}</span>` +
         `<span class="explorer-name">${escHtml(entry.name)}</span>`;
 
+      const childrenContainer = document.createElement('div');
+      childrenContainer.className = 'explorer-children';
+      if (isExpanded && entry.children) {
+        renderTreeLevel(childrenContainer, entry.children, depth + 1);
+      }
+
       item.addEventListener('click', () => {
+        const arrow = item.querySelector('.explorer-arrow') as HTMLElement;
+        const iconEl = item.querySelector('.explorer-icon') as HTMLElement;
         if (expandedDirs.has(entry.path)) {
           expandedDirs.delete(entry.path);
+          arrow?.classList.remove('expanded');
+          if (iconEl) iconEl.innerHTML = getFolderIcon(false);
+          const h = childrenContainer.scrollHeight;
+          childrenContainer.style.height = h + 'px';
+          requestAnimationFrame(() => {
+            childrenContainer.style.height = '0px';
+          });
+          childrenContainer.addEventListener('transitionend', () => {
+            childrenContainer.innerHTML = '';
+            childrenContainer.style.height = '';
+          }, { once: true });
         } else {
           expandedDirs.add(entry.path);
+          arrow?.classList.add('expanded');
+          if (iconEl) iconEl.innerHTML = getFolderIcon(true);
+          if (entry.children) {
+            renderTreeLevel(childrenContainer, entry.children, depth + 1);
+          }
+          childrenContainer.style.height = '0px';
+          requestAnimationFrame(() => {
+            childrenContainer.style.height = childrenContainer.scrollHeight + 'px';
+            childrenContainer.addEventListener('transitionend', () => {
+              childrenContainer.style.height = '';
+            }, { once: true });
+          });
         }
-        renderClaudePanel();
       });
       item.addEventListener('contextmenu', (e) => showClaudeCtx(e, entry.path, 'directory'));
       parent.appendChild(item);
-
-      if (isExpanded && entry.children) {
-        renderTreeLevel(parent, entry.children, depth + 1);
-      }
+      parent.appendChild(childrenContainer);
     } else {
       item.innerHTML =
         `<span class="explorer-arrow" style="visibility:hidden">▸</span>` +
@@ -160,14 +188,26 @@ function renderTreeLevel(parent: HTMLElement, entries: any[], depth: number) {
         `<span class="explorer-name">${escHtml(entry.name)}</span>`;
 
       item.addEventListener('click', () => {
-        if (!S.activeSessionId) return;
-        import('../editor/file-viewer').then(m => {
-          m.openFileTab(entry.path, claudeDir);
-        });
+        openClaudeFile(entry.path);
       });
       item.addEventListener('contextmenu', (e) => showClaudeCtx(e, entry.path, 'file'));
       parent.appendChild(item);
     }
+  }
+}
+
+async function openClaudeFile(filePath: string) {
+  try {
+    const res = await apiFetch(`/api/claude-read?path=${encodeURIComponent(filePath)}`);
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(`Failed to read file: ${data.error}`, 'error');
+      return;
+    }
+    const { openFileTab } = await import('../editor/file-viewer');
+    openFileTab(filePath, data.content || '', { binary: data.binary });
+  } catch (e) {
+    showToast(`Read error: ${(e as Error).message}`, 'error');
   }
 }
 

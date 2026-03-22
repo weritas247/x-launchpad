@@ -3,7 +3,7 @@ import { S, sessionMeta, escHtml } from '../core/state';
 import { wsSend, apiFetch } from '../core/websocket';
 import { showToast } from '../ui/toast';
 import { confirmModal } from '../ui/confirm-modal';
-import { openFileTab } from '../editor/file-viewer';
+import { openFileTab, getActiveFilePath } from '../editor/file-viewer';
 import { getFileIcon, getFolderIcon } from '../ui/file-icons';
 
 let explorerTree: any[] = [];
@@ -29,6 +29,12 @@ let ctxTargetPath = '';
 let ctxTargetType = ''; // 'file' | 'directory'
 
 export function initExplorer() {
+  // Reveal active file button
+  document.getElementById('explorer-reveal-active')?.addEventListener('click', () => {
+    const filePath = getActiveFilePath();
+    if (filePath) revealFileInExplorer(filePath);
+  });
+
   // Explorer context menu
   const ctxMenu = document.getElementById('explorer-ctx-menu');
   document.addEventListener('click', () => {
@@ -238,24 +244,52 @@ function renderTreeLevel(parent, entries, depth) {
       const isExpanded = expandedDirs.has(entry.path);
       const dirHasChanges = hasDirChanges(entry.path);
       item.innerHTML =
-        `<span class="explorer-arrow">${isExpanded ? '▾' : '▸'}</span>` +
+        `<span class="explorer-arrow${isExpanded ? ' expanded' : ''}">▸</span>` +
         `<span class="explorer-icon">${getFolderIcon(isExpanded)}</span>` +
         `<span class="explorer-name">${escHtml(entry.name)}</span>` +
         (dirHasChanges ? `<span class="explorer-git-dot"></span>` : '');
+
+      const childrenContainer = document.createElement('div');
+      childrenContainer.className = 'explorer-children';
+      if (isExpanded && entry.children) {
+        renderTreeLevel(childrenContainer, entry.children, depth + 1);
+      }
+
       item.addEventListener('click', () => {
+        const arrow = item.querySelector('.explorer-arrow') as HTMLElement;
+        const iconEl = item.querySelector('.explorer-icon') as HTMLElement;
         if (expandedDirs.has(entry.path)) {
           expandedDirs.delete(entry.path);
+          arrow?.classList.remove('expanded');
+          if (iconEl) iconEl.innerHTML = getFolderIcon(false);
+          const h = childrenContainer.scrollHeight;
+          childrenContainer.style.height = h + 'px';
+          requestAnimationFrame(() => {
+            childrenContainer.style.height = '0px';
+          });
+          childrenContainer.addEventListener('transitionend', () => {
+            childrenContainer.innerHTML = '';
+            childrenContainer.style.height = '';
+          }, { once: true });
         } else {
           expandedDirs.add(entry.path);
+          arrow?.classList.add('expanded');
+          if (iconEl) iconEl.innerHTML = getFolderIcon(true);
+          if (entry.children) {
+            renderTreeLevel(childrenContainer, entry.children, depth + 1);
+          }
+          childrenContainer.style.height = '0px';
+          requestAnimationFrame(() => {
+            childrenContainer.style.height = childrenContainer.scrollHeight + 'px';
+            childrenContainer.addEventListener('transitionend', () => {
+              childrenContainer.style.height = '';
+            }, { once: true });
+          });
         }
-        renderExplorer();
       });
       item.addEventListener('contextmenu', (e) => showExplorerCtx(e, entry.path, 'directory'));
       parent.appendChild(item);
-
-      if (isExpanded && entry.children) {
-        renderTreeLevel(parent, entry.children, depth + 1);
-      }
+      parent.appendChild(childrenContainer);
     } else {
       const icon = getFileIcon(entry.name);
       const status = gitStatusMap[entry.path];
