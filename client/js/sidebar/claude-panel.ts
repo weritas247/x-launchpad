@@ -1,20 +1,66 @@
-// ─── CLAUDE PANEL: ~/.claude directory browser ──────────────────────
-import { S } from '../core/state';
+// ─── CLAUDE PANEL: ~/.claude directory browser with tabs ──────────────────────
+import { S, sessionMeta } from '../core/state';
 import { apiFetch, wsSend } from '../core/websocket';
 import { getFileIcon, getFolderIcon } from '../ui/file-icons';
 import { showToast } from '../ui/toast';
 import { confirmModal } from '../ui/confirm-modal';
 
-let claudeTree: any[] = [];
-let claudeDir = '';
-const expandedDirs = new Set<string>();
+type ClaudeTab = 'home' | 'project';
+
+let activeTab: ClaudeTab = 'home';
+
+// Per-tab state
+const tabState: Record<ClaudeTab, { tree: any[]; dir: string; expandedDirs: Set<string> }> = {
+  home: { tree: [], dir: '', expandedDirs: new Set() },
+  project: { tree: [], dir: '', expandedDirs: new Set() },
+};
+
 let pendingRevealPath: string | null = null;
+let fetchSeq = 0; // race-condition guard for async fetches
 
 let ctxTargetPath = '';
 let ctxTargetType = ''; // 'file' | 'directory'
 
+function getProjectCwd(): string | undefined {
+  if (!S.activeSessionId) return undefined;
+  const meta = sessionMeta.get(S.activeSessionId);
+  return meta?.cwd || undefined;
+}
+
+function getBaseParam(): string {
+  if (activeTab === 'project') {
+    const cwd = getProjectCwd();
+    return cwd ? `&base=${encodeURIComponent(cwd)}` : '';
+  }
+  return '';
+}
+
+function getBaseBody(): Record<string, string> {
+  if (activeTab === 'project') {
+    const cwd = getProjectCwd();
+    return cwd ? { base: cwd } : {};
+  }
+  return {};
+}
+
 export function initClaudePanel() {
   document.getElementById('claude-refresh')?.addEventListener('click', requestClaudeDir);
+
+  // Tab switching
+  document.querySelectorAll('.claude-tab').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tab = (btn as HTMLElement).dataset.claudeTab as ClaudeTab;
+      if (!tab || tab === activeTab) return;
+      switchTab(tab);
+    });
+  });
+
+  // Reveal active file button
+  document.getElementById('claude-reveal-active')?.addEventListener('click', async () => {
+    const { getActiveFilePath } = await import('../editor/file-viewer');
+    const filePath = getActiveFilePath();
+    if (filePath) revealFileInClaudePanel(filePath);
+  });
 
   // Context menu
   const ctxMenu = document.getElementById('claude-ctx-menu');
@@ -24,12 +70,12 @@ export function initClaudePanel() {
 
   document.getElementById('cctx-open')?.addEventListener('click', () => {
     if (!ctxTargetPath) return;
+    const st = tabState[activeTab];
     if (ctxTargetType === 'directory') {
-      // 디렉토리 토글
-      if (expandedDirs.has(ctxTargetPath)) {
-        expandedDirs.delete(ctxTargetPath);
+      if (st.expandedDirs.has(ctxTargetPath)) {
+        st.expandedDirs.delete(ctxTargetPath);
       } else {
-        expandedDirs.add(ctxTargetPath);
+        st.expandedDirs.add(ctxTargetPath);
       }
       renderClaudePanel();
     } else {
@@ -38,8 +84,9 @@ export function initClaudePanel() {
   });
 
   document.getElementById('cctx-copy-path')?.addEventListener('click', () => {
-    if (!ctxTargetPath || !claudeDir) return;
-    const fullPath = claudeDir + '/' + ctxTargetPath;
+    const st = tabState[activeTab];
+    if (!ctxTargetPath || !st.dir) return;
+    const fullPath = st.dir + '/' + ctxTargetPath;
     navigator.clipboard.writeText(fullPath).then(() => {
       showToast('Path copied', 'success');
     });
@@ -47,7 +94,8 @@ export function initClaudePanel() {
 
   document.getElementById('cctx-reveal')?.addEventListener('click', () => {
     if (!ctxTargetPath) return;
-    const fullPath = claudeDir + '/' + ctxTargetPath;
+    const st = tabState[activeTab];
+    const fullPath = st.dir + '/' + ctxTargetPath;
     apiFetch('/api/reveal-in-finder', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -63,7 +111,7 @@ export function initClaudePanel() {
       const res = await apiFetch('/api/claude-delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: ctxTargetPath }),
+        body: JSON.stringify({ filePath: ctxTargetPath, ...getBaseBody() }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -78,12 +126,47 @@ export function initClaudePanel() {
   });
 }
 
+function switchTab(tab: ClaudeTab) {
+  activeTab = tab;
+  console.log('[claude-panel] switchTab:', tab, 'cwd:', getProjectCwd());
+
+  // Update tab button UI
+  document.querySelectorAll('.claude-tab').forEach((btn) => {
+    const t = (btn as HTMLElement).dataset.claudeTab;
+    btn.classList.toggle('active', t === tab);
+  });
+
+  // Always re-render and re-fetch for the new tab
+  renderClaudePanel();
+  requestClaudeDir();
+}
+
 export async function requestClaudeDir() {
+  const tab = activeTab; // capture at call time
+  const seq = ++fetchSeq;  // unique request id
   try {
-    const res = await apiFetch('/api/claude-dir');
+    if (tab === 'project' && !getProjectCwd()) {
+      tabState.project.tree = [];
+      tabState.project.dir = '';
+      if (seq === fetchSeq) renderClaudePanel();
+      return;
+    }
+    const baseParam = tab === 'project'
+      ? `?base=${encodeURIComponent(getProjectCwd()!)}`
+      : '';
+    console.log('[claude-panel] fetch seq:', seq, 'tab:', tab, 'url:', `/api/claude-dir${baseParam}`);
+    const res = await apiFetch(`/api/claude-dir${baseParam}`);
+    if (seq !== fetchSeq) {
+      console.log('[claude-panel] stale response seq:', seq, 'current:', fetchSeq, '— discarded');
+      return; // a newer request was made, discard this response
+    }
     const data = await res.json();
+    console.log('[claude-panel] response seq:', seq, 'dir:', data.dir, 'items:', data.tree?.length);
     if (data.ok) {
-      handleClaudeDirData(data);
+      const st = tabState[tab];
+      st.tree = data.tree || [];
+      st.dir = data.dir || '';
+      renderClaudePanel();
     }
   } catch (e) {
     console.error('[claude-panel] fetch error:', e);
@@ -91,9 +174,11 @@ export async function requestClaudeDir() {
 }
 
 export function handleClaudeDirData(msg: any) {
-  claudeTree = msg.tree || [];
-  claudeDir = msg.dir || '';
-  renderClaudePanel();
+  // External callers (activity-bar) always provide home data
+  const st = tabState.home;
+  st.tree = msg.tree || [];
+  st.dir = msg.dir || '';
+  if (activeTab === 'home') renderClaudePanel();
 }
 
 function showClaudeCtx(e: MouseEvent, path: string, type: string) {
@@ -112,21 +197,58 @@ function renderClaudePanel() {
   const container = document.getElementById('claude-tree');
   if (!container) return;
 
+  const st = tabState[activeTab];
+
   const headerPath = document.getElementById('claude-path');
   if (headerPath) {
-    headerPath.textContent = '~/.claude';
-    headerPath.title = claudeDir;
+    if (activeTab === 'home') {
+      headerPath.textContent = '~/.claude';
+      headerPath.title = st.dir;
+    } else {
+      const cwd = getProjectCwd();
+      if (cwd) {
+        const parts = cwd.replace(/\/$/, '').split('/');
+        headerPath.textContent = parts[parts.length - 1] + '/.claude';
+      } else {
+        headerPath.textContent = '(no project)';
+      }
+      headerPath.title = st.dir;
+    }
   }
 
-  if (claudeTree.length === 0) {
+  // Update project tab label with project name
+  const projectTab = document.querySelector('.claude-tab[data-claude-tab="project"]') as HTMLElement;
+  if (projectTab) {
+    const cwd = getProjectCwd();
+    if (cwd) {
+      const parts = cwd.replace(/\/$/, '').split('/');
+      projectTab.textContent = parts[parts.length - 1];
+      projectTab.title = cwd + '/.claude';
+    } else {
+      projectTab.textContent = 'Project';
+      projectTab.title = '';
+    }
+  }
+
+  if (activeTab === 'project' && !getProjectCwd()) {
+    container.innerHTML = '<div class="explorer-empty">No project detected</div>';
+    return;
+  }
+
+  if (st.tree.length === 0) {
     container.innerHTML = '<div class="explorer-empty">No files found</div>';
     return;
   }
   container.innerHTML = '';
-  renderTreeLevel(container, claudeTree, 0);
+  renderTreeLevel(container, st.tree, 0, st.expandedDirs);
+
+  if (pendingRevealPath) {
+    const revealPath = pendingRevealPath;
+    requestAnimationFrame(() => applyRevealHighlight(revealPath, container));
+  }
 }
 
-function renderTreeLevel(parent: HTMLElement, entries: any[], depth: number) {
+function renderTreeLevel(parent: HTMLElement, entries: any[], depth: number, expandedDirs: Set<string>) {
   for (const entry of entries) {
     const item = document.createElement('div');
     item.className = 'explorer-item' + (entry.type === 'directory' ? ' is-dir' : '');
@@ -143,7 +265,7 @@ function renderTreeLevel(parent: HTMLElement, entries: any[], depth: number) {
       const childrenContainer = document.createElement('div');
       childrenContainer.className = 'explorer-children';
       if (isExpanded && entry.children) {
-        renderTreeLevel(childrenContainer, entry.children, depth + 1);
+        renderTreeLevel(childrenContainer, entry.children, depth + 1, expandedDirs);
       }
 
       item.addEventListener('click', () => {
@@ -167,7 +289,7 @@ function renderTreeLevel(parent: HTMLElement, entries: any[], depth: number) {
           arrow?.classList.add('expanded');
           if (iconEl) iconEl.innerHTML = getFolderIcon(true);
           if (entry.children) {
-            renderTreeLevel(childrenContainer, entry.children, depth + 1);
+            renderTreeLevel(childrenContainer, entry.children, depth + 1, expandedDirs);
           }
           childrenContainer.style.height = '0px';
           requestAnimationFrame(() => {
@@ -198,7 +320,10 @@ function renderTreeLevel(parent: HTMLElement, entries: any[], depth: number) {
 
 async function openClaudeFile(filePath: string) {
   try {
-    const res = await apiFetch(`/api/claude-read?path=${encodeURIComponent(filePath)}`);
+    const baseParam = activeTab === 'project' && getProjectCwd()
+      ? `&base=${encodeURIComponent(getProjectCwd()!)}`
+      : '';
+    const res = await apiFetch(`/api/claude-read?path=${encodeURIComponent(filePath)}${baseParam}`);
     const data = await res.json();
     if (!data.ok) {
       showToast(`Failed to read file: ${data.error}`, 'error');
@@ -209,6 +334,41 @@ async function openClaudeFile(filePath: string) {
   } catch (e) {
     showToast(`Read error: ${(e as Error).message}`, 'error');
   }
+}
+
+function applyRevealHighlight(filePath: string, container: HTMLElement) {
+  const item = container.querySelector(`.explorer-item[data-path="${CSS.escape(filePath)}"]`) as HTMLElement;
+  if (!item) return;
+
+  const containerRect = container.getBoundingClientRect();
+  const itemRect = item.getBoundingClientRect();
+  const targetOffset = containerRect.height / 3;
+  const itemRelativeTop = itemRect.top - containerRect.top + container.scrollTop;
+  container.scrollTo({ top: itemRelativeTop - targetOffset, behavior: 'smooth' });
+
+  document.querySelectorAll('#claude-tree .explorer-highlight').forEach(el => el.classList.remove('explorer-highlight'));
+  void item.offsetWidth;
+  item.classList.add('explorer-highlight');
+}
+
+function revealFileInClaudePanel(filePath: string) {
+  const st = tabState[activeTab];
+  const parts = filePath.split('/');
+  for (let i = 1; i < parts.length; i++) {
+    const dirPath = parts.slice(0, i).join('/');
+    st.expandedDirs.add(dirPath);
+  }
+
+  pendingRevealPath = filePath;
+  renderClaudePanel();
+
+  import('./activity-bar').then(({ switchPanel }) => {
+    switchPanel('claude');
+  });
+
+  setTimeout(() => {
+    if (pendingRevealPath === filePath) pendingRevealPath = null;
+  }, 3500);
 }
 
 function escHtml(s: string): string {

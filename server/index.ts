@@ -261,8 +261,16 @@ app.get('/api/download', (req, res) => {
 });
 
 // ─── Claude directory tree ───
-app.get('/api/claude-dir', (_req, res) => {
-  const claudeDir = path.join(os.homedir(), '.claude');
+function resolveClaudeBase(base?: string): string {
+  if (base) {
+    const resolved = path.resolve(base, '.claude');
+    return resolved;
+  }
+  return path.join(os.homedir(), '.claude');
+}
+
+app.get('/api/claude-dir', (req, res) => {
+  const claudeDir = resolveClaudeBase(req.query.base as string);
   const IGNORED = new Set(['.git', 'node_modules', '.DS_Store', 'Thumbs.db']);
   function walk(dir: string, depth: number): any[] {
     if (depth > 5) return [];
@@ -297,7 +305,7 @@ app.get('/api/claude-dir', (_req, res) => {
 app.get('/api/claude-read', (req, res) => {
   const filePath = req.query.path as string;
   if (!filePath) return res.status(400).json({ ok: false, error: 'Missing path' });
-  const claudeDir = path.join(os.homedir(), '.claude');
+  const claudeDir = resolveClaudeBase(req.query.base as string);
   const fullPath = path.resolve(claudeDir, filePath);
   if (!fullPath.startsWith(claudeDir + path.sep) && fullPath !== claudeDir) {
     return res.status(403).json({ ok: false, error: 'Access denied' });
@@ -318,7 +326,7 @@ app.get('/api/claude-read', (req, res) => {
 app.post('/api/claude-delete', express.json(), (req, res) => {
   const filePath = req.body.filePath as string;
   if (!filePath) return res.status(400).json({ ok: false, error: 'Missing filePath' });
-  const claudeDir = path.join(os.homedir(), '.claude');
+  const claudeDir = resolveClaudeBase(req.body.base as string);
   const fullPath = path.resolve(claudeDir, filePath);
   if (!fullPath.startsWith(claudeDir + path.sep)) {
     return res.status(403).json({ ok: false, error: 'Access denied' });
