@@ -683,15 +683,28 @@ function saveModalSize() {
 }
 
 // ─── Modal open/close ───────────────────────────────
-export async function openPlanModal() {
-  if (!isLoggedIn()) return;
-  await loadPlans();
-  if (activeId && !plans.find((p) => p.id === activeId)) activeId = null;
+export function openPlanModal(): Promise<void> {
+  if (!isLoggedIn()) return Promise.resolve();
+  restoreModalSize();
+  overlay.classList.add('open');
+
+  // Show cached data immediately, then refresh in background
+  if (plans.length > 0) {
+    renderCurrentView();
+  }
+
+  const ready = loadPlans().then(() => {
+    if (activeId && !plans.find((p) => p.id === activeId)) activeId = null;
+    renderCurrentView();
+  });
+  return ready;
+}
+
+function renderCurrentView() {
   const body = document.querySelector('.plan-body');
   if (currentView === 'board') {
     if (body) body.classList.add('plan-body--board');
     renderBoard();
-    // Board view: editor is hidden until a card is clicked
     if (editorColEl) editorColEl.style.display = 'none';
     if (boardDivider) boardDivider.style.display = 'none';
   } else {
@@ -706,8 +719,6 @@ export async function openPlanModal() {
       showEmptyState();
     }
   }
-  restoreModalSize();
-  overlay.classList.add('open');
 }
 
 export function closePlanModal() {
@@ -1421,11 +1432,19 @@ function renderAiDashboard() {
   }
 }
 
-export async function openAiDashboard() {
-  await loadPlans();
-  updateAiTasksBadge();
-  renderAiDashboard();
+export function openAiDashboard() {
   aiDashOverlay.classList.add('open');
+
+  // Show cached data immediately, then refresh in background
+  if (plans.length > 0) {
+    updateAiTasksBadge();
+    renderAiDashboard();
+  }
+
+  loadPlans().then(() => {
+    updateAiTasksBadge();
+    renderAiDashboard();
+  });
 }
 
 export function closeAiDashboard() {
