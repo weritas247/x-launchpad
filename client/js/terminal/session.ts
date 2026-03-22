@@ -44,7 +44,21 @@ export function activateSession(id) {
 
   const entry = terminalMap.get(id);
   if (entry) {
+    // Force re-measure if cell dimensions are 0 (terminal opened in display:none)
+    const core = (entry.term as any)._core;
+    const charSize = core?._charSizeService;
+    if (charSize && !charSize.hasValidSize) {
+      const fs = entry.term.options.fontSize;
+      entry.term.options.fontSize = fs + 1;
+      entry.term.options.fontSize = fs;
+    }
     entry.fitAddon.fit();
+    // After fit, force textarea positioning update.
+    // _syncTextArea only runs on cursor move, so after fixing dimensions
+    // the textarea may still be 0x0 from previous calls with zero dimensions.
+    if (core?._syncTextArea) {
+      core._syncTextArea();
+    }
     entry.term.scrollToBottom();
     entry.term.focus();
     const meta = sessionMeta.get(id);
