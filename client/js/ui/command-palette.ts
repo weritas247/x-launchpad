@@ -47,6 +47,17 @@ export function initCommandPalette() {
 
   input.addEventListener('input', () => onInput());
   input.addEventListener('keydown', (e) => onKeydown(e));
+  // IME 한글 입력 시 compositionend 에서 영문 변환
+  input.addEventListener('compositionend', () => {
+    const v = input.value;
+    if (hasKorean(v)) {
+      const prefix = mode === 'command' && v.startsWith('> ') ? '> ' : '';
+      const raw = prefix ? v.slice(2) : v;
+      const converted = koreanToQwerty(raw);
+      input.value = prefix + converted;
+      onInput();
+    }
+  });
 
   setOnTreeUpdate(() => {
     if (isPaletteOpen() && mode === 'quick-open') onInput();
@@ -92,6 +103,51 @@ export function onFileTreeUpdated() {
 }
 
 // ═══════════════════════════════════════════════════
+//  Korean → QWERTY conversion
+// ═══════════════════════════════════════════════════
+
+const INITIAL_KEYS = ['r','R','s','e','E','f','a','q','Q','t','T','d','w','W','c','z','x','v','g'];
+const MEDIAL_KEYS = ['k','o','i','O','j','p','u','P','h','hk','ho','hl','y','n','nj','np','nl','b','m','ml','l'];
+const FINAL_KEYS = ['','r','R','rt','s','sw','sg','e','f','fr','fa','fq','ft','fx','fv','fg','a','q','qt','t','T','d','w','c','z','x','v','g'];
+
+const COMPAT_JAMO: Record<string, string> = {
+  'ㄱ':'r','ㄲ':'R','ㄳ':'rt','ㄴ':'s','ㄵ':'sw','ㄶ':'sg','ㄷ':'e','ㄸ':'E',
+  'ㄹ':'f','ㄺ':'fr','ㄻ':'fa','ㄼ':'fq','ㄽ':'ft','ㄾ':'fx','ㄿ':'fv','ㅀ':'fg',
+  'ㅁ':'a','ㅂ':'q','ㅃ':'Q','ㅄ':'qt','ㅅ':'t','ㅆ':'T','ㅇ':'d','ㅈ':'w',
+  'ㅉ':'W','ㅊ':'c','ㅋ':'z','ㅌ':'x','ㅍ':'v','ㅎ':'g',
+  'ㅏ':'k','ㅐ':'o','ㅑ':'i','ㅒ':'O','ㅓ':'j','ㅔ':'p','ㅕ':'u','ㅖ':'P',
+  'ㅗ':'h','ㅘ':'hk','ㅙ':'ho','ㅚ':'hl','ㅛ':'y','ㅜ':'n','ㅝ':'nj','ㅞ':'np',
+  'ㅟ':'nl','ㅠ':'b','ㅡ':'m','ㅢ':'ml','ㅣ':'l',
+};
+
+function koreanToQwerty(str: string): string {
+  let result = '';
+  for (const ch of str) {
+    const code = ch.charCodeAt(0);
+    // Composed syllable (가-힣)
+    if (code >= 0xAC00 && code <= 0xD7A3) {
+      const offset = code - 0xAC00;
+      const ini = Math.floor(offset / 588);
+      const med = Math.floor((offset % 588) / 28);
+      const fin = offset % 28;
+      result += INITIAL_KEYS[ini] + MEDIAL_KEYS[med] + FINAL_KEYS[fin];
+    }
+    // Compatibility jamo (ㄱ-ㅣ)
+    else if (COMPAT_JAMO[ch]) {
+      result += COMPAT_JAMO[ch];
+    }
+    else {
+      result += ch;
+    }
+  }
+  return result;
+}
+
+function hasKorean(str: string): boolean {
+  return /[\u3131-\u3163\uAC00-\uD7A3]/.test(str);
+}
+
+// ═══════════════════════════════════════════════════
 //  Fuzzy search
 // ═══════════════════════════════════════════════════
 
@@ -100,7 +156,7 @@ interface FuzzyResult {
   positions: number[];
 }
 
-function fuzzyMatch(query: string, text: string): FuzzyResult | null {
+function fuzzyMatchRaw(query: string, text: string): FuzzyResult | null {
   const lq = query.toLowerCase();
   const lt = text.toLowerCase();
   let qi = 0;
@@ -122,6 +178,17 @@ function fuzzyMatch(query: string, text: string): FuzzyResult | null {
 
   if (qi < lq.length) return null;
   return { score, positions };
+}
+
+function fuzzyMatch(query: string, text: string): FuzzyResult | null {
+  const direct = fuzzyMatchRaw(query, text);
+  if (!hasKorean(query)) return direct;
+  const converted = koreanToQwerty(query);
+  const mapped = fuzzyMatchRaw(converted, text);
+  if (!direct && !mapped) return null;
+  if (!direct) return mapped;
+  if (!mapped) return direct;
+  return mapped.score >= direct.score ? mapped : direct;
 }
 
 function highlightMatch(text: string, positions: number[]): string {
