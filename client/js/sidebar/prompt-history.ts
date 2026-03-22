@@ -22,7 +22,7 @@ const clearBtn = document.getElementById('input-panel-clear');
 const titleEl = panel.querySelector('.input-panel-title');
 
 // sessionId → [ { text, bufferLine, time } ]
-const historyMap = new Map();
+export const historyMap = new Map();
 // Per-session input buffer (accumulates typed chars until Enter)
 const inputBuffers = new Map();
 // sessionId → [ { text, timestamp } ] (Claude prompts from JSONL)
@@ -118,28 +118,32 @@ export function trackInput(sessionId, data) {
   if (!inputBuffers.has(sessionId)) inputBuffers.set(sessionId, '');
 
   if (data === '\r' || data === '\n') {
-    // Enter pressed — capture what's on the current terminal line
     const entry = terminalMap.get(sessionId);
+    const buffered = (inputBuffers.get(sessionId) || '').trim();
+    inputBuffers.set(sessionId, '');
+
     if (!entry) return;
 
     const term = entry.term;
     const buf = term.buffer.active;
     const lineIndex = buf.baseY + buf.cursorY;
-    const line = buf.getLine(buf.cursorY);
-    if (!line) return;
 
-    const rawText = line.translateToString(true).trim();
-    if (!rawText) return;
+    // Priority 1: use inputBuffer (actual keystrokes typed by user)
+    // Priority 2: fall back to terminal buffer line (for pasted text etc.)
+    let userInput = buffered;
+    if (!userInput) {
+      const line = buf.getLine(buf.cursorY);
+      const rawText = line ? line.translateToString(true).trim() : '';
+      userInput = rawText ? extractUserInput(rawText) : '';
+    }
 
-    // Strip common prompt prefixes to get just user input
-    const userInput = extractUserInput(rawText);
     if (!userInput) return;
 
     if (!historyMap.has(sessionId)) historyMap.set(sessionId, []);
     const entries = historyMap.get(sessionId);
     entries.push({
       text: userInput,
-      fullLine: rawText,
+      fullLine: userInput,
       bufferLine: lineIndex,
       time: new Date(),
     });
@@ -148,7 +152,6 @@ export function trackInput(sessionId, data) {
     if (entries.length > 200) entries.shift();
 
     if (sessionId === S.activeSessionId && !isClaudeSession(sessionId)) renderPanel();
-    inputBuffers.set(sessionId, '');
   } else if (data === '\x7f') {
     // Backspace
     const current = inputBuffers.get(sessionId) || '';
