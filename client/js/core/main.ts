@@ -349,6 +349,9 @@ document.addEventListener('keydown', (e) => {
   // Git graph modal handles its own keys (arrows, enter, escape)
   if (isGitGraphOpen() && handleGitGraphKeydown(e)) return;
 
+  // Centralized keybinding handling (before modal guards so toggle shortcuts work)
+  if (tryKeybinding(e)) return;
+
   if (e.key === 'Escape') {
     if (isPaletteOpen()) {
       closePalette();
@@ -383,9 +386,6 @@ document.addEventListener('keydown', (e) => {
       return;
     }
   }
-
-  // Centralized keybinding handling
-  if (tryKeybinding(e)) return;
 
   // Cmd+1~9: switch to Nth tab (terminal + file tabs in DOM order)
   if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey) {
