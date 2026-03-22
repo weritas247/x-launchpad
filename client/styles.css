@@ -442,6 +442,23 @@ body::after {
     height: 20px;
 }
 
+.activity-btn img {
+    width: 20px;
+    height: 20px;
+    filter: grayscale(1) brightness(3);
+    opacity: 0.5;
+}
+
+.activity-btn:hover img {
+    filter: grayscale(1) brightness(3);
+    opacity: 0.7;
+}
+
+.activity-btn.active img {
+    filter: grayscale(0) brightness(1);
+    opacity: 1;
+}
+
 .activity-btn:hover {
     color: var(--text-dim);
     background: var(--bg-hover);

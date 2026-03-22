@@ -34,16 +34,12 @@ function restoreIconOrder() {
     bar.querySelectorAll('.activity-btn[data-panel]').forEach((b) => {
       btnMap[(b as HTMLElement).dataset.panel] = b;
     });
-    // source-control is always first
-    if (btnMap['source-control']) bar.appendChild(btnMap['source-control']);
-    // Reorder: append in saved order, skip unknown and source-control
+    // Reorder: append in saved order
     for (const panel of saved) {
-      if (panel === 'source-control') continue;
       if (btnMap[panel]) bar.appendChild(btnMap[panel]);
     }
     // Append any remaining buttons not in saved order
     Object.keys(btnMap).forEach((p) => {
-      if (p === 'source-control') return;
       if (!saved.includes(p)) bar.appendChild(btnMap[p]);
     });
   } catch {}

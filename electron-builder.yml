@@ -11,6 +11,7 @@ asar: true
 asarUnpack:
   - "node_modules/node-pty/**"
   - "node_modules/better-sqlite3/**"
+  - "dist/**/*.jsc"
 
 files:
   - "dist/**/*"

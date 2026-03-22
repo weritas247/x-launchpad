@@ -313,6 +313,7 @@ registerCommand({ id: 'fullscreen', label: 'Toggle Fullscreen', category: 'UI', 
 registerCommand({ id: 'focusSearch', label: 'Focus Search', category: 'UI', execute: () => switchPanel('search') });
 registerCommand({ id: 'focusExplorer', label: 'Focus Explorer', category: 'UI', execute: () => switchPanel('explorer') });
 registerCommand({ id: 'focusSourceControl', label: 'Focus Source Control', category: 'UI', execute: () => switchPanel('source-control') });
+registerCommand({ id: 'focusClaude', label: 'Focus Claude', category: 'UI', execute: () => switchPanel('claude') });
 registerCommand({ id: 'ui:changeTheme', label: 'Change Theme', category: 'UI', execute: () => {} }); // Handled specially by palette
 registerCommand({ id: 'toggleFileEdit', label: 'Toggle File Edit', category: 'UI', execute: () => {} }); // placeholder if exists
 
